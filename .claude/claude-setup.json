@@ -1,0 +1,4 @@
+{
+  "wiki": { "enabled": true, "root": "wiki/", "link_style": "md", "log_order": "append" },
+  "ai_artifacts": "commit"
+}
