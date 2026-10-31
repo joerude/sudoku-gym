@@ -71,11 +71,27 @@ export function mount(el, params, query) {
   const autoBox = h("input", { type: "checkbox", id: "autoNotes", checked: true, onchange: e => G?.setAutoNotes(e.target.checked) });
   const countsBox = h("input", { type: "checkbox", id: "padCounts", checked: prefs.counts,
     onchange: e => { prefs.counts = e.target.checked; savePrefs(); refresh(); } });
+  const clearBtn = h("button", { type: "button", id: "clearBtn", title: "Стереть все свои цифры и заметки (отменяется «↶ отменить»)",
+    onclick: () => G?.clear() }, "Очистить");
+  // give up needs a second click within 3 s, so a stray click doesn't end the game
+  let armed = null;
+  const giveUpBtn = h("button", { type: "button", id: "giveUpBtn", title: "Завершить партию как брошенную", onclick: () => {
+    if (!G || G.S.status !== "active") return;
+    if (!armed) {
+      giveUpBtn.textContent = "Точно сдаться?"; giveUpBtn.classList.add("danger");
+      armed = setTimeout(disarm, 3000);
+      return;
+    }
+    disarm();
+    G.S.msg = { text: "Партия сдана", cls: "bad" };
+    endGame("abandoned");
+  } }, "Сдаться");
+  const disarm = () => { clearTimeout(armed); armed = null; giveUpBtn.textContent = "Сдаться"; giveUpBtn.classList.remove("danger"); };
   const setup = setupSection();
   ui = {
     badge: h("span", { class: "badge", id: "badge" }), errs: h("span", { class: "counter", id: "errors" }),
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
-    results: h("div", { id: "results" }), autoBox, notesBtn, setup,
+    results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, setup,
   };
   ui.board = createBoard(boardEl, { onCell: i => { if (G) { digit = 0; G.select(i); } } });
   ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => G?.erase() });
@@ -85,6 +101,7 @@ export function mount(el, params, query) {
       h("div", { class: "bar", style: "margin-top:10px" }, notesBtn,
         h("button", { type: "button", id: "undoBtn", onclick: () => G?.undoLast() }, "↶ отменить"),
         h("button", { type: "button", id: "checkBtn", title: "Подсветить ошибки (учитывается в итогах)", onclick: () => G?.check() }, "Проверить"),
+        clearBtn, giveUpBtn,
         h("label", { class: "check" }, autoBox, "автоочистка заметок"),
         h("label", { class: "check", title: "Сколько каждой цифры осталось поставить" }, countsBox, "счётчик цифр")),
       ui.msg),
@@ -115,7 +132,7 @@ export function mount(el, params, query) {
   }).catch(e => setMsg(e.message, "bad"));
   refresh();
   if (G?.S.result) showResults();
-  return () => { document.removeEventListener("keydown", onKey); clearInterval(tick); ui = null; };
+  return () => { document.removeEventListener("keydown", onKey); clearInterval(tick); clearTimeout(armed); ui = null; };
 }
 
 function setMsg(text, cls = "") {
@@ -129,6 +146,7 @@ function refresh() {
     ui.board.render({ values: Array(81).fill(0), given: Array(81).fill(false) });
     ui.pad.update(null);
     ui.badge.textContent = "партия не начата"; ui.errs.textContent = "";
+    ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
     if (pendingMsg) { setMsg(pendingMsg.text, pendingMsg.cls); pendingMsg = null; }
     else if (!ui.msg.textContent) setMsg("Выбери уровень и нажми «Новая партия».");
     return;
@@ -147,6 +165,7 @@ function refresh() {
   ui.timer.textContent = fmtTime(G.elapsed());
   ui.timer.classList.toggle("done", S.status === "solved");
   ui.notesBtn.classList.toggle("on", S.notesMode);
+  ui.clearBtn.disabled = ui.giveUpBtn.disabled = over;
   ui.autoBox.checked = S.autoNotes;
   if (S.msg) setMsg(S.msg.text, S.msg.cls);
   else if (!over) setMsg("");

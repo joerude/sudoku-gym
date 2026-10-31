@@ -87,12 +87,27 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       say(null);
       onChange();
     },
+    /** Wipe every entered digit and note; one undo step brings them all back. */
+    clear() {
+      if (locked()) return;
+      const cells = [];
+      for (let i = 0; i < 81; i++) if (!S.given[i] && (S.vals[i] || S.notes[i])) cells.push({ i, val: S.vals[i] });
+      if (!cells.length) return;
+      S.undo.push({ batch: cells, notes: S.notes.slice() });
+      for (const { i } of cells) { S.vals[i] = 0; log("erase", i); }
+      S.notes = Array(81).fill(0); S.showBad.clear();
+      say(null);
+      onChange();
+    },
     undoLast() {
       if (locked()) return;
       const u = S.undo.pop();
       if (!u) return;
-      S.vals[u.i] = u.val; S.notes = u.notes; S.sel = u.i; S.showBad.delete(u.i);
-      log("undo", u.i, u.val);
+      for (const { i, val } of u.batch || [u]) {
+        S.vals[i] = val; S.sel = i; S.showBad.delete(i);
+        log("undo", i, val);
+      }
+      S.notes = u.notes;
       afterPlace();
       onChange();
     },
