@@ -273,6 +273,7 @@ label.field.range input { width: 100%; max-width: 320px; accent-color: var(--acc
 .theme-toggle { margin-left: auto; font-size: 13px; padding: 3px 9px; white-space: nowrap; background: none; color: var(--muted); }
 .prompt, #drillHow { text-align: center; }
 .zen-btn[aria-pressed="true"] { border-color: var(--accent); }
+button.mini { font-size: 12px; padding: 3px 9px; }  /* compact controls in the bar above the board */
 /* zen (Z, as on lichess): on #/play and #/drills only the board, its timer and the controls stay */
 :root { --zen-w: min(100%, clamp(300px, calc(100vh - 320px), 640px)); }
 body.zen.zen-page .top, body.zen.zen-page .zen-hide, body.zen.zen-page .playing .zen-hide-playing { display: none !important; }

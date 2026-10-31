@@ -226,6 +226,13 @@ try {
   ok((await page.textContent(cellSel(cE))).trim() === gEnter.solution[cE], "digit reaches the board while a select has focus");
   ok(await page.evaluate(() => document.activeElement.id !== "level"), "the select lets go of focus");
   ok(await page.$eval("#level", e => e.value) !== gEnter.solution[cE], "the digit did not change the select");
+  // «＋ новая» and zen sit next to the timer; mid-game the first click only asks
+  ok(await page.$eval("#newGameTop", e => e.closest(".bar").contains(document.querySelector("#timer"))), "new game + zen next to the timer");
+  ok(await page.$$eval(".main-col .bar .zen-btn", els => els.length === 1), "zen toggle above the board, not below");
+  await page.click("#newGameTop");
+  ok((await page.textContent("#newGameTop")).includes("Бросить"), "«＋ новая» mid-game asks first");
+  await page.waitForTimeout(3200);
+  ok((await page.textContent("#newGameTop")).includes("новая"), "«＋ новая» disarms after 3 s");
   // the same digit again clears the cell (keyboard and pad)
   await page.keyboard.press(`Digit${gEnter.solution[cE]}`);
   ok((await page.textContent(cellSel(cE))).trim() === "", "same digit again clears the cell");

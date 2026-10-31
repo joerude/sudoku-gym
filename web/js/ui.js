@@ -129,8 +129,8 @@ export function initZen() {
   try { on = localStorage.getItem(ZEN_KEY) === "1"; } catch { /* no storage */ }
   document.body.classList.toggle("zen", on);
 }
-export function zenButton() {
-  const b = h("button", { type: "button", class: "zen-btn", onclick: () => setZen(!isZen()) });
+export function zenButton(extraClass = "") {
+  const b = h("button", { type: "button", class: `zen-btn ${extraClass}`.trim(), onclick: () => setZen(!isZen()) });
   paintZen(b);
   return b;
 }

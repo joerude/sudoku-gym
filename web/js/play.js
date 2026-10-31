@@ -95,6 +95,19 @@ export function mount(el, params, query) {
     G.S.msg = { text: "Партия сдана", cls: "bad" };
     endGame("abandoned");
   } }, "Сдаться");
+  // «＋ новая» above the board: one click when nothing is at stake, a confirming second click mid-game
+  let armedNew = null;
+  const newTop = h("button", { type: "button", class: "mini", id: "newGameTop", title: "Новая партия с текущими настройками",
+    onclick: () => {
+      if (G?.S.status === "active" && G.S.seq > 0 && !armedNew) {
+        newTop.textContent = "Бросить партию?"; newTop.classList.add("danger");
+        armedNew = setTimeout(disarmNew, 3000);
+        return;
+      }
+      disarmNew();
+      newGame(false);
+    } }, "＋ новая");
+  const disarmNew = () => { clearTimeout(armedNew); armedNew = null; newTop.textContent = "＋ новая"; newTop.classList.remove("danger"); };
   const disarm = () => { clearTimeout(armed); armed = null; giveUpBtn.textContent = "Сдаться"; giveUpBtn.classList.remove("danger"); };
   const setup = setupSection();
   const fav = createFav("puzzle", { onChange: r => {
@@ -110,11 +123,13 @@ export function mount(el, params, query) {
   ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => G?.erase() });
   ui.root = h("div", { class: "layout" },
     h("div", { class: "main-col" },
-      h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer), boardEl, padEl,
+      // zen and «new game» sit next to the timer: reachable without scrolling, and in zen where the side panel is hidden
+      h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer,
+        newTop, zenButton("mini")), boardEl, padEl,
       h("div", { class: "bar", style: "margin-top:10px" }, notesBtn,
         h("button", { type: "button", id: "undoBtn", onclick: () => G?.undoLast() }, "↶ отменить"),
         h("button", { type: "button", id: "checkBtn", title: "Подсветить ошибки (учитывается в итогах)", onclick: () => G?.check() }, "Проверить"),
-        clearBtn, giveUpBtn, zenButton(),
+        clearBtn, giveUpBtn,
         h("label", { class: "check zen-hide" }, autoBox, "автоочистка заметок"),
         h("label", { class: "check zen-hide", title: "Сколько каждой цифры осталось поставить" }, countsBox, "счётчик цифр")),
       ui.msg),
@@ -151,7 +166,7 @@ export function mount(el, params, query) {
   getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
   if (G?.S.result) showResults();
-  return () => { closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); ui = null; };
+  return () => { closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
 }
 
 function setMsg(text, cls = "") {
