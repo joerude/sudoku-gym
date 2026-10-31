@@ -415,6 +415,39 @@ try {
   const g5 = await waitGame(page, () => page.click("#planPlay"));
   ok(g5.level === "medium" && g5.mode === "hardcore", "today: «Начать партию» starts medium hardcore");
 
+  // --- 8b. look settings ----------------------------------------------------------------------
+  await page.goto(`${BASE}/#/settings`);
+  await page.waitForSelector("#lookBoard .cell");
+  const look = () => page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement), cell = document.querySelector("#lookBoard .cell");
+    return { theme: document.documentElement.dataset.theme || null, bg: getComputedStyle(document.body).backgroundColor,
+             font: getComputedStyle(document.body).fontFamily, cellPx: parseFloat(getComputedStyle(cell).fontSize),
+             surface: cs.getPropertyValue("--surface").trim() };
+  });
+  const l0 = await look();
+  ok(/JetBrains Mono/.test(l0.font), "look: JetBrains Mono is the default font", l0.font);
+  ok(await page.evaluate(() => document.fonts.check('16px "JetBrains Mono"', "123 Вид")), "look: bundled JetBrains Mono loaded");
+  await page.click('#themes [data-theme-id="nord"]');
+  const l1 = await look();
+  ok(l1.theme === "dark" && l1.bg === "rgb(46, 52, 64)", "look: nord theme recolours the page", JSON.stringify(l1));
+  await page.click('#fonts [data-font="inter"]');
+  await page.fill("#digitScale", "1.4");
+  await page.dispatchEvent("#digitScale", "input");
+  const l2 = await look();
+  ok(/Inter/.test(l2.font) && l2.cellPx > l0.cellPx * 1.3, "look: font and digit size apply", JSON.stringify([l0.cellPx, l2.cellPx, l2.font]));
+  await page.$eval('#customColors input[data-key="bg"]', e => { e.value = "#102030"; e.dispatchEvent(new Event("input", { bubbles: true })); });
+  const l3 = await look();
+  ok(l3.bg === "rgb(16, 32, 48)" && l3.surface === "#3b4252" &&
+     await page.$eval('#themes [data-theme-id="custom"]', b => b.classList.contains("on")), "look: editing a colour makes «Своя» from nord", JSON.stringify(l3));
+  await page.reload();
+  await page.waitForSelector("#lookBoard .cell");
+  const l4 = await look();
+  ok(l4.bg === l3.bg && /Inter/.test(l4.font) && Math.abs(l4.cellPx - l2.cellPx) < 0.5, "look: settings survive a reload", JSON.stringify(l4));
+  await shot(page, "settings");
+  await page.click("#lookReset");
+  const l5 = await look();
+  ok(l5.theme === null && /JetBrains Mono/.test(l5.font) && Math.abs(l5.cellPx - l0.cellPx) < 0.5, "look: reset restores the default look", JSON.stringify(l5));
+
   // --- 9. mobile 390px -------------------------------------------------------------------------
   const mob = await newPage({ width: 390, height: 844 }, { deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await mob.goto(`${BASE}/#/play`);
@@ -423,7 +456,7 @@ try {
   const sw = await mob.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
   ok(sw[0] <= sw[1], "390px: no horizontal scroll on #/play", sw.join(" > "));
   await shot(mob, "play-mobile");
-  for (const r of ["drills", "stats", "today", "theory/pointing-claiming"]) {
+  for (const r of ["drills", "stats", "today", "theory/pointing-claiming", "settings"]) {
     await mob.goto(`${BASE}/#/${r}`);
     await mob.waitForTimeout(700);
     const w = await mob.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);

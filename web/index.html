@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sudoku Gym</title>
 <link rel="icon" href="data:,">
+<link rel="preload" href="fonts/jetbrains-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="style.css">
+<script>
+  // last look from js/appearance.js, applied before first paint
+  try { const b = JSON.parse(localStorage.getItem("gym-appearance-boot"));
+        if (b) { if (b.theme) document.documentElement.dataset.theme = b.theme; document.documentElement.style.cssText = b.style; } } catch {}
+</script>
 </head>
 <body>
 <header class="top">
@@ -17,6 +24,7 @@
       <a href="#/drills" data-route="drills">Упражнения</a>
       <a href="#/stats" data-route="stats">Статистика</a>
       <a href="#/theory" data-route="theory">Теория</a>
+      <a href="#/settings" data-route="settings">Вид</a>
     </nav>
   </div>
 </header>

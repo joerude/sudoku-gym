@@ -1,5 +1,7 @@
-/* Sudoku Gym — tokens and look carried over from trainer.html */
+/* Sudoku Gym — tokens and look carried over from trainer.html; #/settings overrides them inline (js/appearance.js) */
 :root {
+  --font: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; --font-mono: var(--font);
+  --digit-scale: 1; --note-scale: 1;
   --bg: #f6f5f1; --surface: #ffffff; --ink: #1d1d1b; --muted: #6b6a66;
   --line: #c9c7c0; --line-strong: #1d1d1b;
   --peer: #ecebe5; --same: #d6e4f5; --sel: #b9d2f0;
@@ -41,7 +43,7 @@
 [hidden] { display: none !important; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.45 var(--font);
 }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -73,7 +75,7 @@ button.on, .btn.primary, button.primary { background: var(--accent); color: var(
 button.danger { background: var(--bad); color: var(--bg); border-color: var(--bad); }
 label.field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
 label.check { font-size: 13px; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
-.timer { margin-left: auto; font: 600 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums;
+.timer { margin-left: auto; font: 600 22px/1 var(--font-mono); font-variant-numeric: tabular-nums;
   /* fixed width up to 100.0 с / 10:00.0, so the bar never re-wraps and the board below stays put */
   min-width: 7ch; text-align: right; white-space: nowrap; flex: none; }
 .timer.done { color: var(--ok); }
@@ -90,7 +92,7 @@ label.check { font-size: 13px; color: var(--muted); display: inline-flex; gap: 4
 button:active:not(:disabled) { transform: translateY(1px); filter: brightness(.94); }
 .cell { transition: background-color .08s ease-out, color .08s ease-out; }
 .cell:active { filter: brightness(.92); }
-kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+kbd { font: 12px var(--font-mono); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 
 section, .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
 .layout { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 0 24px; align-items: start; }
@@ -105,7 +107,7 @@ section, .card { background: var(--surface); border: 1px solid var(--line); bord
 /* --- board --- */
 /* row numbers left, column numbers top; the 2px pads match the grid border so numbers sit on cell centres */
 .board-frame { display: grid; grid-template-columns: 1.3em minmax(0, 1fr); grid-template-rows: 1.3em auto; }
-.col-nums, .row-nums { display: grid; color: var(--muted); font: 11px/1 ui-monospace, Menlo, monospace; user-select: none; }
+.col-nums, .row-nums { display: grid; color: var(--muted); font: 11px/1 var(--font-mono); user-select: none; }
 .col-nums { grid-template-columns: repeat(9, minmax(0, 1fr)); padding: 0 2px; }
 .row-nums { grid-template-rows: repeat(9, minmax(0, 1fr)); padding: 2px 0; }
 .col-nums span, .row-nums span { display: flex; align-items: center; justify-content: center; }
@@ -120,7 +122,7 @@ section, .card { background: var(--surface); border: 1px solid var(--line); bord
   position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0;
   overflow: hidden; line-height: 1;
   border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
-  font-size: 6.2cqi; cursor: pointer; color: var(--user);
+  font-size: calc(6.2cqi * var(--digit-scale)); cursor: pointer; color: var(--user);
 }
 .grid.static .cell { cursor: default; }
 .cell.br { border-right: 2px solid var(--line-strong); }
@@ -150,8 +152,8 @@ section, .card { background: var(--surface); border: 1px solid var(--line); bord
 .why { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 14px; line-height: 1.5; }
 .grid.locked { opacity: .8; }
 .notes { position: absolute; inset: 1px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
-.notes span { display: flex; align-items: center; justify-content: center; font-size: 2.3cqi; color: var(--muted); border-radius: 3px; }
-.notes.big span { font-size: 2.7cqi; color: var(--ink); }
+.notes span { display: flex; align-items: center; justify-content: center; font-size: calc(2.3cqi * var(--note-scale)); color: var(--muted); border-radius: 3px; }
+.notes.big span { font-size: calc(2.7cqi * var(--note-scale)); color: var(--ink); }
 .notes span.pick { cursor: pointer; }
 .notes span.pick:hover { background: var(--sel); }
 .notes span.hl { background: var(--same); color: var(--ink); font-weight: 700; }
@@ -169,7 +171,7 @@ section, .card { background: var(--surface); border: 1px solid var(--line); bord
 /* --- results / metrics --- */
 .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin: 8px 0 12px; }
 .metric { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
-.metric b { display: block; font: 600 18px/1.2 ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.metric b { display: block; font: 600 18px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
 .metric span { font-size: 12px; color: var(--muted); }
 .status-solved { color: var(--ok); } .status-failed { color: var(--bad); } .status-abandoned { color: var(--muted); }
 
@@ -207,8 +209,8 @@ td.num, th.num { text-align: right; }
 /* --- theory / markdown --- */
 .md { max-width: 720px; }
 .md h1 { font-size: 22px; } .md h2 { font-size: 17px; margin-top: 22px; } .md h3 { font-size: 15px; margin-top: 18px; }
-.md pre { background: var(--peer); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font: 13px/1.4 ui-monospace, Menlo, monospace; }
-.md code { font: 13px ui-monospace, Menlo, monospace; background: var(--peer); border-radius: 4px; padding: 0 3px; }
+.md pre { background: var(--peer); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font: 13px/1.4 var(--font-mono); }
+.md code { font: 13px var(--font-mono); background: var(--peer); border-radius: 4px; padding: 0 3px; }
 .md pre code { background: none; padding: 0; }
 .md li { margin: 3px 0; }
 .toc { list-style: none; padding: 0; margin: 0; }
@@ -224,3 +226,26 @@ td.num, th.num { text-align: right; }
 .plan li.done::before { background: var(--ok); color: var(--surface); }
 .plan .body { flex: 1; min-width: 0; }
 .plan p { margin: 2px 0 6px; color: var(--muted); font-size: 13px; }
+
+/* --- settings (#/settings) --- */
+.look { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 0 24px; align-items: start; }
+.look-preview { position: sticky; top: 12px; margin-bottom: 14px; }
+@media (max-width: 820px) {
+  .look { grid-template-columns: minmax(0, 1fr); }
+  .look-preview { position: static; max-width: 360px; }
+}
+.theme-grid, .font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.theme-btn { display: flex; justify-content: space-between; align-items: center; gap: 6px; text-align: left; min-height: 38px; }
+.theme-btn.on, .font-btn.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dots { display: inline-flex; gap: 3px; flex: none; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; }
+.font-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.font-btn b { font-size: 20px; font-weight: 600; line-height: 1.1; }
+.font-btn span { font-size: 13px; color: var(--muted); }
+.font-btn.on { background: var(--surface); color: var(--ink); border-color: var(--accent); }  /* not the accent fill of button.on */
+.color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; }
+.color-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.color-row input { width: 36px; height: 28px; padding: 1px 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; flex: none; }
+label.field.range { font-size: 13px; margin-bottom: 10px; }
+label.field.range output { color: var(--ink); font-variant-numeric: tabular-nums; }
+label.field.range input { width: 100%; max-width: 320px; accent-color: var(--accent); }

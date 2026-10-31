@@ -1,7 +1,9 @@
 // Hash router + nav + global Ctrl+V of a grid.
+import { initAppearance } from "./appearance.js";
 import { parseGrid } from "./board.js";
 import * as play from "./play.js";
 import * as review from "./review.js";
+import * as settings from "./settings.js";
 import * as drills from "./drills.js";
 import * as stats from "./stats.js";
 import * as theory from "./theory.js";
@@ -16,9 +18,11 @@ const ROUTES = [
   [/^stats$/, stats.mount, "stats"],
   [/^theory$/, theory.mountList, "theory"],
   [/^theory\/([^/]+)$/, theory.mountPage, "theory"],
+  [/^settings$/, settings.mount, "settings"],
 ];
-const TITLES = { today: "Сегодня", play: "Играть", drills: "Упражнения", stats: "Статистика", theory: "Теория" };
+const TITLES = { today: "Сегодня", play: "Играть", drills: "Упражнения", stats: "Статистика", theory: "Теория", settings: "Вид" };
 
+initAppearance();
 const app = document.getElementById("app");
 let cleanup = null;
 
