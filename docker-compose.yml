@@ -1,0 +1,16 @@
+services:
+  sudoku-gym:
+    build:
+      context: .
+      args:
+        UID: "1000"
+        GID: "1000"
+    container_name: sudoku-gym
+    environment:
+      TZ: "<+06>-6"                 # UTC+6 (Bishkek), POSIX form: works without tzdata; stats group days by local date
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ./data:/app/data            # progress: puzzles, games, moves, drills (sudoku.db)
+      - ./theory:/app/theory:ro     # theory sources, re-seeded on each start
+    restart: unless-stopped

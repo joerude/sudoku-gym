@@ -1,0 +1,93 @@
+"""SQLite schema and connection for Sudoku Gym."""
+import os
+import sqlite3
+
+DEFAULT_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "sudoku.db")
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS puzzles (
+    id INTEGER PRIMARY KEY,
+    bank_id TEXT UNIQUE NOT NULL,
+    level TEXT NOT NULL,
+    givens TEXT NOT NULL,
+    solution TEXT NOT NULL,
+    se_rating REAL,
+    tech_grade INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS puzzles_level ON puzzles(level);
+
+CREATE TABLE IF NOT EXISTS games (
+    id INTEGER PRIMARY KEY,
+    puzzle_id INTEGER NOT NULL REFERENCES puzzles(id),
+    mode TEXT NOT NULL CHECK (mode IN ('original', 'hardcore')),
+    mistake_limit INTEGER,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'solved', 'failed', 'abandoned')),
+    time_ms INTEGER,
+    mistakes INTEGER,
+    corrections INTEGER,
+    checks INTEGER,
+    note_actions INTEGER,
+    first_move_ms INTEGER,
+    max_pause_ms INTEGER,
+    long_pauses INTEGER
+);
+CREATE INDEX IF NOT EXISTS games_puzzle ON games(puzzle_id);
+
+CREATE TABLE IF NOT EXISTS moves (
+    game_id INTEGER NOT NULL REFERENCES games(id),
+    seq INTEGER NOT NULL,
+    t_ms INTEGER NOT NULL,
+    cell INTEGER,
+    value INTEGER,
+    kind TEXT NOT NULL CHECK (kind IN ('place', 'erase', 'note', 'check', 'undo')),
+    correct INTEGER,
+    PRIMARY KEY (game_id, seq)
+);
+
+CREATE TABLE IF NOT EXISTS techniques (
+    slug TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    level INTEGER NOT NULL,
+    ord INTEGER NOT NULL,
+    drill TEXT,
+    body_md TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS drills (
+    id INTEGER PRIMARY KEY,
+    technique TEXT NOT NULL,
+    puzzle_id INTEGER NOT NULL REFERENCES puzzles(id),
+    board TEXT NOT NULL,
+    answers TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'place'
+);
+CREATE INDEX IF NOT EXISTS drills_technique ON drills(technique);
+
+CREATE TABLE IF NOT EXISTS drill_attempts (
+    id INTEGER PRIMARY KEY,
+    drill_id INTEGER NOT NULL REFERENCES drills(id),
+    at TEXT NOT NULL,
+    time_ms INTEGER NOT NULL,
+    correct INTEGER NOT NULL,
+    cell INTEGER,
+    value INTEGER
+);
+"""
+
+
+def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
+    if path != ":memory:":
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    conn = sqlite3.connect(path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    if path != ":memory:":
+        conn.execute("PRAGMA journal_mode = WAL")
+    conn.executescript(SCHEMA)
+    # databases created before drills.kind existed
+    if "kind" not in {r[1] for r in conn.execute("PRAGMA table_info(drills)")}:
+        conn.execute("ALTER TABLE drills ADD COLUMN kind TEXT NOT NULL DEFAULT 'place'")
+        conn.commit()
+    return conn

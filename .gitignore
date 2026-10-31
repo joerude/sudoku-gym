@@ -1,0 +1,5 @@
+# progress database (bind-mounted into the container) — local only
+data/
+__pycache__/
+*.pyc
+node_modules/
