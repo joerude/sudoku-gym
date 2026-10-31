@@ -76,7 +76,16 @@ CREATE TABLE IF NOT EXISTS drill_attempts (
     valid_other INTEGER NOT NULL DEFAULT 0,  -- a true move/elimination, but not by the drill's technique
     hint INTEGER NOT NULL DEFAULT 0  -- 0 none, 1 answered after «где искать», 2 answer revealed (cell/value NULL)
 );
+
+CREATE TABLE IF NOT EXISTS favorites (
+    kind TEXT NOT NULL CHECK (kind IN ('puzzle', 'drill')),
+    ref_id INTEGER NOT NULL,  -- puzzles.id or drills.id
+    at TEXT NOT NULL,
+    PRIMARY KEY (kind, ref_id)
+);
 """
+
+FAVORITE_KINDS = ("puzzle", "drill")
 
 
 def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
@@ -96,3 +105,12 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
             conn.commit()
     return conn
+
+
+def is_favorite(conn, kind: str, ref_id: int) -> bool:
+    return conn.execute("SELECT 1 FROM favorites WHERE kind = ? AND ref_id = ?", (kind, ref_id)).fetchone() is not None
+
+
+def favorite_counts(conn) -> dict:
+    counts = dict(conn.execute("SELECT kind, COUNT(*) FROM favorites GROUP BY kind").fetchall())
+    return {k: counts.get(k, 0) for k in FAVORITE_KINDS}

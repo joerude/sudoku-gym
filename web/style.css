@@ -249,3 +249,17 @@ td.num, th.num { text-align: right; }
 label.field.range { font-size: 13px; margin-bottom: 10px; }
 label.field.range output { color: var(--ink); font-variant-numeric: tabular-nums; }
 label.field.range input { width: 100%; max-width: 320px; accent-color: var(--accent); }
+
+/* --- favourites, zen, theme toggle --- */
+.fav { padding: 2px 8px; line-height: 1.2; color: var(--muted); flex: none; }
+.fav.on { background: var(--surface); color: var(--s4); border-color: var(--s4); }  /* not the accent fill of button.on */
+.theme-toggle { margin-left: auto; font-size: 13px; padding: 3px 9px; white-space: nowrap; }
+.prompt, #drillHow { text-align: center; }
+.zen-btn[aria-pressed="true"] { border-color: var(--accent); }
+/* zen (Z, as on lichess): on #/play and #/drills only the board, its timer and the controls stay */
+:root { --zen-w: min(100%, clamp(300px, calc(100vh - 320px), 640px)); }
+body.zen.zen-page .top, body.zen.zen-page .zen-hide, body.zen.zen-page .playing .zen-hide-playing { display: none !important; }
+body.zen.zen-page main { padding-top: 12px; }
+body.zen.zen-page .layout { grid-template-columns: var(--zen-w); grid-template-rows: none; justify-content: center; }
+body.zen.zen-page .layout > .main-col { grid-row: auto; }
+body.zen.zen-page .layout > .first-mobile { order: 0; }

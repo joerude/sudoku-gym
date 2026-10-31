@@ -11,6 +11,7 @@ import statistics
 import time
 from datetime import datetime, timezone
 
+from db import is_favorite
 from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, candidates, find_steps, parse, to_str
 
 DRILL_TECHNIQUES = list(TECH_TIER)
@@ -249,33 +250,37 @@ def pick_technique(conn) -> str | None:
 
 
 def next_drill(conn, technique: str | None = None) -> dict | None:
-    """technique: None → adaptive, 'random' → random unlocked technique, else any slug (explicit choice).
+    """technique: None → adaptive, 'random' → random unlocked technique, 'favorites' → a starred drill of any
+    technique, else any slug (explicit choice).
 
     Raises ValueError on an unknown slug; returns None when there is no drill."""
-    if technique == "random":
-        techs = unlocked_techniques(conn)
-        technique = random.choice(techs) if techs else None
-    elif technique is None:
-        technique = pick_technique(conn)
-    elif technique not in DRILL_TECHNIQUES:
-        raise ValueError(f"неизвестная техника: {technique}")
-    if technique is None:
-        return None
+    if technique == "favorites":
+        where, args = "id IN (SELECT ref_id FROM favorites WHERE kind = 'drill')", ()
+    else:
+        if technique == "random":
+            techs = unlocked_techniques(conn)
+            technique = random.choice(techs) if techs else None
+        elif technique is None:
+            technique = pick_technique(conn)
+        elif technique not in DRILL_TECHNIQUES:
+            raise ValueError(f"неизвестная техника: {technique}")
+        if technique is None:
+            return None
+        where, args = "technique = ?", (technique,)
     row = conn.execute(
-        "SELECT id, technique, kind, board FROM drills WHERE technique = ? AND id NOT IN"
+        f"SELECT id, technique, kind, board FROM drills WHERE {where} AND id NOT IN"
         " (SELECT drill_id FROM drill_attempts ORDER BY id DESC LIMIT ?) ORDER BY RANDOM() LIMIT 1",
-        (technique, RECENT_EXCLUDE)).fetchone()
+        (*args, RECENT_EXCLUDE)).fetchone()
     if row is None:  # everything was attempted recently: take the least recently attempted one
         row = conn.execute(
             "SELECT d.id, d.technique, d.kind, d.board FROM drills d LEFT JOIN drill_attempts a ON a.drill_id = d.id"
-            " WHERE d.technique = ? GROUP BY d.id ORDER BY MAX(COALESCE(a.id, 0)), RANDOM() LIMIT 1",
-            (technique,)).fetchone()
+            f" WHERE d.{where} GROUP BY d.id ORDER BY MAX(COALESCE(a.id, 0)), RANDOM() LIMIT 1", args).fetchone()
     if row is None:
         return None
     board = row[3]
     return {"id": row[0], "technique": row[1], "kind": row[2], "prompt": DRILL_PROMPT[row[1]],
             "title": TECH_TITLE[row[1]], "board": board,
-            "candidates": [sorted(c) for c in candidates(parse(board))]}
+            "candidates": [sorted(c) for c in candidates(parse(board))], "fav": is_favorite(conn, "drill", row[0])}
 
 
 def _drill(conn, drill_id: int):

@@ -1,4 +1,6 @@
-// Small shared UI helpers: element builder, labels, metrics card.
+// Small shared UI helpers: element builder, labels, metrics card, favourite star, zen mode, theme.
+import { setFavorite } from "./api.js";
+import { THEMES, loadPrefs, palette, savePrefs } from "./appearance.js";
 import { fmtTime } from "./board.js";
 
 export const LEVEL_NAME = { easy: "лёгкий", medium: "средний", hard: "сложный", expert: "эксперт", custom: "своя сетка",
@@ -70,4 +72,79 @@ export function statusLine(g) {
 
 export function errorBox(e) {
   return h("p", { class: "msg bad", role: "alert" }, e?.message || String(e));
+}
+
+/** ☆/★ toggle for one puzzle or drill. set(id, fav) when a new one is shown; toggle() is also bound to F.
+ *  onChange({fav, counts}) after the server stored it. label: show «в избранное» next to the star. */
+export function createFav(kind, { onChange, label = false } = {}) {
+  let id = null, fav = false, busy = false;
+  const el = h("button", { type: "button", class: "fav", id: `fav-${kind}`, onclick: () => toggle() });
+  const paint = () => {
+    el.hidden = id === null;
+    el.textContent = (fav ? "★" : "☆") + (label ? (fav ? " в избранном" : " в избранное") : "");
+    el.classList.toggle("on", fav);
+    el.setAttribute("aria-pressed", fav);
+    el.title = fav ? "Убрать из избранного (F)" : "Добавить в избранное (F)";
+  };
+  async function toggle() {
+    if (id === null || busy) return;
+    busy = true;
+    const target = id;
+    try {
+      const r = await setFavorite(kind, target, !fav);
+      if (id === target) fav = r.fav;
+      onChange?.(r);
+    } catch (e) {
+      el.title = e.message;
+    } finally { busy = false; paint(); }
+  }
+  paint();
+  return { el, toggle, set(newId, isFav) { if (newId === id) return; id = newId; fav = !!isFav; paint(); } };
+}
+
+// Zen mode (as on lichess): on the play and drills pages only the board, its timer and the controls stay.
+// The router marks those pages with body.zen-page; Z toggles, Esc leaves; the choice is remembered.
+const ZEN_KEY = "gym-zen";
+export const isZen = () => document.body.classList.contains("zen");
+function paintZen(b) {
+  const on = isZen();
+  b.textContent = on ? "✕ zen" : "☯ zen";
+  b.title = on ? "Выйти из zen-режима (Z или Esc)" : "Zen-режим: только доска (Z)";
+  b.setAttribute("aria-pressed", on);
+}
+export function setZen(on) {
+  document.body.classList.toggle("zen", on);
+  try { localStorage.setItem(ZEN_KEY, on ? "1" : "0"); } catch { /* no storage */ }
+  for (const b of document.querySelectorAll(".zen-btn")) paintZen(b);
+}
+export function initZen() {
+  let on = false;
+  try { on = localStorage.getItem(ZEN_KEY) === "1"; } catch { /* no storage */ }
+  document.body.classList.toggle("zen", on);
+}
+export function zenButton() {
+  const b = h("button", { type: "button", class: "zen-btn", onclick: () => setZen(!isZen()) });
+  paintZen(b);
+  return b;
+}
+
+// Header theme switch: auto (system) → light → dark, through the same look settings as #/settings (js/appearance.js).
+// A preset or own theme from #/settings is shown by name; the next press goes to light or dark, whichever it is not.
+const QUICK = ["auto", "light", "dark"];
+export function themeButton() {
+  const b = h("button", { type: "button", class: "theme-toggle", id: "themeBtn" });
+  const sync = () => {
+    const prefs = loadPrefs(), t = THEMES.find(x => x.id === prefs.theme);
+    const icon = prefs.theme === "auto" ? "◐" : palette(prefs).dark ? "☾" : "☀";
+    b.textContent = `${icon} ${prefs.theme === "auto" ? "авто" : t.name.toLowerCase()}`;
+    b.title = `Тема: ${t.name}. Нажми, чтобы сменить (авто → светлая → тёмная)`;
+  };
+  b.onclick = () => {
+    const prefs = loadPrefs(), k = QUICK.indexOf(prefs.theme);
+    const theme = k >= 0 ? QUICK[(k + 1) % QUICK.length] : palette(prefs).dark ? "light" : "dark";
+    savePrefs({ ...prefs, theme });
+    sync();
+  };
+  sync();
+  return Object.assign(b, { sync });
 }

@@ -1,8 +1,8 @@
 // #/play — game page: setup controls, board, timer, results. The game survives navigation.
-import { addPuzzle, createGame, getOptions, getPuzzle } from "./api.js";
+import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
 import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
-import { LEVEL_NAME, errorBox, h, metricsGrid, statusLine, ignoreKey } from "./ui.js";
+import { LEVEL_NAME, createFav, errorBox, h, ignoreKey, metricsGrid, statusLine, zenButton } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
@@ -16,6 +16,7 @@ let options = null;    // /api/puzzle/options
 let ui = null;         // DOM refs while mounted
 let pendingMsg = null; // message to show on next refresh
 let digit = 0;         // last digit pressed: highlighted everywhere until a filled cell is selected
+let favCount = null;   // starred puzzles (null until /api/favorites answers)
 
 const bits = m => { const out = []; for (let v = 1; v <= 9; v++) if (m & (1 << v)) out.push(v); return out; };
 
@@ -57,12 +58,19 @@ function setupSection() {
   limit.onchange = () => { prefs.limit = limit.value; savePrefs(); };
   const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) }, "Новая партия");
   const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, "🎲 Случайная партия");
+  const favBtn = h("button", { type: "button", id: "favGame", title: "Задача из избранного: сначала та, что давно не игралась",
+    onclick: () => begin(getFavoritePuzzle, false) });
+  const syncFav = () => {
+    favBtn.textContent = `★ Из избранного${favCount === null ? "" : ` (${favCount})`}`;
+    favBtn.disabled = !favCount;
+  };
+  syncFav();
   const box = h("section", { class: "first-mobile" },
     h("h2", {}, "Новая партия"),
     h("div", { class: "bar" }, h("label", { class: "field" }, "Уровень", lvl), h("label", { class: "field" }, "Техника", grade)),
     h("div", { class: "bar" }, h("label", { class: "field" }, "Режим", mode), limitField),
-    h("div", { class: "bar", style: "margin:0" }, newBtn, rndBtn));
-  return { box, sync, buttons: [newBtn, rndBtn] };
+    h("div", { class: "bar", style: "margin:0" }, newBtn, rndBtn, favBtn));
+  return { box, sync, syncFav, buttons: [newBtn, rndBtn, favBtn] };
 }
 
 export function mount(el, params, query) {
@@ -88,29 +96,36 @@ export function mount(el, params, query) {
   } }, "Сдаться");
   const disarm = () => { clearTimeout(armed); armed = null; giveUpBtn.textContent = "Сдаться"; giveUpBtn.classList.remove("danger"); };
   const setup = setupSection();
+  const fav = createFav("puzzle", { onChange: r => {
+    if (G) G.S.puzzle.fav = r.fav;
+    favCount = r.counts.puzzle; setup.syncFav();
+  } });
   ui = {
-    badge: h("span", { class: "badge", id: "badge" }), errs: h("span", { class: "counter", id: "errors" }),
+    fav, badge: h("span", { class: "badge", id: "badge" }), errs: h("span", { class: "counter", id: "errors" }),
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
     results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, setup,
   };
   ui.board = createBoard(boardEl, { onCell: i => { if (G) { digit = 0; G.select(i); } } });
   ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => G?.erase() });
-  el.append(h("div", { class: "layout" },
+  ui.root = h("div", { class: "layout" },
     h("div", { class: "main-col" },
-      h("div", { class: "bar" }, ui.badge, ui.errs, ui.timer), boardEl, padEl,
+      h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer), boardEl, padEl,
       h("div", { class: "bar", style: "margin-top:10px" }, notesBtn,
         h("button", { type: "button", id: "undoBtn", onclick: () => G?.undoLast() }, "↶ отменить"),
         h("button", { type: "button", id: "checkBtn", title: "Подсветить ошибки (учитывается в итогах)", onclick: () => G?.check() }, "Проверить"),
-        clearBtn, giveUpBtn,
-        h("label", { class: "check" }, autoBox, "автоочистка заметок"),
-        h("label", { class: "check", title: "Сколько каждой цифры осталось поставить" }, countsBox, "счётчик цифр")),
+        clearBtn, giveUpBtn, zenButton(),
+        h("label", { class: "check zen-hide" }, autoBox, "автоочистка заметок"),
+        h("label", { class: "check zen-hide", title: "Сколько каждой цифры осталось поставить" }, countsBox, "счётчик цифр")),
       ui.msg),
     setup.box,
     h("div", {}, ui.results,
-      h("section", {}, h("h2", {}, "Клавиши"), h("p", { class: "hint", style: "margin:0", html:
+      h("section", { class: "zen-hide" }, h("h2", {}, "Клавиши"), h("p", { class: "hint", style: "margin:0", html:
         "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
-        "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить. " +
-        "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." })))));
+        "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
+        "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти). " +
+        "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." }))));
+  setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
+  el.append(ui.root);
 
   const onKey = e => handleKey(e);
   window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
@@ -130,6 +145,7 @@ export function mount(el, params, query) {
     }
     if (query.start === "1") { history.replaceState(null, "", "#/play"); newGame(false); }
   }).catch(e => setMsg(e.message, "bad"));
+  getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
   if (G?.S.result) showResults();
   return () => { window.removeEventListener("keydown", onKey, true); clearInterval(tick); clearTimeout(armed); ui = null; };
@@ -142,6 +158,8 @@ function setMsg(text, cls = "") {
 
 function refresh() {
   if (!ui) return;
+  ui.root.classList.toggle("playing", G?.S.status === "active");
+  ui.fav.set(G ? G.S.puzzle.id : null, G?.S.puzzle.fav);
   if (!G) {
     ui.board.render({ values: Array(81).fill(0), given: Array(81).fill(false) });
     ui.pad.update(null);
@@ -221,6 +239,7 @@ async function begin(getPuzzleFn, hideGrade) {
   } finally {
     busy = false;
     ui?.setup.buttons.forEach(b => { b.disabled = false; });
+    ui?.setup.syncFav();
   }
 }
 
@@ -258,6 +277,7 @@ function handleKey(e) {
     G.undoLast(); e.preventDefault(); return;
   }
   if (e.ctrlKey || e.metaKey) return;
+  if (e.code === "KeyF") { ui?.fav.toggle(); e.preventDefault(); return; }
   const d = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
   if (d && d[1] !== "0") { press(+d[1], e.shiftKey || G.S.notesMode); e.preventDefault(); return; }
   if (e.key.startsWith("Arrow")) { digit = 0; G.move(e.key); e.preventDefault(); return; }

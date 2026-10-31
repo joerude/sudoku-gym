@@ -1,7 +1,7 @@
 // #/review/{id} — game summary + long pauses with what was available in the position.
 import { getGame, getReview } from "./api.js";
 import { cellName, computeCandidates, createBoard, fmtTime, toDigits, unitCells } from "./board.js";
-import { LEVEL_NAME, dateRu, errorBox, h, metricsGrid, statusLine } from "./ui.js";
+import { LEVEL_NAME, createFav, dateRu, errorBox, h, metricsGrid, statusLine } from "./ui.js";
 
 export function stepText(s) {
   const unit = s.unit_name ? ` (${s.unit_name})` : "";
@@ -58,6 +58,8 @@ export function mount(el, [id]) {
   el.append(box);
   Promise.all([getReview(id), getGame(id)]).then(([rv, full]) => {
     const g = rv.game;
+    const fav = createFav("puzzle", { label: true });
+    fav.set(g.puzzle_id, g.fav);
     box.textContent = "";
     box.append(h("h1", {}, `Разбор партии #${g.id}`),
       h("section", {},
@@ -67,7 +69,8 @@ export function mount(el, [id]) {
           ` · ${dateRu(g.started_at)}`),
         metricsGrid(g),
         h("div", { class: "bar", style: "margin:0" },
-          h("a", { class: "btn", href: "#/play" }, "Играть дальше"), h("a", { class: "btn", href: "#/stats" }, "Статистика"))));
+          h("a", { class: "btn", href: "#/play" }, "Играть дальше"), h("a", { class: "btn", href: "#/stats" }, "Статистика"),
+          fav.el)));
     if (!full.moves.length) {
       box.append(h("section", { id: "noMoves" }, h("h2", {}, "Ходов нет"),
         h("p", { class: "hint", style: "margin:0" }, "Ходы этой партии не записаны (партия перенесена или брошена до первого хода), " +

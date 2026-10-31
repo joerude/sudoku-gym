@@ -45,6 +45,9 @@ export const sendAttempt = (id, timeMs, cell, value, hint = 0) =>
   call("POST", `/api/drills/${id}/attempt`, { time_ms: Math.round(timeMs), cell, value, hint });
 export const drillHint = id => call("GET", `/api/drills/${id}/hint`);
 export const revealDrill = (id, timeMs) => call("POST", `/api/drills/${id}/reveal`, { time_ms: Math.round(timeMs) });
+export const getFavorites = () => call("GET", "/api/favorites");
+export const setFavorite = (kind, id, on) => call(on ? "PUT" : "DELETE", `/api/favorites/${kind}/${id}`);
+export const getFavoritePuzzle = () => call("GET", "/api/puzzle?favorite=1");
 export const getTheory = () => call("GET", "/api/theory");
 export const getTheoryPage = slug => call("GET", `/api/theory/${encodeURIComponent(slug)}`);
 

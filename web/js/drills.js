@@ -1,12 +1,12 @@
 // #/drills — "find the move" drills: place (cell + digit) and eliminate (click the removed candidate).
-import { drillHint, drillTechniques, nextDrill, revealDrill, sendAttempt } from "./api.js";
+import { drillHint, drillTechniques, getFavorites, nextDrill, revealDrill, sendAttempt } from "./api.js";
 import { ROW, COL, cellName, createBoard, createPad, toDigits, unitCells } from "./board.js";
-import { TIER_NAME, errorBox, h, pct, sec, ignoreKey } from "./ui.js";
+import { TIER_NAME, createFav, errorBox, h, ignoreKey, pct, sec, zenButton } from "./ui.js";
 
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
 const progress = t => t.mastered ? "✓" : t.unlocked ? `${Math.min(t.correct, UNLOCK)}/${UNLOCK}` : "";
 
-let choice = "adaptive";  // 'adaptive' | 'random' | slug
+let choice = "adaptive";  // 'adaptive' | 'random' | 'favorites' | slug
 let showCands = false;     // place drills only; eliminate drills always show candidates
 const AUTO_KEY = "gym.drills.autoNext";
 const readAuto = () => { try { return localStorage.getItem(AUTO_KEY) !== "0"; } catch { return true; } };
@@ -29,6 +29,11 @@ export function mount(el, params, query) {
   const boardEl = h("div", { id: "drillBoard" }), padEl = h("div");
   const prompt = h("p", { class: "prompt", id: "prompt" }, "Загрузка…");
   const title = h("span", { class: "badge", id: "drillTech" });
+  let favCount = null;  // starred drills (null until /api/favorites answers)
+  const fav = createFav("drill", { onChange: r => {
+    if (drill) drill.fav = r.fav;
+    favCount = r.counts.drill; renderChips();
+  } });
   const timer = h("span", { class: "timer", id: "drillTimer" }, "0.0 с");
   const msg = h("div", { class: "msg", id: "drillMsg", role: "status" });
   const strip = h("div", { class: "strip", id: "session" });
@@ -42,7 +47,7 @@ export function mount(el, params, query) {
   } });
   autoBox.checked = autoNext;
   let autoTimer = null;
-  const theoryLink = h("a", { id: "drillTheory", class: "hint", style: "margin:0" }, "Как это работает?");
+  const theoryLink = h("a", { id: "drillTheory", class: "hint zen-hide", style: "margin:0" }, "Как это работает?");
   const why = h("div", { class: "why", id: "drillWhy", hidden: true });
   const chips = h("div", { id: "picker" });
 
@@ -60,26 +65,32 @@ export function mount(el, params, query) {
 
   el.append(h("div", { class: "layout" },
     h("div", { class: "main-col" },
-      h("div", { class: "bar head", style: "margin-bottom:4px" }, title, theoryLink, timer), prompt,
-      h("p", { class: "hint", id: "drillHow" }), boardWrap, padEl,
+      h("div", { class: "bar head", style: "margin-bottom:4px" }, title, fav.el, theoryLink, timer), prompt,
+      h("p", { class: "hint zen-hide", id: "drillHow" }), boardWrap, padEl,
       h("div", { class: "bar", style: "margin-top:10px" }, nextBtn,
         h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Пробел"), " / ", h("kbd", {}, "Enter")),
         hintBtn, h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "H"))),
       h("div", { class: "bar", style: "margin-top:6px" },
-        h("label", { class: "check" }, autoBox, "Автопереход после верного"),
-        h("label", { class: "check" }, candBox, "Показывать кандидатов")),
-      msg, why, strip),
-    h("section", {}, h("h2", {}, "Техника"), chips)));
+        h("label", { class: "check zen-hide" }, autoBox, "Автопереход после верного"),
+        h("label", { class: "check zen-hide" }, candBox, "Показывать кандидатов"), zenButton()),
+      msg, why, h("div", { class: "zen-hide" }, strip)),
+    h("section", { class: "zen-hide" }, h("h2", {}, "Техника"), chips,
+      h("p", { class: "hint", style: "margin:8px 0 0" }, h("kbd", {}, "F"), " — в избранное, ", h("kbd", {}, "Z"),
+        " — zen-режим (", h("kbd", {}, "Esc"), " — выйти)."))));
   const how = el.querySelector("#drillHow");
 
   function renderChips() {
     chips.textContent = "";
-    const chip = (key, label, t) => h("button", { type: "button", class: choice === key ? "on" : "", "data-tech": key,
-      "aria-pressed": choice === key, disabled: t?.n === 0,
-      title: t && !t.unlocked ? "Ещё не открыта в адаптивном режиме, но потренировать можно" : null,
+    // t — a technique row; count — a plain number to show instead (the favourites chip)
+    const chip = (key, label, t, count) => h("button", { type: "button", class: choice === key ? "on" : "", "data-tech": key,
+      "aria-pressed": choice === key, disabled: t?.n === 0 || (count === 0 && choice !== key),
+      title: t && !t.unlocked ? "Ещё не открыта в адаптивном режиме, но потренировать можно"
+        : count !== undefined ? "Только упражнения, отмеченные ★ (клавиша F)" : null,
       onclick: () => { choice = key; renderChips(); load(); } },
-      t && !t.unlocked ? "🔒 " : null, label, t ? h("small", {}, progress(t)) : null);
-    chips.append(h("div", { class: "chips" }, chip("adaptive", "Адаптивно"), chip("random", "🎲 Случайная")));
+      t && !t.unlocked ? "🔒 " : null, label,
+      t ? h("small", {}, progress(t)) : count !== undefined && count !== null ? h("small", {}, count) : null);
+    chips.append(h("div", { class: "chips" }, chip("adaptive", "Адаптивно"), chip("random", "🎲 Случайная"),
+      chip("favorites", "★ Избранное", null, favCount)));
     for (const tier of [...new Set(techs.map(t => t.tier))].sort()) {
       chips.append(h("div", { class: "tier-name" }, TIER_NAME[tier] || `Тир ${tier}`),
         h("div", { class: "chips" }, techs.filter(t => t.tier === tier).map(t => chip(t.technique, t.title, t))));
@@ -144,6 +155,7 @@ export function mount(el, params, query) {
       drill = await nextDrill(choice === "adaptive" ? undefined : choice);
       values = toDigits(drill.board); sel = -1; result = null; picked = null; digit = 0; hinted = null;
       title.textContent = drill.title; title.title = drill.title;
+      fav.set(drill.id, drill.fav);
       why.hidden = true; why.textContent = "";
       const slug = techs.find(t => t.technique === drill.technique)?.theory;
       theoryLink.hidden = !slug;
@@ -264,6 +276,7 @@ export function mount(el, params, query) {
     const d = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
     if (d) { onDigit(+d[1]); e.preventDefault(); return; }
     if (e.code === "KeyH") { onHint(); e.preventDefault(); return; }
+    if (e.code === "KeyF") { fav.toggle(); e.preventDefault(); return; }
     if (e.key.startsWith("Arrow") && drill && !result) {
       // only empty cells take an answer, so the arrows jump over filled ones (wrapping within the row / column)
       if (sel < 0) sel = values.indexOf(0);
@@ -290,9 +303,10 @@ export function mount(el, params, query) {
   window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
 
   renderStrip();
+  getFavorites().then(c => { favCount = c.drill; if (techs.length) renderChips(); }).catch(() => {});
   drillTechniques().then(list => {
     techs = list;
-    if (!["adaptive", "random"].includes(choice) && !techs.some(t => t.technique === choice)) choice = "adaptive";
+    if (!["adaptive", "random", "favorites"].includes(choice) && !techs.some(t => t.technique === choice)) choice = "adaptive";
     renderChips();
     load();
   }).catch(e => chips.append(errorBox(e)));

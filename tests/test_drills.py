@@ -244,7 +244,7 @@ class NextDrillTest(unittest.TestCase):
 
     def test_explicit_technique(self):
         d = next_drill(self.conn, "hidden_single_col")
-        self.assertEqual(set(d), {"id", "technique", "kind", "prompt", "title", "board", "candidates"})
+        self.assertEqual(set(d), {"id", "technique", "kind", "prompt", "title", "board", "candidates", "fav"})
         self.assertEqual((d["technique"], d["kind"]), ("hidden_single_col", "place"))
         self.assertEqual(d["prompt"], DRILL_PROMPT["hidden_single_col"])
         self.assertEqual(d["title"], TECH_TITLE["hidden_single_col"])

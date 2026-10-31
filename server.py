@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 import analysis
 import drills
-from db import DEFAULT_DB, connect
+from db import DEFAULT_DB, FAVORITE_KINDS, connect, favorite_counts, is_favorite
 from sudoku_core import GRADE_TITLE, count_solutions, grade, parse, solve, to_str
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -62,7 +62,19 @@ def api_health(conn, m, q, body):
     return {"ok": True, "puzzles": conn.execute("SELECT COUNT(*) FROM puzzles").fetchone()[0]}
 
 
+def _puzzle_out(conn, row) -> dict:
+    return {**dict(row), "grade_title": GRADE_TITLE.get(row["tech_grade"], ""), "fav": is_favorite(conn, "puzzle", row["id"])}
+
+
 def api_puzzle(conn, m, q, body):
+    if q.get("favorite") == "1":  # a starred puzzle, least recently played first
+        row = conn.execute(
+            "SELECT p.id, p.level, p.givens, p.solution, p.tech_grade FROM favorites f JOIN puzzles p ON p.id = f.ref_id"
+            " WHERE f.kind = 'puzzle' ORDER BY (SELECT COALESCE(MAX(g.id), 0) FROM games g WHERE g.puzzle_id = p.id),"
+            " RANDOM() LIMIT 1").fetchone()
+        if row is None:
+            raise ApiError(404, "в избранном нет задач")
+        return _puzzle_out(conn, row)
     level = q.get("level", "medium")
     if level != "random" and level not in LEVELS:
         raise ApiError(400, f"неизвестный уровень: {level}")
@@ -89,7 +101,7 @@ def api_puzzle(conn, m, q, body):
                            [level] + args).fetchone()
     if row is None:
         raise ApiError(404, "нет задач с такими параметрами")
-    return {**dict(row), "grade_title": GRADE_TITLE.get(row["tech_grade"], "")}
+    return _puzzle_out(conn, row)
 
 
 def api_add_puzzle(conn, m, q, body):
@@ -112,7 +124,7 @@ def api_add_puzzle(conn, m, q, body):
     conn.commit()
     row = conn.execute("SELECT id, level, givens, solution, tech_grade FROM puzzles WHERE bank_id = ?",
                        ("custom-" + givens,)).fetchone()
-    return {**dict(row), "grade_title": GRADE_TITLE.get(row["tech_grade"], "")}
+    return _puzzle_out(conn, row)
 
 
 def api_puzzle_options(conn, m, q, body):
@@ -223,6 +235,7 @@ def api_review(conn, m, q, body):
     r = analysis.review(conn, int(m.group(1)))
     if r is None:
         raise ApiError(404, "партия не найдена")
+    r["game"]["fav"] = is_favorite(conn, "puzzle", r["game"]["puzzle_id"])
     return r
 
 
@@ -241,7 +254,7 @@ def api_drill_next(conn, m, q, body):
     except ValueError as e:
         raise ApiError(400, str(e))
     if d is None:
-        raise ApiError(404, "упражнений нет")
+        raise ApiError(404, "в избранном нет упражнений" if technique == "favorites" else "упражнений нет")
     return d
 
 
@@ -266,6 +279,34 @@ def api_drill_hint(conn, m, q, body):
     if res is None:
         raise ApiError(404, "упражнение не найдено")
     return res
+
+
+def api_favorites(conn, m, q, body):
+    return favorite_counts(conn)
+
+
+def _favorite_target(conn, m):
+    kind, ref_id = m.group(1), int(m.group(2))
+    table = {"puzzle": "puzzles", "drill": "drills"}.get(kind)
+    if table is None:
+        raise ApiError(404, f"в избранное можно добавить только: {', '.join(FAVORITE_KINDS)}")
+    if not conn.execute(f"SELECT 1 FROM {table} WHERE id = ?", (ref_id,)).fetchone():
+        raise ApiError(404, "задача не найдена" if kind == "puzzle" else "упражнение не найдено")
+    return kind, ref_id
+
+
+def api_favorite_add(conn, m, q, body):
+    kind, ref_id = _favorite_target(conn, m)
+    conn.execute("INSERT OR IGNORE INTO favorites (kind, ref_id, at) VALUES (?, ?, ?)", (kind, ref_id, now_iso()))
+    conn.commit()
+    return {"fav": True, "counts": favorite_counts(conn)}
+
+
+def api_favorite_remove(conn, m, q, body):
+    kind, ref_id = _favorite_target(conn, m)
+    conn.execute("DELETE FROM favorites WHERE kind = ? AND ref_id = ?", (kind, ref_id))
+    conn.commit()
+    return {"fav": False, "counts": favorite_counts(conn)}
 
 
 def api_theory_list(conn, m, q, body):
@@ -297,6 +338,9 @@ ROUTES = [
     ("POST", r"/api/drills/(\d+)/attempt", api_drill_attempt),
     ("GET", r"/api/drills/(\d+)/hint", api_drill_hint),
     ("POST", r"/api/drills/(\d+)/reveal", api_drill_reveal),
+    ("GET", r"/api/favorites", api_favorites),
+    ("PUT", r"/api/favorites/([a-z]+)/(\d+)", api_favorite_add),
+    ("DELETE", r"/api/favorites/([a-z]+)/(\d+)", api_favorite_remove),
     ("GET", r"/api/theory", api_theory_list),
     ("GET", r"/api/theory/([^/]+)", api_theory_page),
 ]

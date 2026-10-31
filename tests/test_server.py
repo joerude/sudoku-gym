@@ -99,7 +99,7 @@ class ServerTest(unittest.TestCase):
 
     def test_puzzle_selection(self):
         p = self.api("GET", "/api/puzzle?level=easy")
-        self.assertEqual(set(p), {"id", "level", "givens", "solution", "tech_grade", "grade_title"})
+        self.assertEqual(set(p), {"id", "level", "givens", "solution", "tech_grade", "grade_title", "fav"})
         self.assertIn(p["id"], self.easy.values())
         self.assertEqual((p["level"], p["tech_grade"], p["grade_title"]), ("easy", 1, GRADE_TITLE[1]))
         name = next(n for n, i in self.easy.items() if i == p["id"])
@@ -206,7 +206,7 @@ class ServerTest(unittest.TestCase):
                          {"technique": "naked_single", "kind": "place", "tier": 1,
                           "n": self.drill_counts["naked_single"], "unlocked": True, "theory": "naked-single"})
         d = self.api("GET", "/api/drills/next?technique=hidden_single_box")
-        self.assertEqual(set(d), {"id", "technique", "kind", "prompt", "title", "board", "candidates"})
+        self.assertEqual(set(d), {"id", "technique", "kind", "prompt", "title", "board", "candidates", "fav"})
         self.assertEqual((d["technique"], d["kind"], len(d["board"]), len(d["candidates"])),
                          ("hidden_single_box", "place", 81, 81))
         self.assertIn(self.api("GET", "/api/drills/next?technique=random")["technique"], self.drill_counts)
@@ -240,6 +240,35 @@ class ServerTest(unittest.TestCase):
         self.api("POST", "/api/drills/99999/attempt", {"time_ms": 1, "cell": 0, "value": 1}, status=404)
         self.api("POST", f"/api/drills/{d['id']}/attempt", {"cell": 0, "value": 1}, status=400)
         self.api("POST", f"/api/drills/{d['id']}/attempt", {"time_ms": 1, "cell": 81, "value": 1}, status=400)
+
+    def test_favorites(self):
+        self.assertEqual(self.api("GET", "/api/favorites"), {"puzzle": 0, "drill": 0})
+        self.api("GET", "/api/puzzle?favorite=1", status=404)
+        pid = self.hard[0]
+        res = self.api("PUT", f"/api/favorites/puzzle/{pid}")
+        self.assertEqual(res, {"fav": True, "counts": {"puzzle": 1, "drill": 0}})
+        self.api("PUT", f"/api/favorites/puzzle/{pid}")  # idempotent
+        self.assertEqual(self.api("GET", "/api/favorites"), {"puzzle": 1, "drill": 0})
+        p = self.api("GET", "/api/puzzle?favorite=1")
+        self.assertEqual((p["id"], p["fav"]), (pid, True))
+        self.assertFalse(self.api("GET", "/api/puzzle?level=easy")["fav"])
+        gid = self.new_game(pid)
+        self.assertTrue(self.api("GET", f"/api/games/{gid}/review")["game"]["fav"])
+        self.api("POST", f"/api/games/{gid}/finish", {"status": "abandoned", "t_ms": 1000})
+
+        d = self.api("GET", "/api/drills/next?technique=naked_single")
+        self.assertFalse(d["fav"])
+        self.api("PUT", f"/api/favorites/drill/{d['id']}")
+        f = self.api("GET", "/api/drills/next?technique=favorites")
+        self.assertEqual((f["id"], f["fav"]), (d["id"], True))
+
+        res = self.api("DELETE", f"/api/favorites/drill/{d['id']}")
+        self.assertEqual(res, {"fav": False, "counts": {"puzzle": 1, "drill": 0}})
+        self.api("DELETE", f"/api/favorites/puzzle/{pid}")
+        self.api("GET", "/api/drills/next?technique=favorites", status=404)
+        self.api("PUT", "/api/favorites/puzzle/999999", status=404)
+        self.api("PUT", "/api/favorites/drill/999999", status=404)
+        self.api("PUT", "/api/favorites/game/1", status=404)
 
     def test_theory(self):
         self.assertEqual(self.api("GET", "/api/theory"), [
@@ -299,7 +328,7 @@ class ServerTest(unittest.TestCase):
                 for r in range(9)]
         art = "\n".join(rows[:3] + ["------+-------+------"] + rows[3:6] + ["------+-------+------"] + rows[6:])
         p = self.api("POST", "/api/puzzles", {"givens": art})
-        self.assertEqual(set(p), {"id", "level", "givens", "solution", "tech_grade", "grade_title"})
+        self.assertEqual(set(p), {"id", "level", "givens", "solution", "tech_grade", "grade_title", "fav"})
         self.assertEqual((p["level"], p["givens"], p["solution"], p["tech_grade"], p["grade_title"]),
                          ("custom", givens, solution, 1, GRADE_TITLE[1]))
         self.assertNotEqual(p["id"], self.easy[name])

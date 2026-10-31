@@ -8,7 +8,7 @@ import * as drills from "./drills.js";
 import * as stats from "./stats.js";
 import * as theory from "./theory.js";
 import * as today from "./today.js";
-import { errorBox } from "./ui.js";
+import { errorBox, initZen, isZen, setZen, themeButton, typingInto } from "./ui.js";
 
 const ROUTES = [
   [/^today$/, today.mount, "today"],
@@ -21,6 +21,7 @@ const ROUTES = [
   [/^settings$/, settings.mount, "settings"],
 ];
 const TITLES = { today: "Сегодня", play: "Играть", drills: "Упражнения", stats: "Статистика", theory: "Теория", settings: "Вид" };
+const ZEN_PAGES = new Set(["play", "drills"]);
 
 initAppearance();
 const app = document.getElementById("app");
@@ -45,6 +46,8 @@ function route() {
     if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   }
   document.title = `${TITLES[nav] || "Sudoku Gym"} · Sudoku Gym`;
+  document.body.classList.toggle("zen-page", ZEN_PAGES.has(nav));
+  themeBtn?.sync();
   try {
     const res = fn(app, m.slice(1).map(decodeURIComponent), query);
     cleanup = typeof res === "function" ? res : null;
@@ -55,6 +58,15 @@ function route() {
 }
 
 window.addEventListener("hashchange", route);
+const themeBtn = themeButton();  // re-synced on every route: #/settings may have changed the theme
+document.querySelector(".top-in").append(themeBtn);
+initZen();
+
+// Z toggles zen mode on the board pages, Esc leaves it.
+document.addEventListener("keydown", e => {
+  if (!document.body.classList.contains("zen-page") || typingInto(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === "KeyZ" || (e.key === "Escape" && isZen())) { setZen(e.key === "Escape" ? false : !isZen()); e.preventDefault(); }
+});
 
 // http://127.0.0.1:8765/?debug — shows what each key press reaches, to diagnose keyboard problems in a browser.
 if (new URLSearchParams(location.search).has("debug")) {
