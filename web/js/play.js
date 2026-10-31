@@ -15,6 +15,7 @@ let meta = {};         // {hideGrade}
 let options = null;    // /api/puzzle/options
 let ui = null;         // DOM refs while mounted
 let pendingMsg = null; // message to show on next refresh
+let digit = 0;         // last digit pressed: highlighted everywhere until a filled cell is selected
 
 const bits = m => { const out = []; for (let v = 1; v <= 9; v++) if (m & (1 << v)) out.push(v); return out; };
 
@@ -74,8 +75,8 @@ export function mount(el, params, query) {
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
     results: h("div", { id: "results" }), autoBox, notesBtn, setup,
   };
-  ui.board = createBoard(boardEl, { onCell: i => G?.select(i) });
-  ui.pad = createPad(padEl, { onDigit: v => G?.input(v, G.S.notesMode), onErase: () => G?.erase() });
+  ui.board = createBoard(boardEl, { onCell: i => { if (G) { digit = 0; G.select(i); } } });
+  ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => G?.erase() });
   el.append(h("div", { class: "layout" },
     h("div", { class: "main-col" },
       h("div", { class: "bar" }, ui.badge, ui.errs, ui.timer), boardEl, padEl,
@@ -131,7 +132,7 @@ function refresh() {
   }
   const S = G.S, over = S.status !== "active";
   ui.board.render({
-    values: S.vals, given: S.given, sel: over ? -1 : S.sel, highlight: true, locked: over && S.status !== "solved",
+    values: S.vals, given: S.given, sel: over ? -1 : S.sel, highlight: true, locked: over && S.status !== "solved", digit,
     notes: i => (S.vals[i] ? null : bits(S.notes[i])),
     cellClass: i => (G.isWrong(i) && (S.mode === "original" || S.showBad.has(i) || over) ? ["bad"] : []),
   });
@@ -183,6 +184,7 @@ async function begin(getPuzzleFn, hideGrade) {
     const limit = prefs.mode === "original" ? (prefs.limit === "none" ? null : Number(prefs.limit)) : null;
     const { id } = await createGame(puzzle.id, prefs.mode, limit);
     meta = { hideGrade };
+    digit = 0;
     G = startGame({
       puzzle, gameId: id, mode: prefs.mode, limit,
       onChange: refresh, onEnd: endGame,
@@ -220,6 +222,14 @@ export function loadCustom(text) {
   return begin(() => addPuzzle(givens), false);
 }
 
+/** Digit from the pad or keyboard: highlight it on the board, then place it (or toggle the note). */
+function press(v, asNote) {
+  if (!G) return;
+  digit = v;
+  G.input(v, asNote);
+  refresh();
+}
+
 function handleKey(e) {
   if (typingInto(e) || e.target.tagName === "SELECT" || e.altKey || !G) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" || (e.ctrlKey && e.code === "KeyZ")) {
@@ -227,8 +237,8 @@ function handleKey(e) {
   }
   if (e.ctrlKey || e.metaKey) return;
   const d = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
-  if (d && d[1] !== "0") { G.input(+d[1], e.shiftKey || G.S.notesMode); e.preventDefault(); return; }
-  if (e.key.startsWith("Arrow")) { G.move(e.key); e.preventDefault(); return; }
+  if (d && d[1] !== "0") { press(+d[1], e.shiftKey || G.S.notesMode); e.preventDefault(); return; }
+  if (e.key.startsWith("Arrow")) { digit = 0; G.move(e.key); e.preventDefault(); return; }
   if (e.key === "Backspace" || e.key === "Delete" || (d && d[1] === "0")) { G.erase(); e.preventDefault(); return; }
   if ("nNтТ".includes(e.key) && e.key.length === 1 || e.code === "Space") { G.toggleNotes(); e.preventDefault(); }
 }

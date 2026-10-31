@@ -40,10 +40,24 @@ export function parseGrid(text) {
  *   values: number[81], given: boolean[81], sel?: number, highlight?: boolean (peers + same digit),
  *   notes?: (i) => number[] | null  — small digits in empty cells,
  *   notesBig?: boolean, pickable?: boolean (candidates clickable → onCandidate(i, v)),
- *   cellClass?: (i) => string[], candClass?: (i, v) => string, ghost?: Map<cell, digit>, locked?: boolean }
+ *   cellClass?: (i) => string[], candClass?: (i, v) => string, ghost?: Map<cell, digit>, locked?: boolean,
+ *   digit?: number — highlight this digit everywhere (cells and notes); default: the selected cell's value }
+ * Row (1-9, left) and column (1-9, top) numbers frame the grid, matching cellName's r#c#.
  */
 export function createBoard(el, { onCell, onCandidate, interactive = true } = {}) {
   el.textContent = "";
+  const frame = document.createElement("div");
+  frame.className = "board-frame";
+  const labels = cls => {
+    const box = document.createElement("div");
+    box.className = cls;
+    box.setAttribute("aria-hidden", "true");
+    for (let n = 1; n <= 9; n++) box.appendChild(Object.assign(document.createElement("span"), { textContent: n }));
+    frame.appendChild(box);
+    return [...box.children];
+  };
+  frame.appendChild(Object.assign(document.createElement("div"), { className: "corner" }));
+  const colLabels = labels("col-nums"), rowLabels = labels("row-nums");
   const grid = document.createElement("div");
   grid.className = "grid" + (interactive ? "" : " static");
   grid.setAttribute("role", "grid");
@@ -62,11 +76,14 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
       + (k === 8 ? " c8" : "") + (r === 8 ? " r8" : "") });
     grid.appendChild(c);
   }
-  el.appendChild(grid);
+  frame.appendChild(grid);
+  el.appendChild(frame);
 
   function render(view) {
     const { values, given, sel = -1, highlight = false } = view;
-    const selVal = sel >= 0 ? values[sel] : 0;
+    const selVal = view.digit || (sel >= 0 && values[sel]) || 0;
+    rowLabels.forEach((s, n) => s.classList.toggle("on", sel >= 0 && ROW(sel) === n));
+    colLabels.forEach((s, n) => s.classList.toggle("on", sel >= 0 && COL(sel) === n));
     const peers = new Set(sel >= 0 && highlight ? PEERS[sel] : []);
     grid.classList.toggle("locked", !!view.locked);
     for (let i = 0; i < 81; i++) {
@@ -92,7 +109,7 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
           s.textContent = v;
           s.dataset.v = v;
           const extra = view.candClass?.(i, v);
-          s.className = [view.pickable ? "pick" : "", extra || ""].join(" ").trim();
+          s.className = [view.pickable ? "pick" : "", highlight && v === selVal ? "hl" : "", extra || ""].join(" ").trim();
         }
         box.appendChild(s);
       }

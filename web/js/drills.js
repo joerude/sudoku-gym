@@ -23,6 +23,7 @@ export function mount(el, params, query) {
   let autoNext = readAuto();
   if (query.technique) choice = query.technique;
   let drill = null, values = [], start = 0, sel = -1, result = null, picked = null, techs = [], loading = false;
+  let digit = 0;  // last digit pressed or filled cell clicked: highlighted on the board
 
   const boardEl = h("div", { id: "drillBoard" }), padEl = h("div");
   const prompt = h("p", { class: "prompt", id: "prompt" }, "Загрузка…");
@@ -55,7 +56,7 @@ export function mount(el, params, query) {
 
   el.append(h("div", { class: "layout" },
     h("div", { class: "main-col" },
-      h("div", { class: "bar", style: "margin-bottom:4px" }, title, theoryLink, timer), prompt,
+      h("div", { class: "bar head", style: "margin-bottom:4px" }, title, theoryLink, timer), prompt,
       h("p", { class: "hint", id: "drillHow" }), boardWrap, padEl,
       h("div", { class: "bar", style: "margin-top:10px" }, nextBtn,
         h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Пробел"), " / ", h("kbd", {}, "Enter"))),
@@ -106,7 +107,7 @@ export function mount(el, params, query) {
     candBox.checked = elim || showCands;
     candBox.disabled = elim;
     board.render({
-      values, given: values.map(Boolean), sel: result ? -1 : sel, highlight: !elim || sel >= 0,
+      values, given: values.map(Boolean), sel: result ? -1 : sel, highlight: !elim || sel >= 0 || !!digit, digit,
       notes: i => (elim || showCands ? drill.candidates[i] : null), notesBig: elim, pickable: elim && !result,
       ghost,
       cellClass: i => {
@@ -133,8 +134,8 @@ export function mount(el, params, query) {
     msg.textContent = ""; msg.className = "msg";
     try {
       drill = await nextDrill(choice === "adaptive" ? undefined : choice);
-      values = toDigits(drill.board); sel = -1; result = null; picked = null;
-      title.textContent = drill.title;
+      values = toDigits(drill.board); sel = -1; result = null; picked = null; digit = 0;
+      title.textContent = drill.title; title.title = drill.title;
       why.hidden = true; why.textContent = "";
       const slug = techs.find(t => t.technique === drill.technique)?.theory;
       theoryLink.hidden = !slug;
@@ -160,12 +161,14 @@ export function mount(el, params, query) {
   }
 
   function onCell(i) {
-    if (!drill || result || gated || values[i]) return;
-    sel = i; render();
+    if (!drill || result || gated) return;
+    if (values[i]) { digit = values[i]; sel = -1; } else sel = i;
+    render();
   }
   function onDigit(v) {
     if (!drill || result || gated) return;
-    if (sel < 0 || values[sel]) { msg.textContent = "Сначала выбери пустую клетку"; msg.className = "msg"; return; }
+    digit = v;
+    if (sel < 0 || values[sel]) { render(); return; }
     if (drill.kind === "eliminate" && !drill.candidates[sel].includes(v)) {
       msg.textContent = `В ${cellName(sel)} нет кандидата ${v}`; msg.className = "msg"; return;
     }
@@ -207,8 +210,8 @@ export function mount(el, params, query) {
   const onKey = e => {
     if (typingInto(e) || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Enter" || e.code === "Space") {
-      // a control focused from the keyboard (Tab) keeps its own Enter/Space
-      if (e.target !== document.body && e.target !== nextBtn && e.target.matches("button, input, label")) return;
+      // a control focused from the keyboard (Tab) keeps its own Enter/Space; one focused by a mouse click does not
+      if (e.target !== nextBtn && e.target.matches("button:focus-visible, input:focus-visible")) return;
       e.preventDefault();
       if (gated) begin(); else load();
       return;
@@ -216,9 +219,16 @@ export function mount(el, params, query) {
     const d = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
     if (d) { onDigit(+d[1]); e.preventDefault(); return; }
     if (e.key.startsWith("Arrow") && drill && !result) {
-      const i = sel < 0 ? 0 : sel, r = ROW(i), k = COL(i);
-      sel = { ArrowUp: ((r + 8) % 9) * 9 + k, ArrowDown: ((r + 1) % 9) * 9 + k,
-              ArrowLeft: r * 9 + (k + 8) % 9, ArrowRight: r * 9 + (k + 1) % 9 }[e.key];
+      // only empty cells take an answer, so the arrows jump over filled ones (wrapping within the row / column)
+      if (sel < 0) sel = values.indexOf(0);
+      else {
+        const [dr, dk] = { ArrowUp: [8, 0], ArrowDown: [1, 0], ArrowLeft: [0, 8], ArrowRight: [0, 1] }[e.key];
+        for (let n = 1, r = ROW(sel), k = COL(sel); n < 9; n++) {
+          r = (r + dr) % 9; k = (k + dk) % 9;
+          if (!values[r * 9 + k]) { sel = r * 9 + k; break; }
+        }
+      }
+      digit = 0;
       e.preventDefault(); render();
     }
   };
