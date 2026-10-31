@@ -1,4 +1,5 @@
 // Reusable 9x9 board renderer (play, drills, review mini boards) + number pad + grid helpers.
+import { hintPrefs } from "./appearance.js";
 
 export const ROW = i => Math.floor(i / 9);
 export const COL = i => i % 9;
@@ -43,6 +44,7 @@ export function parseGrid(text) {
  *   cellClass?: (i) => string[], candClass?: (i, v) => string, ghost?: Map<cell, digit>, locked?: boolean,
  *   digit?: number — highlight this digit everywhere (cells and notes); default: the selected cell's value }
  * Row (1-9, left) and column (1-9, top) numbers frame the grid, matching cellName's r#c#.
+ * Each kind of highlight (peers, same digit in cells / notes, row and column number) can be off in «Вид» (hintPrefs).
  */
 export function createBoard(el, { onCell, onCandidate, interactive = true } = {}) {
   el.textContent = "";
@@ -81,16 +83,17 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
 
   function render(view) {
     const { values, given, sel = -1, highlight = false } = view;
-    const selVal = view.digit || (sel >= 0 && values[sel]) || 0;
-    rowLabels.forEach((s, n) => s.classList.toggle("on", sel >= 0 && ROW(sel) === n));
-    colLabels.forEach((s, n) => s.classList.toggle("on", sel >= 0 && COL(sel) === n));
-    const peers = new Set(sel >= 0 && highlight ? PEERS[sel] : []);
+    const selVal = view.digit || (sel >= 0 && values[sel]) || 0, hl = hintPrefs();
+    const sameCell = highlight && hl.same && selVal, sameNote = highlight && hl.notes && selVal;
+    rowLabels.forEach((s, n) => s.classList.toggle("on", hl.labels && sel >= 0 && ROW(sel) === n));
+    colLabels.forEach((s, n) => s.classList.toggle("on", hl.labels && sel >= 0 && COL(sel) === n));
+    const peers = new Set(sel >= 0 && highlight && hl.peers ? PEERS[sel] : []);
     grid.classList.toggle("locked", !!view.locked);
     for (let i = 0; i < 81; i++) {
       const c = cells[i].el, cls = [cells[i].base];
       if (given[i]) cls.push("given");
       if (peers.has(i)) cls.push("peer");
-      if (highlight && selVal && values[i] === selVal) cls.push("same");
+      if (sameCell && values[i] === selVal) cls.push("same");
       if (i === sel) cls.push("sel");
       if (view.cellClass) cls.push(...view.cellClass(i));
       const ghost = view.ghost?.get(i);
@@ -109,7 +112,7 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
           s.textContent = v;
           s.dataset.v = v;
           const extra = view.candClass?.(i, v);
-          s.className = [view.pickable ? "pick" : "", highlight && v === selVal ? "hl" : "", extra || ""].join(" ").trim();
+          s.className = [view.pickable ? "pick" : "", sameNote && v === selVal ? "hl" : "", extra || ""].join(" ").trim();
         }
         box.appendChild(s);
       }

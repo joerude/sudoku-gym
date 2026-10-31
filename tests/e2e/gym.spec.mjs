@@ -455,6 +455,16 @@ try {
   await page.click("#lookReset");
   const l5 = await look();
   ok(l5.theme === null && /JetBrains Mono/.test(l5.font) && Math.abs(l5.cellPx - l0.cellPx) < 0.5, "look: reset restores the default look", JSON.stringify(l5));
+  const marks = () => page.evaluate(() => ["peer", "same"].map(c => document.querySelectorAll(`#lookBoard .cell.${c}`).length)
+    .concat(document.querySelectorAll("#lookBoard .notes span.hl, #lookBoard .row-nums span.on").length));
+  const m0 = await marks();
+  for (const id of ["peers", "same", "notes", "labels"]) await page.click(`#hints input[data-hint="${id}"]`);
+  await page.reload();
+  await page.waitForSelector("#lookBoard .cell");
+  const m1 = await marks();
+  ok(m0.every(n => n > 0) && m1.every(n => n === 0), "look: board highlights switch off and stay off after a reload", JSON.stringify([m0, m1]));
+  await page.click("#lookReset");
+  ok((await marks()).every(n => n > 0), "look: reset turns highlights back on");
 
   // --- 8c. board pages: board in the middle on a wide screen, panel right by default, left from #/settings ------
   const wide = await newPage({ width: 1440, height: 900 });

@@ -1,6 +1,6 @@
 // #/settings — look: colour theme (presets + own colours), font, digit and candidate size, side of the panel on the
-// board pages, with a live sample board.
-import { BASE, BASE_NAME, DEFAULTS, FONTS, SCALE, SIDES, THEMES, fontStack, loadPrefs, palette, savePrefs } from "./appearance.js";
+// board pages, board highlights, with a live sample board.
+import { BASE, BASE_NAME, DEFAULTS, FONTS, HINTS, SCALE, SIDES, THEMES, fontStack, loadPrefs, palette, savePrefs } from "./appearance.js";
 import { computeCandidates, createBoard, toDigits } from "./board.js";
 import { h } from "./ui.js";
 
@@ -62,6 +62,8 @@ export function mount(el) {
     return { input, out, row: h("label", { class: "field range" }, h("span", {}, label, " ", out), input) };
   };
   const digitS = slider("digit", "Цифры в клетках"), notesS = slider("notes", "Кандидаты");
+  const hintBoxes = HINTS.map(x => h("input", { type: "checkbox", "data-hint": x.id,
+    onchange: e => set({ hints: { ...prefs.hints, [x.id]: e.target.checked } }) }));
   const sideBtns = SIDES.map(s => h("button", { type: "button", "data-side": s.id, onclick: () => set({ side: s.id }) }, s.name));
 
   const preview = h("div", { id: "lookBoard" });
@@ -77,13 +79,15 @@ export function mount(el) {
           h("label", { class: "check", style: "margin-top:8px" }, darkBox, "тёмная (графики и полосы прокрутки)")),
         h("section", {}, h("h2", {}, "Шрифт"), h("div", { class: "font-grid", id: "fonts" }, fontBtns)),
         h("section", {}, h("h2", {}, "Размер"), digitS.row, notesS.row),
+        h("section", {}, h("h2", {}, "Подсветка на доске"),
+          h("p", { class: "hint" }, "Действует на «Играть», «Упражнения» и на примере. Выключенное ищешь глазами сам."),
+          h("div", { class: "check-list", id: "hints" }, HINTS.map((x, k) => h("label", { class: "check" }, hintBoxes[k], x.name)))),
         h("section", {}, h("h2", {}, "Панель у доски"),
           h("p", { class: "hint" }, "Настройки партии и список техник на «Играть» и «Упражнения». На широком экране доска — по центру."),
           h("div", { class: "chips", id: "sides" }, sideBtns)),
         h("button", { type: "button", id: "lookReset", onclick: () => set({ ...DEFAULTS, custom: prefs.custom }) }, "Сбросить вид"))));
 
   const board = createBoard(preview, { interactive: false });
-  board.render(sampleView());
 
   function refresh() {
     themeBtns.forEach((b, k) => {
@@ -97,6 +101,8 @@ export function mount(el) {
     fontBtns.forEach(b => b.classList.toggle("on", b.dataset.font === prefs.font));
     sideBtns.forEach(b => { const on = b.dataset.side === prefs.side; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
     for (const [s, key] of [[digitS, "digit"], [notesS, "notes"]]) { s.input.value = prefs[key]; s.out.textContent = pctLabel(prefs[key]); }
+    hintBoxes.forEach((b, k) => { b.checked = prefs.hints[HINTS[k].id]; });
+    board.render(sampleView());
   }
   refresh();
   // "Как в системе" follows the OS switch live; the colour pickers should too

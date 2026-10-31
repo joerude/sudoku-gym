@@ -1,5 +1,5 @@
-// Look settings (theme, font, digit sizes, side of the panel on board pages): kept in localStorage, applied as CSS
-// variables and data-theme / data-side on <html>.
+// Look settings (theme, font, digit sizes, side of the panel on board pages, board highlights): kept in localStorage,
+// applied as CSS variables and data-theme / data-side on <html>; highlights are read by board.js on each render.
 // index.html re-applies the last result from BOOT_KEY before first paint, so a page load never flashes the default look.
 const KEY = "gym-appearance";
 const BOOT_KEY = "gym-appearance-boot";
@@ -52,7 +52,15 @@ export const THEMES = [
   { id: "custom", name: "Своя" },
 ];
 export const SCALE = { min: 0.8, max: 1.4, step: 0.05 };
-export const DEFAULTS = { theme: "auto", font: "jetbrains", digit: 1, notes: 1, side: "right", custom: null };
+// highlights on the board around the selected cell / digit; each can be switched off
+export const HINTS = [
+  { id: "peers", name: "ряд, столбец и блок выбранной клетки" },
+  { id: "same", name: "та же цифра в клетках" },
+  { id: "notes", name: "та же цифра в кандидатах" },
+  { id: "labels", name: "номер ряда и столбца у края" },
+];
+const ALL_HINTS = Object.fromEntries(HINTS.map(x => [x.id, true]));
+export const DEFAULTS = { theme: "auto", font: "jetbrains", digit: 1, notes: 1, side: "right", hints: ALL_HINTS, custom: null };
 export const SIDES = [{ id: "left", name: "← слева" }, { id: "right", name: "справа →" }];
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -69,8 +77,13 @@ export function loadPrefs() {
   let theme = THEMES.some(t => t.id === p.theme) ? p.theme : DEFAULTS.theme;
   if (theme === "custom" && !custom) theme = DEFAULTS.theme;
   return { theme, custom, font: FONTS.some(f => f.id === p.font) ? p.font : DEFAULTS.font,
-           digit: clampScale(p.digit ?? 1), notes: clampScale(p.notes ?? 1), side: p.side === "left" ? "left" : "right" };
+           digit: clampScale(p.digit ?? 1), notes: clampScale(p.notes ?? 1), side: p.side === "left" ? "left" : "right",
+           hints: Object.fromEntries(HINTS.map(x => [x.id, p.hints?.[x.id] !== false])) };
 }
+
+let hints = ALL_HINTS;
+/** Board highlights now in force: {peers, same, notes, labels}. */
+export const hintPrefs = () => hints;
 
 const systemDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches;
 /** The palette actually on screen: {dark, bg, surface, ...}. */
@@ -85,13 +98,14 @@ function paletteVars(p) {
   return {
     ...Object.fromEntries(BASE.map(k => [`--${k}`, p[k]])),
     "--given": p.ink, "--line": mix(p.ink, 20), "--line-strong": mix(p.ink, 85), "--peer": mix(p.ink, 7),
-    "--same": mix(p.accent, 22), "--sel": mix(p.accent, 38), "--bad-bg": mix(p.bad, 22), "--ok-bg": mix(p.ok, 22),
+    "--same": mix(p.accent, 40), "--sel": mix(p.accent, 55), "--bad-bg": mix(p.bad, 22), "--ok-bg": mix(p.ok, 22),
     "--other-bg": mix(p.other, 22), "--unit": mix(p.other, 13), "--accent-ink": p.dark ? p.bg : "#ffffff",
   };
 }
 
 export function applyPrefs(prefs) {
   const root = document.documentElement, font = FONTS.find(f => f.id === prefs.font) || FONTS[0];
+  hints = { ...ALL_HINTS, ...prefs.hints };
   root.style.cssText = "";
   const vars = { "--font": fontStack(font), "--font-mono": font.mono ? fontStack(font) : fontStack(FONTS[0]),
                  "--digit-scale": prefs.digit, "--note-scale": prefs.notes };
