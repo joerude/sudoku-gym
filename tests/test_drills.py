@@ -283,6 +283,20 @@ class NextDrillTest(unittest.TestCase):
         self.assertFalse(rows["naked_pair"]["unlocked"])
         self.assertEqual(rows["pointing"]["theory"], "pointing-claiming")
 
+    def test_valid_other_move_is_neutral(self):
+        d = next_drill(self.conn, "hidden_single_col")
+        board = parse(d["board"])
+        sol = self.conn.execute("SELECT p.solution FROM drills d JOIN puzzles p ON p.id = d.puzzle_id WHERE d.id = ?",
+                                (d["id"],)).fetchone()[0]
+        answers = {tuple(a) for a in json.loads(self.conn.execute("SELECT answers FROM drills WHERE id = ?",
+                                                                  (d["id"],)).fetchone()[0])}
+        other = next(i for i in range(81) if not board[i] and (i, int(sol[i])) not in answers)
+        r = attempt(self.conn, d["id"], 4000, other, int(sol[other]))
+        self.assertEqual((r["correct"], r["valid_other_move"]), (False, True))
+        self.assertEqual(self.conn.execute("SELECT valid_other FROM drill_attempts").fetchone()[0], 1)
+        m = next(x for x in technique_list(self.conn) if x["technique"] == "hidden_single_col")
+        self.assertEqual((m["correct"], m["accuracy"]), (0, None))  # not counted as an error
+
     def test_adaptive_never_picks_locked(self):
         for _ in range(30):
             self.assertIn(next_drill(self.conn)["technique"], PLACE)

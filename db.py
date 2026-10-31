@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS drill_attempts (
     time_ms INTEGER NOT NULL,
     correct INTEGER NOT NULL,
     cell INTEGER,
-    value INTEGER
+    value INTEGER,
+    valid_other INTEGER NOT NULL DEFAULT 0  -- a true move/elimination, but not by the drill's technique
 );
 """
 
@@ -86,8 +87,10 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
     if path != ":memory:":
         conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
-    # databases created before drills.kind existed
-    if "kind" not in {r[1] for r in conn.execute("PRAGMA table_info(drills)")}:
-        conn.execute("ALTER TABLE drills ADD COLUMN kind TEXT NOT NULL DEFAULT 'place'")
-        conn.commit()
+    # databases created before these columns existed
+    for table, column, ddl in (("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
+                               ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0")):
+        if column not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+            conn.commit()
     return conn

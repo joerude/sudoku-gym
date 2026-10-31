@@ -185,7 +185,7 @@ def _score(conn, technique: str):
     """None if never attempted; else median of recent correct times × (1 + recent error rate)."""
     rows = conn.execute(
         "SELECT a.correct FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
-        " WHERE d.technique = ? ORDER BY a.id DESC LIMIT ?", (technique, ERROR_WINDOW)).fetchall()
+        " WHERE d.technique = ? AND a.valid_other = 0 ORDER BY a.id DESC LIMIT ?", (technique, ERROR_WINDOW)).fetchall()
     if not rows:
         return None
     correct_times = [r[0] for r in conn.execute(
@@ -203,12 +203,14 @@ def available_techniques(conn) -> list:
 
 
 def mastery(conn, technique: str) -> dict:
-    """{correct, accuracy, mastered}: total correct answers and accuracy over the last ERROR_WINDOW attempts."""
+    """{correct, accuracy, mastered}: total correct answers and accuracy over the last ERROR_WINDOW attempts.
+
+    A true move found by another technique (valid_other) is neutral: it is neither correct nor an error."""
     correct = conn.execute("SELECT COUNT(*) FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
                            " WHERE d.technique = ? AND a.correct = 1", (technique,)).fetchone()[0]
     recent = [r[0] for r in conn.execute(
         "SELECT a.correct FROM drill_attempts a JOIN drills d ON d.id = a.drill_id WHERE d.technique = ?"
-        " ORDER BY a.id DESC LIMIT ?", (technique, ERROR_WINDOW))]
+        " AND a.valid_other = 0 ORDER BY a.id DESC LIMIT ?", (technique, ERROR_WINDOW))]
     accuracy = sum(recent) / len(recent) if recent else None
     return {"correct": correct, "accuracy": accuracy,
             "mastered": correct >= UNLOCK_MIN_CORRECT and (accuracy or 0) >= UNLOCK_MIN_ACCURACY}
@@ -291,8 +293,8 @@ def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int) -> dict | 
             valid_other = str(value) != solution[cell] and value in candidates(parse(board))[cell]
         else:
             valid_other = solution[cell] == str(value)
-    conn.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct, cell, value) VALUES (?, ?, ?, ?, ?, ?)",
-                 (drill_id, _now(), time_ms, int(correct), cell, value))
+    conn.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct, cell, value, valid_other)"
+                 " VALUES (?, ?, ?, ?, ?, ?, ?)", (drill_id, _now(), time_ms, int(correct), cell, value, int(valid_other)))
     conn.commit()
     return {"correct": correct, "valid_other_move": valid_other, "answers": answers,
             **explain(board, row[4], answers, (cell, value) if correct else None),

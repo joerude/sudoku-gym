@@ -156,7 +156,8 @@ def stats(conn) -> dict:
                       "median_ms": _median(solved)})
     attempts = {}
     for t, correct, ms in conn.execute(
-            "SELECT d.technique, a.correct, a.time_ms FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"):
+            "SELECT d.technique, a.correct, a.time_ms FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
+            " WHERE a.valid_other = 0"):  # a true move by another technique is neither right nor wrong
         attempts.setdefault(t, []).append((correct, ms))
     techniques = []
     for t in TECH_TIER:
