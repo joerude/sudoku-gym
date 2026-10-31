@@ -486,6 +486,19 @@ try {
   await wide.waitForSelector("#picker button");
   ok(await wide.evaluate(() => document.documentElement.dataset.side) === "left", "wide: panel side survives a reload");
   await shot(wide, "drills-wide-left");
+  await wide.keyboard.press("z");
+  const zenHome = await wide.evaluate(() => {
+    const a = document.querySelector(".zen-home"), r = a.getBoundingClientRect(), g = document.querySelector(".layout .grid").getBoundingClientRect();
+    return { zen: document.body.classList.contains("zen"), header: getComputedStyle(document.querySelector(".top")).display,
+             shown: r.width > 0, clear: r.right < g.left };
+  });
+  ok(zenHome.zen && zenHome.header === "none" && zenHome.shown && zenHome.clear, "zen: header hidden, «← Сегодня» in the free corner", JSON.stringify(zenHome));
+  await wide.click(".zen-home");
+  const home = await wide.waitForFunction(() => location.hash === "#/today" && !document.body.classList.contains("zen-page")
+    && getComputedStyle(document.querySelector(".zen-home")).display === "none" && getComputedStyle(document.querySelector(".top")).display !== "none",
+    null, { timeout: 3000 }).then(() => true, () => false);
+  ok(home, "zen: «← Сегодня» goes home, where the header is back");
+  await wide.evaluate(() => localStorage.setItem("gym-zen", "0"));
   await wide.context().close();
 
   // --- 9. mobile 390px -------------------------------------------------------------------------

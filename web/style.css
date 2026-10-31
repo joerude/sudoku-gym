@@ -277,6 +277,11 @@ label.field.range input { width: 100%; max-width: 320px; accent-color: var(--acc
 :root { --zen-w: min(100%, clamp(300px, calc(100vh - 320px), 640px)); }
 body.zen.zen-page .top, body.zen.zen-page .zen-hide, body.zen.zen-page .playing .zen-hide-playing { display: none !important; }
 body.zen.zen-page main { padding-top: 12px; }
+/* the header is hidden in zen: a way home stays — in the free corner on a wide screen, above the board on a narrow one */
+.zen-home { display: none; }
+body.zen.zen-page .zen-home { display: block; width: max-content; padding: 10px 16px 0; font-size: 13px; color: var(--muted); text-decoration: none; }
+body.zen.zen-page .zen-home:hover { color: var(--accent); }
+@media (min-width: 1000px) { body.zen.zen-page .zen-home { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; padding: 14px 20px; } }
 body.zen.zen-page .layout { grid-template-columns: var(--zen-w); grid-template-rows: none; justify-content: center;
   --board: auto; --side: auto; --side-align: stretch; --side-w: none; }
 body.zen.zen-page .layout > .main-col { grid-row: auto; }
