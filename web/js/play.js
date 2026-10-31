@@ -76,7 +76,10 @@ function setupSection() {
 
 export function mount(el, params, query) {
   const boardEl = h("div", { id: "board" }), padEl = h("div");
-  const notesBtn = h("button", { type: "button", id: "notesBtn", title: "Режим заметок (N, Т или пробел)", onclick: () => G?.toggleNotes() }, "✎ заметки");
+  const notesBtn = h("button", { type: "button", class: "mini notes-toggle", id: "notesBtn", title: "Режим заметок (N, Т или пробел)",
+    onclick: () => G?.toggleNotes() }, "✎ заметки");
+  const notesLabel = h("div", { class: "notes-label", id: "notesLabel" },
+    "✎ режим заметок · ", h("kbd", {}, "N"), " / ", h("kbd", {}, "пробел"), " — выключить");
   const autoBox = h("input", { type: "checkbox", id: "autoNotes", checked: true, onchange: e => G?.setAutoNotes(e.target.checked) });
   const countsBox = h("input", { type: "checkbox", id: "padCounts", checked: prefs.counts,
     onchange: e => { prefs.counts = e.target.checked; savePrefs(); refresh(); } });
@@ -125,8 +128,8 @@ export function mount(el, params, query) {
     h("div", { class: "main-col" },
       // zen and «new game» sit next to the timer: reachable without scrolling, and in zen where the side panel is hidden
       h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer,
-        newTop, zenButton("mini")), boardEl, padEl,
-      h("div", { class: "bar", style: "margin-top:10px" }, notesBtn,
+        notesBtn, newTop, zenButton("mini")), boardEl, notesLabel, padEl,
+      h("div", { class: "bar", style: "margin-top:10px" },
         h("button", { type: "button", id: "undoBtn", onclick: () => G?.undoLast() }, "↶ отменить"),
         h("button", { type: "button", id: "checkBtn", title: "Подсветить ошибки (учитывается в итогах)", onclick: () => G?.check() }, "Проверить"),
         clearBtn, giveUpBtn,
@@ -182,6 +185,7 @@ function refresh() {
     ui.board.render({ values: Array(81).fill(0), given: Array(81).fill(false) });
     ui.pad.update(null);
     ui.badge.textContent = "партия не начата"; ui.errs.textContent = "";
+    ui.root?.classList.remove("notes-on");
     ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
     if (pendingMsg) { setMsg(pendingMsg.text, pendingMsg.cls); pendingMsg = null; }
     else if (!ui.msg.textContent) setMsg("Выбери уровень и нажми «Новая партия».");
@@ -200,7 +204,11 @@ function refresh() {
   ui.errs.classList.toggle("bad", S.mode === "original" && S.mistakes > 0);
   ui.timer.textContent = fmtTime(G.elapsed());
   ui.timer.classList.toggle("done", S.status === "solved");
-  ui.notesBtn.classList.toggle("on", S.notesMode);
+  // notes mode is visible at a glance: the toggle, a dashed board, pencil-style pad digits and a label above the pad
+  ui.notesBtn.classList.toggle("on", !!S.notesMode);
+  ui.notesBtn.setAttribute("aria-pressed", !!S.notesMode);
+  ui.notesBtn.textContent = S.notesMode ? "✎ заметки: вкл" : "✎ заметки";
+  ui.root.classList.toggle("notes-on", !!S.notesMode && !over);
   ui.clearBtn.disabled = ui.giveUpBtn.disabled = over;
   ui.autoBox.checked = S.autoNotes;
   if (S.msg) setMsg(S.msg.text, S.msg.cls);

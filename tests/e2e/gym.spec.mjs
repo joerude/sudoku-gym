@@ -198,9 +198,18 @@ try {
   ok((await page.textContent(`${cellSel(c3)} .notes`)).includes("3"), "Shift+digit adds a note");
   await page.keyboard.press("n");
   ok(await page.$eval("#notesBtn", e => e.classList.contains("on")), "N toggles notes mode");
+  ok(await page.evaluate(() => {
+    const label = document.querySelector("#notesLabel"), btn = document.querySelector("#notesBtn");
+    return document.querySelector(".layout").classList.contains("notes-on") && getComputedStyle(label).display !== "none"
+      && /вкл/.test(btn.textContent) && btn.closest(".bar").contains(document.querySelector("#timer"))
+      && getComputedStyle(document.querySelector("#board .grid")).outlineStyle === "dashed";
+  }), "notes mode is visible: toggle «вкл» next to the timer, label above the pad, dashed board");
+  await shot(page, "play-notes");
   await page.keyboard.press("7");
   await page.keyboard.press("Space");
   ok(!(await page.$eval("#notesBtn", e => e.classList.contains("on"))), "Space toggles notes mode off");
+  ok(await page.evaluate(() => !document.querySelector(".layout").classList.contains("notes-on")
+    && getComputedStyle(document.querySelector("#notesLabel")).display === "none"), "notes mode off: indicators gone");
   await page.keyboard.press(g3.solution[c3]);
   ok((await page.textContent(cellSel(c3))).trim() === g3.solution[c3], "digit placed");
   await page.keyboard.press("Control+z");

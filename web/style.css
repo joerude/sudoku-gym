@@ -184,6 +184,12 @@ section, .card { margin-bottom: 28px; }
 .pad button { padding: 10px 0; font-size: 18px; position: relative; }
 .pad button small { position: absolute; right: 5px; bottom: 2px; font-size: 10px; color: var(--muted); }
 .pad button.empty { opacity: .35; }
+/* notes mode on #/play: dashed board, pencil-style pad digits, a label above the pad */
+.notes-label { display: none; margin: 10px 0 -4px; font-size: 13px; color: var(--accent); }
+.notes-on .notes-label { display: block; }
+.notes-on #board .grid { outline: 2px dashed var(--accent); outline-offset: 3px; }
+.notes-on .pad button[data-digit] { display: flex; align-items: flex-start; justify-content: flex-start; padding: 6px 9px 14px;
+  font-size: 13px; color: var(--accent); border-color: var(--accent); }
 
 /* --- results / metrics --- */
 .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin: 8px 0 12px; }
