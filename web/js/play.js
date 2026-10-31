@@ -9,8 +9,12 @@ import { LEVEL_NAME, alignSideToBoard, confirmDialog, createFav, errorBox, h, ig
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
-let prefs = { level: "medium", grade: "", mode: "original", limit: "3", counts: true, customLevel: "medium" };
+let prefs = { level: "medium", grade: "", mode: "original", limit: "3", limitN: "3", counts: true, customLevel: "medium" };
 try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") }; } catch { /* no storage */ }
+// limit: "1".."99" or "none"; limitN: the last number, kept while «без лимита» is on
+const toLimit = v => { const n = Number(v); return Number.isInteger(n) && n >= 1 && n <= 99 ? String(n) : null; };
+if (prefs.limit !== "none") prefs.limit = toLimit(prefs.limit) || "3";
+prefs.limitN = toLimit(prefs.limitN) || (prefs.limit === "none" ? "3" : prefs.limit);
 const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ } };
 
 let G = null;          // current game (game.js api)
@@ -36,16 +40,25 @@ const levelTotal = level => Object.values(gradeCounts(level)).reduce((a, b) => a
 /** Cells whose digit repeats in their row, column or box. */
 const conflicts = vals => new Set(vals.flatMap((v, i) => (v && PEERS[i].some(p => vals[p] === v) ? [i] : [])));
 
-/** Mode and mistake-limit selects bound to prefs: the setup and the grid editor each have a pair. */
+/** Mode select and mistake limit (1–99 or «без лимита») bound to prefs: the setup and the grid editor each have a set. */
 function modeFields(ids) {
   const mode = h("select", { id: ids.mode, "aria-label": tr("Режим") },
     h("option", { value: "original" }, tr("original — ошибки видны")), h("option", { value: "hardcore" }, tr("hardcore — без подсветки")));
-  const limit = h("select", { id: ids.limit, "aria-label": tr("Лимит ошибок") },
-    h("option", { value: "3" }, "3"), h("option", { value: "5" }, "5"), h("option", { value: "none" }, tr("без лимита")));
-  const limitField = h("label", { class: "field" }, tr("Лимит ошибок"), limit);
-  const sync = () => { mode.value = prefs.mode; limit.value = prefs.limit; limitField.hidden = prefs.mode !== "original"; };
+  const limit = h("input", { type: "number", id: ids.limit, min: 1, max: 99, step: 1, inputmode: "numeric",
+    "aria-label": tr("Лимит ошибок"), title: tr("Сколько ошибок можно сделать: 1–99") });
+  const noLimit = h("input", { type: "checkbox", id: ids.noLimit });
+  const limitField = h("div", { class: "field" }, h("label", { for: ids.limit }, tr("Лимит ошибок")),
+    h("span", { class: "limit-row" }, limit, h("label", { class: "check" }, noLimit, tr("без лимита"))));
+  const sync = () => {
+    mode.value = prefs.mode; limit.value = prefs.limitN;
+    noLimit.checked = prefs.limit === "none"; limit.disabled = noLimit.checked;
+    limitField.hidden = prefs.mode !== "original";
+  };
   mode.onchange = () => { prefs.mode = mode.value; savePrefs(); sync(); markRecord(); };
-  limit.onchange = () => { prefs.limit = limit.value; savePrefs(); };
+  // a valid number is taken as you type; leaving the field with a bad one puts the last valid number back
+  limit.oninput = () => { const n = toLimit(limit.value); if (n) { prefs.limit = prefs.limitN = n; savePrefs(); } };
+  limit.onchange = () => { if (!toLimit(limit.value)) limit.value = prefs.limitN; };
+  noLimit.onchange = () => { prefs.limit = noLimit.checked ? "none" : prefs.limitN; savePrefs(); sync(); };
   sync();
   return { modeField: h("label", { class: "field" }, tr("Режим"), mode), limitField, sync };
 }
@@ -54,7 +67,7 @@ function setupSection() {
   const lvl = h("select", { id: "level", "aria-label": tr("Уровень") },
     [...LEVELS, "random"].map(l => h("option", { value: l }, l === "random" ? LEVEL_NAME.random : LEVEL_NAME[l])));
   const grade = h("select", { id: "grade", "aria-label": tr("Техника") });
-  const fields = modeFields({ mode: "mode", limit: "limit" });
+  const fields = modeFields({ mode: "mode", limit: "limit", noLimit: "noLimit" });
   const sync = () => {
     const counts = gradeCounts(lvl.value);
     grade.textContent = "";
@@ -95,7 +108,7 @@ function editorSection() {
   const lvl = h("select", { id: "customLevel", "aria-label": tr("Уровень") },
     [...LEVELS, "custom"].map(l => h("option", { value: l }, LEVEL_NAME[l])));
   lvl.onchange = () => { prefs.customLevel = lvl.value; savePrefs(); markRecord(); };
-  const fields = modeFields({ mode: "customMode", limit: "customLimit" });
+  const fields = modeFields({ mode: "customMode", limit: "customLimit", noLimit: "customNoLimit" });
   const status = h("p", { class: "hint", id: "customStatus" });
   const startBtn = h("button", { type: "button", class: "primary", id: "customStart", onclick: () => startCustom() }, tr("▶ Начать"));
   const box = h("section", { class: "first-mobile", id: "customEditor" },

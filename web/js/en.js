@@ -167,6 +167,7 @@ export default {
   "hardcore — без подсветки": "hardcore — no highlighting",
   "Лимит ошибок": "Mistake limit",
   "без лимита": "no limit",
+  "Сколько ошибок можно сделать: 1–99": "How many mistakes are allowed: 1–99",
   "Любая ({n})": "Any ({n})",
   "Новая партия": "New game",
   "🎲 Случайная партия": "🎲 Random game",

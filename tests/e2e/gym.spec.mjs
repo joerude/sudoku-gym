@@ -94,7 +94,8 @@ async function startGame(page, { level, mode, limit, grade }) {
   if (level) await setSelect(page, "level", level);
   if (grade !== undefined) await setSelect(page, "grade", grade);
   if (mode) await setSelect(page, "mode", mode);
-  if (limit) await setSelect(page, "limit", limit);
+  if (limit === "none") await page.check("#noLimit");
+  else if (limit) { await page.uncheck("#noLimit"); await page.fill("#limit", limit); await page.dispatchEvent("#limit", "change"); }
   return waitGame(page, () => page.click("#newGame"));
 }
 const typeAt = async (page, i, v) => { await page.click(cellSel(i)); await page.keyboard.press(String(v)); };
@@ -202,6 +203,20 @@ try {
   ok((await page.textContent(cellSel(e2[3]))).trim() === "", "locked board ignores input");
   const s2 = await api(`/api/games/${g2.id}`);
   ok(s2.status === "failed" && s2.mistakes === 3, "server: failed with 3 mistakes");
+
+  // --- 2b. own mistake limit: any n, remembered; «без лимита» ---------------------------------
+  const g2b = await startGame(page, { mode: "original", limit: "7" });
+  ok(g2b.mistake_limit === 7, "original: own limit 7", JSON.stringify(g2b.mistake_limit));
+  ok((await page.textContent("#errors")).includes("Ошибки 0/7"), "original: counter 0/7");
+  await page.reload();
+  await page.waitForSelector("#grade option[value=\"1\"]", { state: "attached" });
+  ok(await page.inputValue("#limit") === "7", "own limit survives a reload");
+  const g2c = await startGame(page, { limit: "none" });
+  ok(g2c.mistake_limit === null && await page.$eval("#limit", e => e.disabled), "«без лимита»: no limit, field disabled");
+  await page.uncheck("#noLimit");
+  ok(await page.inputValue("#limit") === "7" && !(await page.$eval("#limit", e => e.disabled)), "unchecking «без лимита» brings 7 back");
+  await page.fill("#limit", "0"); await page.dispatchEvent("#limit", "change");
+  ok(await page.inputValue("#limit") === "7", "invalid limit reverts to the last valid one");
 
   // --- 3. 🎲 random game; starting another abandons it --------------------------------------
   const g3 = await waitGame(page, () => page.click("#randomGame"));
