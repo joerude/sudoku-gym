@@ -198,6 +198,19 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(set(recent[0]), {"id", "puzzle_id", "level", "mode", "status", "started_at", "finished_at",
                                           "time_ms", "mistakes"})
 
+    def test_new_game_abandons_stale(self):
+        # the player reloaded the page mid-game: the next game closes the old one as abandoned
+        old = self.new_game(self.easy["L1-1"], "hardcore")
+        self.api("POST", f"/api/games/{old}/moves", {"moves": [
+            {"seq": 1, "t_ms": 3000, "cell": 1, "value": 9, "kind": "place"},
+            {"seq": 2, "t_ms": 7000, "cell": 1, "value": 4, "kind": "place"}]})
+        new = self.new_game(self.easy["L1-2"], "hardcore")
+        g = self.api("GET", f"/api/games/{old}")
+        self.assertEqual((g["status"], g["time_ms"], g["mistakes"]), ("abandoned", 7000, 1))
+        self.assertIsNotNone(g["finished_at"])
+        self.assertEqual(self.api("GET", f"/api/games/{new}")["status"], "active")
+        self.api("POST", f"/api/games/{new}/finish", {"status": "abandoned", "t_ms": 1000})
+
     def test_drills(self):
         techs = self.api("GET", "/api/drills/techniques")
         self.assertEqual([t["technique"] for t in techs], DRILL_TECHNIQUES)

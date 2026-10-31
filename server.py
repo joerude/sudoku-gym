@@ -156,6 +156,10 @@ def api_create_game(conn, m, q, body):
         limit = _int(body, "mistake_limit", lo=1, required=False) if "mistake_limit" in body else DEFAULT_MISTAKE_LIMIT
     if not conn.execute("SELECT 1 FROM puzzles WHERE id = ?", (puzzle_id,)).fetchone():
         raise ApiError(404, "задача не найдена")
+    # a game left by a reload or navigation would stay "active" forever: close it at its last move
+    for (stale,) in conn.execute("SELECT id FROM games WHERE status = 'active'").fetchall():
+        moves = analysis.load_moves(conn, stale)
+        _close_game(conn, _game(conn, stale), "abandoned", max((mv["t_ms"] for mv in moves), default=0), moves)
     cur = conn.execute("INSERT INTO games (puzzle_id, mode, mistake_limit, started_at, status) VALUES (?, ?, ?, ?, 'active')",
                        (puzzle_id, mode, limit, now_iso()))
     conn.commit()
@@ -215,8 +219,12 @@ def api_finish(conn, m, q, body):
     status = body.get("status")
     if status not in FINISH_STATUSES:
         raise ApiError(400, "status должен быть solved, failed или abandoned")
-    t_ms = _int(body, "t_ms", lo=0)
-    metrics = analysis.compute_metrics(analysis.load_moves(conn, gid), t_ms)
+    return _close_game(conn, game, status, _int(body, "t_ms", lo=0))
+
+
+def _close_game(conn, game, status, t_ms, moves=None):
+    gid = game["id"]
+    metrics = analysis.compute_metrics(analysis.load_moves(conn, gid) if moves is None else moves, t_ms)
     limit = game["mistake_limit"]
     if game["mode"] == "original" and limit is not None and metrics["mistakes"] >= limit:
         status = "failed"
