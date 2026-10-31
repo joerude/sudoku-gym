@@ -1,32 +1,32 @@
 # Sudoku Gym
 
-Локальный тренажёр скоростного судоку: 20 000 задач с фильтром по технике, режимы original/hardcore как на usdoku, разбор пауз, упражнения «найди ход» по 10 техникам с объяснениями, теория и статистика. Тренер — Claude Code со skill `sudoku-speed-coach` (`.claude/skills/`), читает прогресс прямо из базы.
+A local trainer for speed sudoku (Russian UI). It has 20,000 puzzles filterable by technique, original and hardcore modes as on usdoku, a review of your pauses after each game, "find the move" drills for 10 techniques with explanations, theory pages and stats. Claude Code coaches through the `sudoku-speed-coach` skill (`.claude/skills/`) and reads progress straight from the database.
 
-## Запуск
+## Run
 
 ```bash
 docker compose up -d --build   # http://127.0.0.1:8765
 ```
 
-Первый старт скачивает банк задач ([grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank), public domain) и генерирует упражнения. Прогресс — в `data/sudoku.db` (bind mount, в git не попадает); теория — `theory/*.md`, подхватывается при каждом старте.
+The first start downloads the puzzle bank ([grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank), public domain) and generates the drills. Progress lives in `data/sudoku.db` (bind-mounted, not in git). Theory comes from `theory/*.md` and is reloaded on every start.
 
-Без Docker: `python3 tools/import_bank.py --if-empty && python3 server.py`.
+Without Docker: `python3 tools/import_bank.py --if-empty && python3 server.py`
 
-## Разработка
+## Develop
 
 ```bash
-python3 -m unittest discover -s tests          # юнит-тесты
-node tests/e2e/gym.spec.mjs [папка-скриншотов]  # e2e (нужен playwright-core)
-python3 tools/regrade.py                        # пересчитать tech_grade после изменения техник в ядре
+python3 -m unittest discover -s tests   # unit tests
+node tests/e2e/gym.spec.mjs [shots-dir]  # e2e, needs playwright-core
+python3 tools/regrade.py                 # recompute tech_grade after technique changes in the core
 ```
 
-| Модуль | Что делает |
+| Module | Role |
 |---|---|
-| `sudoku_core.py` | кандидаты, шаги с названием техники, решатель, грейд 1–5 |
-| `db.py` | схема SQLite |
-| `analysis.py` | метрики партии, разбор пауз, статистика |
-| `drills.py` | генерация упражнений, адаптивный выбор, открытие техник, объяснения |
-| `server.py` | HTTP API + статика `web/` |
-| `web/` | интерфейс (vanilla JS) |
+| `sudoku_core.py` | candidates, technique-labelled steps, solver, grade 1–5 |
+| `db.py` | SQLite schema |
+| `analysis.py` | game metrics, pause review, stats |
+| `drills.py` | drill generation, adaptive pick, technique unlocks, explanations |
+| `server.py` | HTTP API and static files from `web/` |
+| `web/` | UI (vanilla JS) |
 
-Дизайн и план: `docs/superpowers/`.
+Design docs and plans are in `docs/superpowers/`.
