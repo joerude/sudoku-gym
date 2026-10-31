@@ -272,7 +272,14 @@ function press(v, asNote) {
 }
 
 function handleKey(e) {
-  if (ignoreKey(e) || e.altKey || !G) return;
+  if (ignoreKey(e) || e.altKey) return;
+  if (!G) {  // no game yet (e.g. after a page reload): say so instead of silently ignoring the key
+    if (e.key === "Enter" && e.target === document.body) { newGame(false); e.preventDefault(); return; }
+    if (/^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
+      setMsg("Партия не начата — нажми «Новая партия» или Enter.", "bad"); e.preventDefault();
+    }
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" || (e.ctrlKey && e.code === "KeyZ")) {
     G.undoLast(); e.preventDefault(); return;
   }

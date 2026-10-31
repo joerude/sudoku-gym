@@ -198,13 +198,21 @@ try {
   const mv3 = (await api(`/api/games/${g3.id}`)).moves.map(m => `${m.kind}:${m.cell ?? "-"}:${m.value ?? "-"}`);
   ok(mv3.join(" ") === `note:${c3}:3 note:${c3}:7 place:${c3}:${g3.solution[c3]} undo:${c3}:0 check:-:-`,
      "move log: note, note, place, undo (restored 0), check — flushed by the 1 s queue", mv3.join(" "));
+  // no game after a reload: a digit explains what to do, Enter starts a game
+  await page.reload();
+  await page.waitForSelector("#newGame");
+  await page.keyboard.press("Digit5");
+  ok(/Партия не начата/.test(await page.textContent("#msg")), "no game: a digit says the game is not started");
+  const gEnter = await waitGame(page, () => page.keyboard.press("Enter"));
+  ok(gEnter.status === "active", "no game: Enter starts a new game");
+  const cE = gEnter.givens.indexOf("0");
   // focus stuck on a select (Firefox keeps it when the same option is picked again) must not swallow digits
-  await page.click(cellSel(c3));
+  await page.click(cellSel(cE));
   await page.focus("#level");
-  await page.keyboard.press(`Digit${g3.solution[c3]}`);
-  ok((await page.textContent(cellSel(c3))).trim() === g3.solution[c3], "digit reaches the board while a select has focus");
+  await page.keyboard.press(`Digit${gEnter.solution[cE]}`);
+  ok((await page.textContent(cellSel(cE))).trim() === gEnter.solution[cE], "digit reaches the board while a select has focus");
   ok(await page.evaluate(() => document.activeElement.id !== "level"), "the select lets go of focus");
-  ok(await page.$eval("#level", e => e.value) !== g3.solution[c3], "the digit did not change the select");
+  ok(await page.$eval("#level", e => e.value) !== gEnter.solution[cE], "the digit did not change the select");
   await typeAt(page, c3, 5);
 
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------
@@ -228,7 +236,7 @@ try {
     ok((await page.textContent("#badge")).includes("своя сетка"), "custom badge");
     ok(g4full.level === "custom" && g4full.givens === "100006000600035120032000000000140030860000092050029000000000370013590008000400005",
        "Ctrl+V ASCII grid loads a custom puzzle");
-    ok((await api(`/api/games/${g3.id}`)).status === "abandoned", "previous active game finished as abandoned");
+    ok((await api(`/api/games/${gEnter.id}`)).status === "abandoned", "previous active game finished as abandoned");
     ok((await page.textContent(cellSel(0))).trim() === "1" && (await page.textContent(cellSel(5))).trim() === "6", "custom grid on board");
   }
 
