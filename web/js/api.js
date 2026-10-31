@@ -50,6 +50,8 @@ export const revealDrill = (id, timeMs) => call("POST", `/api/drills/${id}/revea
 export const getFavorites = () => call("GET", "/api/favorites");
 export const setFavorite = (kind, id, on) => call(on ? "PUT" : "DELETE", `/api/favorites/${kind}/${id}`);
 export const getFavoritePuzzle = () => call("GET", "/api/puzzle?favorite=1");
+export const exportFavorites = () => call("GET", "/api/favorites/export");
+export const importFavorites = favorites => call("POST", "/api/favorites/import", favorites);
 export const getTheory = () => call("GET", "/api/theory");
 export const getTheoryPage = slug => call("GET", `/api/theory/${encodeURIComponent(slug)}`);
 

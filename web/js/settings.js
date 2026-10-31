@@ -1,9 +1,10 @@
 // #/settings — look: colour theme (presets + own colours), font, digit and candidate size, side of the panel on the
-// board pages, board highlights, with a live sample board.
+// board pages, board highlights, export/import, with a live sample board.
 import { LANGS, lang, setLang, tr } from "./i18n.js";
 import { BASE, BASE_NAME, DEFAULTS, FONTS, HINTS, SCALE, SIDES, THEMES, fontStack, loadPrefs, palette, savePrefs } from "./appearance.js";
 import { computeCandidates, createBoard, toDigits } from "./board.js";
 import { h } from "./ui.js";
+import { transferSection } from "./transfer.js";
 
 const GIVENS = "530070000600195000098000060800060003400803001700020006060000280000419005000080079";
 const SOLUTION = "534678912672195348198342567859761423426853791713924856961537284287419635345286179";
@@ -89,6 +90,7 @@ export function mount(el) {
         h("section", {}, h("h2", {}, tr("Язык")),
           h("div", { class: "chips", id: "langs" }, LANGS.map(l => h("button", { type: "button", "data-lang": l.id,
             class: l.id === lang ? "on" : "", "aria-pressed": l.id === lang, onclick: () => l.id !== lang && setLang(l.id) }, l.name)))),
+        transferSection({ onLook: p => { prefs = p; refresh(); } }),
         h("button", { type: "button", id: "lookReset", onclick: () => set({ ...DEFAULTS, custom: prefs.custom }) }, tr("Сбросить вид")))));
 
   const board = createBoard(preview, { interactive: false });

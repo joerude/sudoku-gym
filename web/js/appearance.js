@@ -71,15 +71,21 @@ function validCustom(c) {
   return BASE.every(k => HEX.test(c[k])) ? { dark: !!c.dark, ...Object.fromEntries(BASE.map(k => [k, c[k]])) } : null;
 }
 
-export function loadPrefs() {
-  let p = {};
-  try { p = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { /* no storage */ }
+/** A stored or imported look → valid prefs; unknown or broken fields fall back to the defaults. */
+export function normalizePrefs(p) {
+  if (!p || typeof p !== "object") p = {};
   const custom = validCustom(p.custom);
   let theme = THEMES.some(t => t.id === p.theme) ? p.theme : DEFAULTS.theme;
   if (theme === "custom" && !custom) theme = DEFAULTS.theme;
   return { theme, custom, font: FONTS.some(f => f.id === p.font) ? p.font : DEFAULTS.font,
            digit: clampScale(p.digit ?? 1), notes: clampScale(p.notes ?? 1), side: p.side === "left" ? "left" : "right",
            hints: Object.fromEntries(HINTS.map(x => [x.id, p.hints?.[x.id] !== false])) };
+}
+
+export function loadPrefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { /* no storage */ }
+  return normalizePrefs(p);
 }
 
 let hints = ALL_HINTS;

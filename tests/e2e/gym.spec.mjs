@@ -5,7 +5,7 @@
 // Env: PLAYWRIGHT_CORE (dir of playwright-core's node_modules), CHROME (executable), SHOTS (screenshot dir).
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -605,6 +605,28 @@ try {
   ok(m0.every(n => n > 0) && m1.every(n => n === 0), "look: board highlights switch off and stay off after a reload", JSON.stringify([m0, m1]));
   await page.click("#lookReset");
   ok((await marks()).every(n => n > 0), "look: reset turns highlights back on");
+  // --- 8b'. export / import of the look and favourites -----------------------------------------
+  const favPid = (await api("/api/puzzle?level=easy")).id;
+  await fetch(`${BASE}/api/favorites/puzzle/${favPid}`, { method: "PUT" });
+  await page.click('#themes [data-theme-id="nord"]');
+  const dl = page.waitForEvent("download");
+  await page.click("#exportBtn");
+  const file = await (await dl).path();
+  const exported = JSON.parse(readFileSync(file, "utf-8"));
+  ok(exported.app === "sudoku-gym" && exported.appearance.theme === "nord" && exported.favorites.puzzles.length >= 1,
+     "export: file has the look and favourites", JSON.stringify(exported).slice(0, 200));
+  await page.click("#lookReset");
+  await fetch(`${BASE}/api/favorites/puzzle/${favPid}`, { method: "DELETE" });
+  await page.setInputFiles("#importFile", file);
+  await page.waitForSelector("#confirm");
+  await page.click("#confirmOk");
+  await page.waitForFunction(() => /добавлено/.test(document.querySelector("#transferMsg").textContent));
+  ok((await look()).theme === "dark" && (await api("/api/favorites")).puzzle >= 1, "import: nord and the favourite are back");
+  await page.setInputFiles("#importFile", { name: "x.json", mimeType: "application/json", buffer: Buffer.from("{\"a\":1}") });
+  await page.waitForFunction(() => /не файл настроек/.test(document.querySelector("#transferMsg").textContent));
+  ok(!(await page.$("#confirm")), "import: a foreign file is refused without a dialog");
+  await page.click("#lookReset");
+  await fetch(`${BASE}/api/favorites/puzzle/${favPid}`, { method: "DELETE" });
 
   // --- 8c. board pages: board in the middle on a wide screen, panel right by default, left from #/settings ------
   const wide = await newPage({ width: 1440, height: 900 });
