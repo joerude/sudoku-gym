@@ -1,5 +1,6 @@
 // #/stats — by level/mode, daily median chart, techniques, recent games.
 import { getStats, listGames } from "./api.js";
+import { recordsCard } from "./records.js";
 import { fmtTime } from "./board.js";
 import { LEVEL_NAME, STATUS_NAME, dateRu, errorBox, h, pct, sec } from "./ui.js";
 
@@ -74,6 +75,9 @@ export function mount(el) {
   el.append(box);
   Promise.all([getStats(), listGames(20)]).then(([st, games]) => {
     box.textContent = "";
+    const rec = recordsCard({ title: "Рекорды по уровню и режиму", id: "recordsStats" });
+    box.append(rec.el);
+    rec.load();
     box.append(h("section", {}, h("h2", {}, "По уровню и режиму"),
       st.by_level_mode.length
         ? table([["Уровень"], ["Режим"], ["Партий", 1], ["Решено", 1], ["Медиана", 1], ["Лучшее", 1], ["Ошибок/партия", 1], ["Провалы", 1]],

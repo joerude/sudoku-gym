@@ -3,6 +3,7 @@ import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, get
 import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
 import { closeReward, showReward } from "./reward.js";
+import { recordsCard } from "./records.js";
 import { LEVEL_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, metricsGrid, statusLine, zenButton } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
@@ -53,9 +54,9 @@ function setupSection() {
     for (const o of lvl.options) o.disabled = !!options && levelTotal(o.value) === 0;
   };
   lvl.value = prefs.level; mode.value = prefs.mode; limit.value = prefs.limit;
-  lvl.onchange = () => { prefs.level = lvl.value; savePrefs(); sync(); };
+  lvl.onchange = () => { prefs.level = lvl.value; savePrefs(); sync(); markRecord(); };
   grade.onchange = () => { prefs.grade = grade.value; savePrefs(); };
-  mode.onchange = () => { prefs.mode = mode.value; savePrefs(); sync(); };
+  mode.onchange = () => { prefs.mode = mode.value; savePrefs(); sync(); markRecord(); };
   limit.onchange = () => { prefs.limit = limit.value; savePrefs(); };
   const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) }, "Новая партия");
   const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, "🎲 Случайная партия");
@@ -122,6 +123,8 @@ export function mount(el, params, query) {
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
     results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, setup,
   };
+  ui.records = recordsCard();
+  ui.records.el.classList.add("zen-hide");
   ui.board = createBoard(boardEl, { onCell: i => { if (G) { digit = 0; G.select(i); } } });
   ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => G?.erase() });
   ui.root = h("div", { class: "layout" },
@@ -137,7 +140,7 @@ export function mount(el, params, query) {
         h("label", { class: "check zen-hide", title: "Сколько каждой цифры осталось поставить" }, countsBox, "счётчик цифр")),
       ui.msg),
     setup.box,
-    h("div", {}, ui.results,
+    h("div", {}, ui.results, ui.records.el,
       h("section", { class: "zen-hide" }, h("h2", {}, "Клавиши"), h("p", { class: "hint", style: "margin:0", html:
         "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
@@ -145,6 +148,8 @@ export function mount(el, params, query) {
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." }))));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
   el.append(ui.root);
+  markRecord();
+  ui.records.load();
   const unalign = alignSideToBoard(ui.root);
 
   const onKey = e => handleKey(e);
@@ -170,6 +175,14 @@ export function mount(el, params, query) {
   refresh();
   if (G?.S.result) showResults();
   return () => { closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
+}
+
+/** Highlight the record for the level and mode being played (or chosen for the next game). */
+function markRecord() {
+  if (!ui) return;
+  const p = G?.S.puzzle;
+  if (p && G.S.status === "active") ui.records.mark(p.level, G.S.mode);
+  else ui.records.mark(prefs.level === "random" ? null : prefs.level, prefs.mode);
 }
 
 function setMsg(text, cls = "") {
@@ -237,6 +250,7 @@ async function endGame(status) {
   }
   refresh();
   showResults();
+  ui?.records.load();
   if (G.S.status === "solved" && G.S.result) showReward(G.S.result, G.S.puzzle, { onNew: () => newGame(false) });
 }
 
@@ -259,6 +273,7 @@ async function begin(getPuzzleFn, hideGrade) {
       onQueueError: e => setMsg(`Ходы пока не отправлены: ${e.message}. Повторю.`, "bad"),
     });
     G.setAutoNotes(ui ? ui.autoBox.checked : true);
+    markRecord();
     setMsg("");
     if (ui) ui.results.textContent = "";
     refresh();

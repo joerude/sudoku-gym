@@ -138,6 +138,24 @@ def _median(xs):
     return round(statistics.median(xs)) if xs else None
 
 
+def records(conn) -> list:
+    """Personal best per level × mode (all four levels, both modes; empty ones with None).
+
+    Only solved games count; on a tie the earlier game keeps the record."""
+    best = {}
+    for gid, level, mode, ms, at in conn.execute(
+            "SELECT g.id, p.level, g.mode, g.time_ms, g.started_at FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
+            " WHERE g.status = 'solved' AND g.time_ms IS NOT NULL ORDER BY g.time_ms, g.id"):
+        key = (level, mode)
+        if key in best:
+            best[key]["solved"] += 1
+        else:
+            best[key] = {"best_ms": ms, "game_id": gid, "at": at, "solved": 1}
+    empty = {"best_ms": None, "game_id": None, "at": None, "solved": 0}
+    return [{"level": lv, "mode": md, **best.get((lv, md), empty)}
+            for lv in sorted(LEVEL_ORDER, key=LEVEL_ORDER.get) for md in ("original", "hardcore")]
+
+
 def stats(conn) -> dict:
     games = conn.execute(
         "SELECT g.status, g.mode, g.time_ms, g.mistakes, date(g.started_at, 'localtime') AS day, p.level"

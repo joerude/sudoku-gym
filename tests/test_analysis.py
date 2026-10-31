@@ -4,7 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from analysis import LONG_PAUSE_MS, compute_metrics, game_info, pauses, replay, review, stats  # noqa: E402
+from analysis import LONG_PAUSE_MS, compute_metrics, game_info, pauses, records, replay, review, stats  # noqa: E402
 from db import connect  # noqa: E402
 from fixtures import L1, insert_puzzle  # noqa: E402
 from sudoku_core import TECH_TIER, TECH_TITLE, parse, to_str, unit_name  # noqa: E402
@@ -169,6 +169,23 @@ class StatsTest(unittest.TestCase):
             {"level": "medium", "mode": "hardcore", "n": 1, "solved": 1, "median_ms": 300000, "best_ms": 300000,
              "mistakes_per_game": 4.0, "fail_rate": 0.0},
         ])
+
+    def test_records(self):
+        rec = records(self.conn)
+        self.assertEqual([(r["level"], r["mode"]) for r in rec],
+                         [(lv, md) for lv in ("easy", "medium", "hard", "expert") for md in ("original", "hardcore")])
+        easy_orig = rec[0]
+        first = self.conn.execute("SELECT id FROM games WHERE time_ms = 100000").fetchone()[0]
+        self.assertEqual(easy_orig, {"level": "easy", "mode": "original", "best_ms": 100000, "game_id": first,
+                                     "at": "2026-10-29T09:00:00+00:00", "solved": 3})
+        self.assertEqual((rec[3]["best_ms"], rec[3]["solved"]), (300000, 1))  # medium hardcore
+        self.assertEqual(rec[2], {"level": "medium", "mode": "original", "best_ms": None, "game_id": None, "at": None,
+                                  "solved": 0})  # failed/abandoned/active games never count
+
+    def test_records_tie_keeps_the_first(self):
+        easy = self.conn.execute("SELECT id FROM puzzles WHERE bank_id = 'e1'").fetchone()[0]
+        later = make_game(self.conn, easy, [], "original", "solved", "2026-10-31T09:00:00+00:00", 100000, 0, 3)
+        self.assertNotEqual(records(self.conn)[0]["game_id"], later)
 
     def test_daily(self):
         self.assertEqual(stats(self.conn)["daily"], [

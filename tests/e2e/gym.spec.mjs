@@ -147,6 +147,12 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForSelector("#reward", { state: "detached" });
   ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: Esc closes the dialog, green stays");
+  // records: the solved game is the record of its level × mode, highlighted and linked to its review
+  await page.waitForFunction(id => !!document.querySelector(`#records a[href="#/review/${id}"]`), g1.id);
+  ok(await page.$eval(`#records td[data-rec="${g1.level}-hardcore"]`, (td, id) =>
+    td.classList.contains("cur") && td.querySelector("a").getAttribute("href") === `#/review/${id}`, g1.id),
+    "records: new record in the play panel, current combination highlighted");
+  ok(await page.$$eval("#records td[data-rec]", tds => tds.length === 8), "records: 4 levels × 2 modes");
   await shot(page, "play-solved");
   await page.click("#reviewLink");
   await page.waitForSelector("#noPauses, .pause-item");
@@ -438,6 +444,8 @@ try {
   await page.waitForSelector("#gamesTable");
   const byLevel = await page.textContent("#byLevel");
   ok(/лёгкий/.test(byLevel) && /hardcore/.test(byLevel) && /original/.test(byLevel), "stats: level/mode table");
+  await page.waitForSelector("#recordsStats table.records");
+  ok(await page.$$eval("#recordsStats td[data-rec] a", as => as.length >= 1), "stats: records table with links to the record games");
   ok(await page.$$eval("#gamesTable tbody tr", r => r.length >= 5), "stats: recent games listed");
   ok(await page.$(`#gamesTable a[href="#/review/${g1.id}"]`) !== null, "stats: review link for the solved game");
   ok(await page.$("#chart svg polyline") !== null, "stats: daily chart drawn");

@@ -181,6 +181,9 @@ class ServerTest(unittest.TestCase):
         for _ in range(5):
             self.assertEqual(self.api("GET", "/api/puzzle?level=easy")["id"], self.easy["L1-3"])
 
+        rec = self.api("GET", "/api/records")
+        self.assertEqual(len(rec), 8)
+        self.assertEqual(set(rec[0]), {"level", "mode", "best_ms", "game_id", "at", "solved"})
         st = self.api("GET", "/api/stats")
         easy = [x for x in st["by_level_mode"] if x["level"] == "easy"]
         self.assertEqual(easy, [
