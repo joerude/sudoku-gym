@@ -2,7 +2,7 @@
 import { addPuzzle, createGame, getOptions, getPuzzle } from "./api.js";
 import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
-import { LEVEL_NAME, errorBox, h, metricsGrid, statusLine, typingInto } from "./ui.js";
+import { LEVEL_NAME, errorBox, h, metricsGrid, statusLine, ignoreKey } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
@@ -113,7 +113,7 @@ export function mount(el, params, query) {
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." })))));
 
   const onKey = e => handleKey(e);
-  document.addEventListener("keydown", onKey);
+  window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
   const tick = setInterval(() => { if (G && ui) ui.timer.textContent = fmtTime(G.elapsed()); }, 100);
 
   const ready = options ? Promise.resolve(options) : getOptions().then(o => { options = o; });
@@ -132,7 +132,7 @@ export function mount(el, params, query) {
   }).catch(e => setMsg(e.message, "bad"));
   refresh();
   if (G?.S.result) showResults();
-  return () => { document.removeEventListener("keydown", onKey); clearInterval(tick); clearTimeout(armed); ui = null; };
+  return () => { window.removeEventListener("keydown", onKey, true); clearInterval(tick); clearTimeout(armed); ui = null; };
 }
 
 function setMsg(text, cls = "") {
@@ -253,7 +253,7 @@ function press(v, asNote) {
 }
 
 function handleKey(e) {
-  if (typingInto(e) || e.target.tagName === "SELECT" || e.altKey || !G) return;
+  if (ignoreKey(e) || e.altKey || !G) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" || (e.ctrlKey && e.code === "KeyZ")) {
     G.undoLast(); e.preventDefault(); return;
   }

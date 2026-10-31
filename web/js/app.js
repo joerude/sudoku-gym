@@ -52,6 +52,23 @@ function route() {
 
 window.addEventListener("hashchange", route);
 
+// http://127.0.0.1:8765/?debug — shows what each key press reaches, to diagnose keyboard problems in a browser.
+if (new URLSearchParams(location.search).has("debug")) {
+  const box = document.createElement("pre");
+  box.className = "keylog";
+  box.textContent = "нажми клавишу…";
+  document.body.append(box);
+  const log = [];
+  window.addEventListener("keydown", e => {
+    const t = e.target, a = document.activeElement;
+    setTimeout(() => {  // after the page handlers ran
+      log.unshift(`${e.key} (${e.code}) → ${t.tagName}${t.id ? "#" + t.id : ""}, фокус ${a?.tagName}${a?.id ? "#" + a.id : ""}, `
+        + (e.defaultPrevented ? "обработано" : "НЕ обработано"));
+      box.textContent = log.slice(0, 8).join("\n");
+    });
+  }, true);
+}
+
 // After a mouse click (detail > 0) drop focus from buttons/checkboxes, and after picking an option from a select,
 // so digits, Space and Enter go to the board. Keyboard (Tab) users keep focus as usual.
 document.addEventListener("click", e => {

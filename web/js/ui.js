@@ -33,6 +33,16 @@ export function typingInto(e) {
   return el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "range"].includes(el.type);
 }
 
+// Whether a keydown is not meant for the board. A digit typed while a select still has focus (Firefox keeps it
+// focused when the same option is picked again) goes to the board, and the select lets go of focus.
+export function ignoreKey(e) {
+  if (typingInto(e)) return true;
+  if (e.target.tagName !== "SELECT") return false;
+  if (!/^(?:Digit|Numpad)\d$/.test(e.code)) return true;
+  e.target.blur();
+  return false;
+}
+
 export const sec = ms => ms === null || ms === undefined ? "—" : `${(ms / 1000).toFixed(1)} с`;
 export const pct = x => x === null || x === undefined ? "—" : `${Math.round(x * 100)}%`;
 export const dateRu = iso => iso ? new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit",

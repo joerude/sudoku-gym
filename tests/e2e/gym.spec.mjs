@@ -198,6 +198,13 @@ try {
   const mv3 = (await api(`/api/games/${g3.id}`)).moves.map(m => `${m.kind}:${m.cell ?? "-"}:${m.value ?? "-"}`);
   ok(mv3.join(" ") === `note:${c3}:3 note:${c3}:7 place:${c3}:${g3.solution[c3]} undo:${c3}:0 check:-:-`,
      "move log: note, note, place, undo (restored 0), check — flushed by the 1 s queue", mv3.join(" "));
+  // focus stuck on a select (Firefox keeps it when the same option is picked again) must not swallow digits
+  await page.click(cellSel(c3));
+  await page.focus("#level");
+  await page.keyboard.press(`Digit${g3.solution[c3]}`);
+  ok((await page.textContent(cellSel(c3))).trim() === g3.solution[c3], "digit reaches the board while a select has focus");
+  ok(await page.evaluate(() => document.activeElement.id !== "level"), "the select lets go of focus");
+  ok(await page.$eval("#level", e => e.value) !== g3.solution[c3], "the digit did not change the select");
   await typeAt(page, c3, 5);
 
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------

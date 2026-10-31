@@ -1,7 +1,7 @@
 // #/drills — "find the move" drills: place (cell + digit) and eliminate (click the removed candidate).
 import { drillHint, drillTechniques, nextDrill, revealDrill, sendAttempt } from "./api.js";
 import { ROW, COL, cellName, createBoard, createPad, toDigits, unitCells } from "./board.js";
-import { TIER_NAME, errorBox, h, pct, sec, typingInto } from "./ui.js";
+import { TIER_NAME, errorBox, h, pct, sec, ignoreKey } from "./ui.js";
 
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
 const progress = t => t.mastered ? "✓" : t.unlocked ? `${Math.min(t.correct, UNLOCK)}/${UNLOCK}` : "";
@@ -253,7 +253,7 @@ export function mount(el, params, query) {
   }
 
   const onKey = e => {
-    if (typingInto(e) || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (ignoreKey(e) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Enter" || e.code === "Space") {
       // a control focused from the keyboard (Tab) keeps its own Enter/Space; one focused by a mouse click does not
       if (e.target !== nextBtn && e.target.matches("button:focus-visible, input:focus-visible")) return;
@@ -287,7 +287,7 @@ export function mount(el, params, query) {
     else if (hiddenAt !== null) { pausedMs += performance.now() - hiddenAt; hiddenAt = null; }
   };
   document.addEventListener("visibilitychange", onVisibility);
-  document.addEventListener("keydown", onKey);
+  window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
 
   renderStrip();
   drillTechniques().then(list => {
@@ -297,7 +297,7 @@ export function mount(el, params, query) {
     load();
   }).catch(e => chips.append(errorBox(e)));
   return () => {
-    document.removeEventListener("keydown", onKey); document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("keydown", onKey, true); document.removeEventListener("visibilitychange", onVisibility);
     clearInterval(tick); clearTimeout(autoTimer);
   };
 }
