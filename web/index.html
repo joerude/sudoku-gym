@@ -11,7 +11,8 @@
 <script>
   // last look from js/appearance.js, applied before first paint
   try { const b = JSON.parse(localStorage.getItem("gym-appearance-boot"));
-        if (b) { if (b.theme) document.documentElement.dataset.theme = b.theme; document.documentElement.style.cssText = b.style; } } catch {}
+        if (b) { const r = document.documentElement; if (b.theme) r.dataset.theme = b.theme; if (b.side) r.dataset.side = b.side;
+                 r.style.cssText = b.style; } } catch {}
 </script>
 </head>
 <body>

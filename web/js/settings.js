@@ -1,5 +1,6 @@
-// #/settings — look: colour theme (presets + own colours), font, digit and candidate size, with a live sample board.
-import { BASE, BASE_NAME, DEFAULTS, FONTS, SCALE, THEMES, fontStack, loadPrefs, palette, savePrefs } from "./appearance.js";
+// #/settings — look: colour theme (presets + own colours), font, digit and candidate size, side of the panel on the
+// board pages, with a live sample board.
+import { BASE, BASE_NAME, DEFAULTS, FONTS, SCALE, SIDES, THEMES, fontStack, loadPrefs, palette, savePrefs } from "./appearance.js";
 import { computeCandidates, createBoard, toDigits } from "./board.js";
 import { h } from "./ui.js";
 
@@ -61,6 +62,7 @@ export function mount(el) {
     return { input, out, row: h("label", { class: "field range" }, h("span", {}, label, " ", out), input) };
   };
   const digitS = slider("digit", "Цифры в клетках"), notesS = slider("notes", "Кандидаты");
+  const sideBtns = SIDES.map(s => h("button", { type: "button", "data-side": s.id, onclick: () => set({ side: s.id }) }, s.name));
 
   const preview = h("div", { id: "lookBoard" });
   el.append(h("h1", {}, "Вид"),
@@ -75,6 +77,9 @@ export function mount(el) {
           h("label", { class: "check", style: "margin-top:8px" }, darkBox, "тёмная (графики и полосы прокрутки)")),
         h("section", {}, h("h2", {}, "Шрифт"), h("div", { class: "font-grid", id: "fonts" }, fontBtns)),
         h("section", {}, h("h2", {}, "Размер"), digitS.row, notesS.row),
+        h("section", {}, h("h2", {}, "Панель у доски"),
+          h("p", { class: "hint" }, "Настройки партии и список техник на «Играть» и «Упражнения». На широком экране доска — по центру."),
+          h("div", { class: "chips", id: "sides" }, sideBtns)),
         h("button", { type: "button", id: "lookReset", onclick: () => set({ ...DEFAULTS, custom: prefs.custom }) }, "Сбросить вид"))));
 
   const board = createBoard(preview, { interactive: false });
@@ -90,6 +95,7 @@ export function mount(el) {
     for (const k of BASE) colorInputs[k].value = p[k];
     darkBox.checked = !!p.dark;
     fontBtns.forEach(b => b.classList.toggle("on", b.dataset.font === prefs.font));
+    sideBtns.forEach(b => { const on = b.dataset.side === prefs.side; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
     for (const [s, key] of [[digitS, "digit"], [notesS, "notes"]]) { s.input.value = prefs[key]; s.out.textContent = pctLabel(prefs[key]); }
   }
   refresh();

@@ -456,6 +456,28 @@ try {
   const l5 = await look();
   ok(l5.theme === null && /JetBrains Mono/.test(l5.font) && Math.abs(l5.cellPx - l0.cellPx) < 0.5, "look: reset restores the default look", JSON.stringify(l5));
 
+  // --- 8c. board pages: board in the middle on a wide screen, panel right by default, left from #/settings ------
+  const wide = await newPage({ width: 1440, height: 900 });
+  const sides = async () => {
+    await wide.goto(`${BASE}/#/drills`);
+    await wide.waitForSelector("#picker button");
+    return wide.evaluate(() => {
+      const b = document.querySelector(".layout .grid").getBoundingClientRect(), s = document.querySelector("#picker").getBoundingClientRect();
+      return { mid: Math.round(b.left + b.width / 2 - document.documentElement.clientWidth / 2), panelRight: s.left > b.right };
+    });
+  };
+  const side0 = await sides();
+  ok(Math.abs(side0.mid) <= 12 && side0.panelRight, "wide: board centred, panel on the right", JSON.stringify(side0));
+  await wide.goto(`${BASE}/#/settings`);
+  await wide.click('#sides [data-side="left"]');
+  const side1 = await sides();
+  ok(Math.abs(side1.mid) <= 12 && !side1.panelRight, "wide: «← слева» moves the panel left, board stays centred", JSON.stringify(side1));
+  await wide.reload();
+  await wide.waitForSelector("#picker button");
+  ok(await wide.evaluate(() => document.documentElement.dataset.side) === "left", "wide: panel side survives a reload");
+  await shot(wide, "drills-wide-left");
+  await wide.context().close();
+
   // --- 9. mobile 390px -------------------------------------------------------------------------
   const mob = await newPage({ width: 390, height: 844 }, { deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await mob.goto(`${BASE}/#/play`);

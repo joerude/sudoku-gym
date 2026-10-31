@@ -1,4 +1,5 @@
-// Look settings (theme, font, digit sizes): kept in localStorage, applied as CSS variables on <html>.
+// Look settings (theme, font, digit sizes, side of the panel on board pages): kept in localStorage, applied as CSS
+// variables and data-theme / data-side on <html>.
 // index.html re-applies the last result from BOOT_KEY before first paint, so a page load never flashes the default look.
 const KEY = "gym-appearance";
 const BOOT_KEY = "gym-appearance-boot";
@@ -51,7 +52,8 @@ export const THEMES = [
   { id: "custom", name: "Своя" },
 ];
 export const SCALE = { min: 0.8, max: 1.4, step: 0.05 };
-export const DEFAULTS = { theme: "auto", font: "jetbrains", digit: 1, notes: 1, custom: null };
+export const DEFAULTS = { theme: "auto", font: "jetbrains", digit: 1, notes: 1, side: "right", custom: null };
+export const SIDES = [{ id: "left", name: "← слева" }, { id: "right", name: "справа →" }];
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const clampScale = v => Number.isFinite(+v) ? Math.min(SCALE.max, Math.max(SCALE.min, +v)) : 1;
@@ -67,7 +69,7 @@ export function loadPrefs() {
   let theme = THEMES.some(t => t.id === p.theme) ? p.theme : DEFAULTS.theme;
   if (theme === "custom" && !custom) theme = DEFAULTS.theme;
   return { theme, custom, font: FONTS.some(f => f.id === p.font) ? p.font : DEFAULTS.font,
-           digit: clampScale(p.digit ?? 1), notes: clampScale(p.notes ?? 1) };
+           digit: clampScale(p.digit ?? 1), notes: clampScale(p.notes ?? 1), side: p.side === "left" ? "left" : "right" };
 }
 
 const systemDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches;
@@ -100,8 +102,9 @@ export function applyPrefs(prefs) {
     if (!p.builtin) Object.assign(vars, paletteVars(p));
   }
   if (attr) root.dataset.theme = attr; else delete root.dataset.theme;
+  root.dataset.side = prefs.side;
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, String(v));
-  try { localStorage.setItem(BOOT_KEY, JSON.stringify({ theme: attr, style: root.style.cssText })); } catch { /* ignore */ }
+  try { localStorage.setItem(BOOT_KEY, JSON.stringify({ theme: attr, side: prefs.side, style: root.style.cssText })); } catch { /* ignore */ }
 }
 
 export function savePrefs(prefs) {
