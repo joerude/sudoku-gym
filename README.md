@@ -7,18 +7,32 @@ Inspired by [Monkeytype](https://monkeytype.com) (themes, fonts, minimal look) a
 ## Run
 
 ```bash
-docker compose up -d --build   # http://127.0.0.1:8765
+./gym start    # build and start the container, wait for the server, open http://127.0.0.1:8765
 ```
 
-The first start downloads the puzzle bank ([grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank), public domain) and generates the drills. Progress lives in `data/sudoku.db` (bind-mounted, not in git). Theory comes from `theory/*.md` and is reloaded on every start.
+The first start downloads the puzzle bank ([grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank), public domain) and generates the drills, which takes a couple of minutes. After that the container comes back by itself whenever Docker starts (`restart: unless-stopped`), so after a reboot `./gym open` is enough. Progress lives in `data/sudoku.db` (bind-mounted, not in git). Theory comes from `theory/*.md` and is reloaded on every start.
 
-Without Docker: `python3 tools/import_bank.py --if-empty && python3 server.py`
+| Command | What it does |
+|---|---|
+| `./gym start` | build and start the container, wait until it answers, open the browser |
+| `./gym stop` | stop the container (progress in `data/` stays) |
+| `./gym restart` | rebuild and restart, e.g. after code changes |
+| `./gym status` | is the server up, how many puzzles are loaded |
+| `./gym logs [N]` | follow the container logs |
+| `./gym open` | open the trainer in the browser |
+| `./gym dev` | run without Docker from the working tree (`PORT=8766 ./gym dev` for another port) |
+| `./gym test` | unit tests, then e2e if node and playwright-core are found (`BROWSER=firefox` for Firefox) |
+
+`NO_OPEN=1` skips opening the browser. The plain equivalents: `docker compose up -d --build`, or without Docker `python3 tools/import_bank.py --if-empty && python3 server.py`.
+
+Keyboard not reacting in Firefox? Keyboard extensions such as Vimium take the digit keys before the page sees them: exclude `http://127.0.0.1:8765/*` in their settings. `http://127.0.0.1:8765/?debug` shows where each key press goes.
 
 ## Develop
 
 ```bash
+./gym test                               # both suites below
 python3 -m unittest discover -s tests   # unit tests
-node tests/e2e/gym.spec.mjs [shots-dir]  # e2e, needs playwright-core
+node tests/e2e/gym.spec.mjs [shots-dir]  # e2e, needs playwright-core (PLAYWRIGHT_CORE=<its node_modules>)
 python3 tools/regrade.py                 # recompute tech_grade after technique changes in the core
 ```
 

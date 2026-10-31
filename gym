@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Sudoku Gym launcher: ./gym <command>. Run ./gym help for the list.
+set -euo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+
+PORT="${PORT:-8765}"          # docker-compose.yml publishes 8765; PORT only changes `dev`
+URL="http://127.0.0.1:${PORT}/"
+HEALTH="${URL}api/health"
+
+say() { printf '\033[1m%s\033[0m\n' "$*"; }
+die() { printf 'ошибка: %s\n' "$*" >&2; exit 1; }
+
+healthy() { curl -sf --max-time 2 "$HEALTH" >/dev/null 2>&1; }
+
+# Wait until the server answers; the first start imports the puzzle bank, which takes a couple of minutes.
+wait_ready() {
+  local limit="${1:-300}" waited=0
+  printf 'жду сервер'
+  until healthy; do
+    if (( waited >= limit )); then
+      printf '\n'
+      die "сервер не ответил за ${limit} с — смотри ./gym logs"
+    fi
+    printf '.'; sleep 2; waited=$((waited + 2))
+  done
+  printf ' готов: %s\n' "$(curl -sf "$HEALTH")"
+}
+
+open_browser() {
+  [[ "${NO_OPEN:-0}" == 1 ]] && return 0
+  if command -v xdg-open >/dev/null; then xdg-open "$URL" >/dev/null 2>&1 &
+  elif command -v open >/dev/null; then open "$URL"
+  else say "открой $URL"
+  fi
+}
+
+need_docker() { command -v docker >/dev/null || die "нужен Docker (или запусти без него: ./gym dev)"; }
+
+# node for the e2e suite: PATH first, then the newest nvm install
+find_node() {
+  command -v node 2>/dev/null && return 0
+  ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V | tail -1
+}
+
+cmd="${1:-help}"
+shift || true
+case "$cmd" in
+  start)
+    need_docker
+    say "сборка и запуск контейнера…"
+    docker compose up -d --build
+    wait_ready
+    open_browser
+    say "Sudoku Gym: $URL"
+    ;;
+  stop)
+    need_docker
+    docker compose stop
+    ;;
+  restart)
+    need_docker
+    docker compose up -d --build --force-recreate
+    wait_ready
+    ;;
+  status)
+    if healthy; then say "работает: $URL"; curl -sf "$HEALTH"; echo
+    else say "не отвечает на $URL"; fi
+    command -v docker >/dev/null && docker compose ps
+    ;;
+  logs)
+    need_docker
+    docker compose logs -f --tail "${1:-50}"
+    ;;
+  open)
+    healthy || die "сервер не запущен — ./gym start"
+    NO_OPEN=0 open_browser
+    ;;
+  dev)
+    # without Docker, straight from the working tree (code changes apply on a page reload)
+    command -v python3 >/dev/null || die "нужен python3"
+    if healthy; then die "порт $PORT уже занят (контейнер?) — ./gym stop или PORT=8766 ./gym dev"; fi
+    python3 tools/import_bank.py --if-empty
+    ( sleep 1; wait_ready 30 >/dev/null && open_browser ) &
+    say "Sudoku Gym (без Docker): $URL — Ctrl+C, чтобы остановить"
+    exec python3 server.py --port "$PORT"
+    ;;
+  test)
+    say "юнит-тесты"
+    python3 -m unittest discover -s tests
+    node_bin="$(find_node || true)"
+    if [[ -z "$node_bin" ]]; then say "e2e пропущены: нет node"; exit 0; fi
+    say "e2e (${BROWSER:-chromium})"
+    set +e
+    "$node_bin" tests/e2e/gym.spec.mjs "$@"
+    code=$?
+    set -e
+    if (( code == 2 )); then say "e2e пропущены: нет playwright-core (задай PLAYWRIGHT_CORE)"; exit 0; fi
+    exit "$code"
+    ;;
+  help|-h|--help)
+    cat <<'EOF'
+./gym start     собрать и поднять контейнер, дождаться сервера, открыть браузер
+./gym stop      остановить контейнер (прогресс в data/ сохраняется)
+./gym restart   пересобрать и перезапустить (после правок кода)
+./gym status    жив ли сервер, сколько задач в базе
+./gym logs [N]  логи контейнера (последние N строк и дальше в реальном времени)
+./gym open      открыть тренажёр в браузере
+./gym dev       запустить без Docker из рабочей папки (PORT=8766 — другой порт)
+./gym test      юнит-тесты и e2e (BROWSER=firefox — в Firefox)
+
+NO_OPEN=1 — не открывать браузер.
+EOF
+    ;;
+  *)
+    die "неизвестная команда «$cmd» — ./gym help"
+    ;;
+esac
