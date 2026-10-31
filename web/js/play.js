@@ -6,7 +6,7 @@ import { LEVEL_NAME, errorBox, h, metricsGrid, statusLine, typingInto } from "./
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
-let prefs = { level: "medium", grade: "", mode: "original", limit: "3" };
+let prefs = { level: "medium", grade: "", mode: "original", limit: "3", counts: true };
 try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") }; } catch { /* no storage */ }
 const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ } };
 
@@ -69,6 +69,8 @@ export function mount(el, params, query) {
   const boardEl = h("div", { id: "board" }), padEl = h("div");
   const notesBtn = h("button", { type: "button", id: "notesBtn", title: "Режим заметок (N, Т или пробел)", onclick: () => G?.toggleNotes() }, "✎ заметки");
   const autoBox = h("input", { type: "checkbox", id: "autoNotes", checked: true, onchange: e => G?.setAutoNotes(e.target.checked) });
+  const countsBox = h("input", { type: "checkbox", id: "padCounts", checked: prefs.counts,
+    onchange: e => { prefs.counts = e.target.checked; savePrefs(); refresh(); } });
   const setup = setupSection();
   ui = {
     badge: h("span", { class: "badge", id: "badge" }), errs: h("span", { class: "counter", id: "errors" }),
@@ -83,7 +85,8 @@ export function mount(el, params, query) {
       h("div", { class: "bar", style: "margin-top:10px" }, notesBtn,
         h("button", { type: "button", id: "undoBtn", onclick: () => G?.undoLast() }, "↶ отменить"),
         h("button", { type: "button", id: "checkBtn", title: "Подсветить ошибки (учитывается в итогах)", onclick: () => G?.check() }, "Проверить"),
-        h("label", { class: "check" }, autoBox, "автоочистка заметок")),
+        h("label", { class: "check" }, autoBox, "автоочистка заметок"),
+        h("label", { class: "check", title: "Сколько каждой цифры осталось поставить" }, countsBox, "счётчик цифр")),
       ui.msg),
     setup.box,
     h("div", {}, ui.results,
@@ -136,7 +139,7 @@ function refresh() {
     notes: i => (S.vals[i] ? null : bits(S.notes[i])),
     cellClass: i => (G.isWrong(i) && (S.mode === "original" || S.showBad.has(i) || over) ? ["bad"] : []),
   });
-  ui.pad.update(S.vals);
+  ui.pad.update(prefs.counts ? S.vals : null);
   const p = S.puzzle, showGrade = !meta.hideGrade || over;
   ui.badge.textContent = `${LEVEL_NAME[p.level] || p.level} · ${showGrade ? `техника: ${p.grade_title}` : "техника скрыта"} · ${S.mode}`;
   ui.errs.textContent = S.mode === "original" ? `Ошибки ${S.mistakes}/${S.limit ?? "∞"}` : "";

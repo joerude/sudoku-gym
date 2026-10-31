@@ -223,6 +223,16 @@ class ServerTest(unittest.TestCase):
         self.assertEqual((res["correct"], res["valid_other_move"]), (False, False))
         stats = {t["technique"]: t for t in self.api("GET", "/api/stats")["techniques"]}
         self.assertEqual((stats["hidden_single_box"]["n"], stats["hidden_single_box"]["accuracy"]), (2, 0.5))
+        h = self.api("GET", f"/api/drills/{d['id']}/hint")
+        self.assertEqual(set(h), {"hint", "unit", "digit", "cells"})
+        res = self.api("POST", f"/api/drills/{d['id']}/attempt", {"time_ms": 3500, "cell": cell, "value": value, "hint": 1})
+        self.assertTrue(res["correct"])
+        res = self.api("POST", f"/api/drills/{d['id']}/reveal", {"time_ms": 8000})
+        self.assertEqual((res["correct"], res["answers"]), (False, answers))
+        stats = {t["technique"]: t for t in self.api("GET", "/api/stats")["techniques"]}
+        self.assertEqual((stats["hidden_single_box"]["n"], stats["hidden_single_box"]["accuracy"]), (3, 1 / 3))
+        self.api("GET", "/api/drills/99999/hint", status=404)
+        self.api("POST", f"/api/drills/{d['id']}/attempt", {"time_ms": 1, "cell": cell, "value": value, "hint": 2}, status=400)
 
         if "pointing" in self.drill_counts:
             e = self.api("GET", "/api/drills/next?technique=pointing")

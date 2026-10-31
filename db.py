@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS drill_attempts (
     correct INTEGER NOT NULL,
     cell INTEGER,
     value INTEGER,
-    valid_other INTEGER NOT NULL DEFAULT 0  -- a true move/elimination, but not by the drill's technique
+    valid_other INTEGER NOT NULL DEFAULT 0,  -- a true move/elimination, but not by the drill's technique
+    hint INTEGER NOT NULL DEFAULT 0  -- 0 none, 1 answered after «где искать», 2 answer revealed (cell/value NULL)
 );
 """
 
@@ -89,7 +90,8 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     # databases created before these columns existed
     for table, column, ddl in (("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
-                               ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0")):
+                               ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),
+                               ("drill_attempts", "hint", "INTEGER NOT NULL DEFAULT 0")):
         if column not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
             conn.commit()

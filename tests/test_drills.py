@@ -7,8 +7,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from db import connect  # noqa: E402
 from drills import (  # noqa: E402
-    DRILL_PROMPT, DRILL_TECHNIQUES, KIND, UNLOCK_MIN_CORRECT, attempt, explain, make_drills, next_drill,
-    technique_list, unlocked_tier,
+    DRILL_PROMPT, DRILL_TECHNIQUES, KIND, UNLOCK_MIN_CORRECT, attempt, explain, hint, make_drills, next_drill,
+    reveal, technique_list, unlocked_tier,
 )
 from fixtures import L2, L3, seed_variants  # noqa: E402
 from sudoku_core import TECH_TIER, TECH_TITLE, candidates, find_steps, parse  # noqa: E402
@@ -360,6 +360,72 @@ class ExplainTest(unittest.TestCase):
         self.assertTrue(r["correct"])
         self.assertIn("убираем", r["explanation"])
         self.assertEqual(r["theory"], "pointing-claiming")
+
+
+class HintTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.conn, _ = seeded_conn()
+        make_drills(cls.conn, per_technique=3, seed=5)
+
+    def setUp(self):
+        self.conn.execute("DELETE FROM drill_attempts")
+
+    def drill(self, technique):
+        did, answers = self.conn.execute("SELECT id, answers FROM drills WHERE technique=? LIMIT 1", (technique,)).fetchone()
+        return did, json.loads(answers)
+
+    def mastery(self, technique):
+        return next(x for x in technique_list(self.conn) if x["technique"] == technique)
+
+    def test_every_technique_hints_without_giving_the_answer(self):
+        for did, t, answers in self.conn.execute("SELECT id, technique, answers FROM drills").fetchall():
+            h = hint(self.conn, did)
+            self.assertTrue(h["hint"], t)
+            self.assertNotIn("убираем", h["hint"], t)
+            if KIND[t] == "place":
+                for c, _ in json.loads(answers):
+                    self.assertNotIn(f"r{c // 9 + 1}c{c % 9 + 1}", h["hint"], t)
+
+    def test_where_to_look(self):
+        did, answers = self.drill("hidden_single_row")
+        h = hint(self.conn, did)
+        self.assertEqual(h["unit"], answers[0][0] // 9)  # the row of the answer
+        self.assertIsNone(h["digit"])
+        did, answers = self.drill("pointing")
+        h = hint(self.conn, did)
+        self.assertTrue(18 <= h["unit"] <= 26)
+        self.assertEqual(h["digit"], answers[0][1])
+        did, answers = self.drill("x_wing")
+        h = hint(self.conn, did)
+        self.assertEqual((h["unit"], h["digit"]), (None, answers[0][1]))
+        did, _ = self.drill("y_wing")
+        self.assertEqual(len(hint(self.conn, did)["cells"]), 1)  # the pivot
+        self.assertIsNone(hint(self.conn, 99999))
+
+    def test_correct_after_hint_is_neutral(self):
+        did, answers = self.drill("hidden_single_box")
+        r = attempt(self.conn, did, 9000, *answers[0], hint=1)
+        self.assertTrue(r["correct"])
+        self.assertEqual(self.conn.execute("SELECT hint FROM drill_attempts").fetchone()[0], 1)
+        m = self.mastery("hidden_single_box")
+        self.assertEqual((m["correct"], m["accuracy"]), (0, None))
+
+    def test_wrong_after_hint_is_an_error(self):
+        did, answers = self.drill("hidden_single_box")
+        c, v = answers[0]
+        attempt(self.conn, did, 9000, c, v % 9 + 1, hint=1)
+        self.assertEqual(self.mastery("hidden_single_box")["accuracy"], 0.0)
+
+    def test_reveal(self):
+        did, answers = self.drill("pointing")
+        r = reveal(self.conn, did, 12000)
+        self.assertEqual((r["correct"], r["answers"]), (False, answers))
+        self.assertIn("убираем", r["explanation"])
+        row = self.conn.execute("SELECT time_ms, correct, cell, value, hint FROM drill_attempts").fetchone()
+        self.assertEqual(tuple(row), (12000, 0, None, None, 2))
+        self.assertEqual(self.mastery("pointing")["accuracy"], 0.0)  # «не знаю» counts as an error
+        self.assertIsNone(reveal(self.conn, 99999, 1000))
 
 
 if __name__ == "__main__":

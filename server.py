@@ -247,7 +247,22 @@ def api_drill_next(conn, m, q, body):
 
 def api_drill_attempt(conn, m, q, body):
     time_ms, cell, value = _int(body, "time_ms", lo=0), _int(body, "cell", 0, 80), _int(body, "value", 1, 9)
-    res = drills.attempt(conn, int(m.group(1)), time_ms, cell, value)
+    hint = _int(body, "hint", 0, 1, required=False, default=0)
+    res = drills.attempt(conn, int(m.group(1)), time_ms, cell, value, hint)
+    if res is None:
+        raise ApiError(404, "упражнение не найдено")
+    return res
+
+
+def api_drill_reveal(conn, m, q, body):
+    res = drills.reveal(conn, int(m.group(1)), _int(body, "time_ms", lo=0))
+    if res is None:
+        raise ApiError(404, "упражнение не найдено")
+    return res
+
+
+def api_drill_hint(conn, m, q, body):
+    res = drills.hint(conn, int(m.group(1)))
     if res is None:
         raise ApiError(404, "упражнение не найдено")
     return res
@@ -280,6 +295,8 @@ ROUTES = [
     ("GET", r"/api/drills/techniques", api_drill_techniques),
     ("GET", r"/api/drills/next", api_drill_next),
     ("POST", r"/api/drills/(\d+)/attempt", api_drill_attempt),
+    ("GET", r"/api/drills/(\d+)/hint", api_drill_hint),
+    ("POST", r"/api/drills/(\d+)/reveal", api_drill_reveal),
     ("GET", r"/api/theory", api_theory_list),
     ("GET", r"/api/theory/([^/]+)", api_theory_page),
 ]

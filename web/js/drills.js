@@ -1,6 +1,6 @@
 // #/drills — "find the move" drills: place (cell + digit) and eliminate (click the removed candidate).
-import { drillTechniques, nextDrill, sendAttempt } from "./api.js";
-import { ROW, COL, cellName, createBoard, createPad, toDigits } from "./board.js";
+import { drillHint, drillTechniques, nextDrill, revealDrill, sendAttempt } from "./api.js";
+import { ROW, COL, cellName, createBoard, createPad, toDigits, unitCells } from "./board.js";
 import { TIER_NAME, errorBox, h, pct, sec, typingInto } from "./ui.js";
 
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
@@ -24,6 +24,7 @@ export function mount(el, params, query) {
   if (query.technique) choice = query.technique;
   let drill = null, values = [], start = 0, sel = -1, result = null, picked = null, techs = [], loading = false;
   let digit = 0;  // last digit pressed or filled cell clicked: highlighted on the board
+  let hinted = null;  // «где искать» shown for this drill: {hint, unit, digit, cells}; a right answer after it is neutral
 
   const boardEl = h("div", { id: "drillBoard" }), padEl = h("div");
   const prompt = h("p", { class: "prompt", id: "prompt" }, "Загрузка…");
@@ -33,6 +34,8 @@ export function mount(el, params, query) {
   const strip = h("div", { class: "strip", id: "session" });
   const candBox = h("input", { type: "checkbox", id: "showCands", onchange: e => { showCands = e.target.checked; render(); } });
   const nextBtn = h("button", { type: "button", id: "nextDrill", onclick: () => load() }, "Дальше");
+  const hintBtn = h("button", { type: "button", id: "hintBtn", title: "Подсказка (H): сначала где искать, потом ответ",
+    onclick: () => onHint() }, "💡 Подсказка");
   const autoBox = h("input", { type: "checkbox", id: "autoNext", onchange: e => {
     autoNext = e.target.checked;
     try { localStorage.setItem(AUTO_KEY, autoNext ? "1" : "0"); } catch {}
@@ -59,7 +62,8 @@ export function mount(el, params, query) {
       h("div", { class: "bar head", style: "margin-bottom:4px" }, title, theoryLink, timer), prompt,
       h("p", { class: "hint", id: "drillHow" }), boardWrap, padEl,
       h("div", { class: "bar", style: "margin-top:10px" }, nextBtn,
-        h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Пробел"), " / ", h("kbd", {}, "Enter"))),
+        h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Пробел"), " / ", h("kbd", {}, "Enter")),
+        hintBtn, h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "H"))),
       h("div", { class: "bar", style: "margin-top:6px" },
         h("label", { class: "check" }, autoBox, "Автопереход после верного"),
         h("label", { class: "check" }, candBox, "Показывать кандидатов")),
@@ -100,6 +104,7 @@ export function mount(el, params, query) {
     const ans = new Map((result?.answers || []).map(([c, v]) => [c, v]));
     const ansSet = new Set((result?.answers || []).map(([c, v]) => `${c}:${v}`));
     const ghost = new Map();
+    const look = new Set(hinted && !result && hinted.unit !== null ? unitCells(hinted.unit) : []);
     if (!elim && result) {
       for (const [c, v] of ans) ghost.set(c, v);
       if (picked) ghost.set(picked[0], picked[1]);
@@ -111,7 +116,7 @@ export function mount(el, params, query) {
       notes: i => (elim || showCands ? drill.candidates[i] : null), notesBig: elim, pickable: elim && !result,
       ghost,
       cellClass: i => {
-        if (!result) return [];
+        if (!result) return [look.has(i) ? "unit" : "", hinted?.cells.includes(i) ? "pat" : ""].filter(Boolean);
         const pat = (result.pattern || []).includes(i) ? ["pat"] : [];
         if (elim) return pat;
         if (picked && picked[0] === i) return [result.correct ? "ok" : result.valid_other_move ? "other" : "bad"];
@@ -125,6 +130,8 @@ export function mount(el, params, query) {
     });
     padEl.hidden = elim && (sel < 0 || !!result);
     nextBtn.textContent = result ? "Дальше" : "Пропустить";
+    hintBtn.hidden = !!result;
+    hintBtn.textContent = hinted ? "Показать ответ" : "💡 Подсказка";
   }
 
   async function load() {
@@ -134,7 +141,7 @@ export function mount(el, params, query) {
     msg.textContent = ""; msg.className = "msg";
     try {
       drill = await nextDrill(choice === "adaptive" ? undefined : choice);
-      values = toDigits(drill.board); sel = -1; result = null; picked = null; digit = 0;
+      values = toDigits(drill.board); sel = -1; result = null; picked = null; digit = 0; hinted = null;
       title.textContent = drill.title; title.title = drill.title;
       why.hidden = true; why.textContent = "";
       const slug = techs.find(t => t.technique === drill.technique)?.theory;
@@ -176,31 +183,68 @@ export function mount(el, params, query) {
   }
 
   let sending = false;
+  /** First press: where to look (no answer). Second press: show the answer — counted as an error. */
+  async function onHint() {
+    if (!drill || result || sending || gated) return;
+    sending = true;
+    const id = drill.id;
+    try {
+      if (!hinted) {
+        const hn = await drillHint(id);
+        if (!drill || drill.id !== id || result) return;
+        hinted = hn;
+        if (hn.digit) digit = hn.digit;
+        why.textContent = "";
+        why.append(h("b", {}, "Подсказка: "), hn.hint, " ", h("span", { class: "hint" },
+          "Ответ после подсказки не идёт в зачёт, но и ошибкой не считается."));
+        why.hidden = false;
+        render();
+        return;
+      }
+      const ms = elapsed();
+      const res = await revealDrill(id, ms);
+      if (!drill || drill.id !== id) return;
+      result = res; picked = null;
+      timer.textContent = sec(ms);
+      session.n++;
+      const list = res.answers.map(([c, v]) => drill.kind === "eliminate" ? `${v} из ${cellName(c)}` : `${cellName(c)} = ${v}`);
+      msg.textContent = `Ответ показан — засчитано как ошибка. ${list.join(", ")}`; msg.className = "msg bad";
+      showWhy(res);
+      renderStrip(); render(); refreshTechs();
+    } catch (e) {
+      msg.textContent = e.message; msg.className = "msg bad";
+    } finally { sending = false; }
+  }
+
+  function showWhy(res) {
+    if (!res.explanation) return;
+    why.textContent = "";
+    why.append(h("b", {}, "Почему: "), res.explanation, " ",
+      res.theory ? h("a", { href: `#/theory/${res.theory}` }, "Теория →") : null);
+    why.hidden = false;
+  }
+
   async function answer(cell, value) {
     if (!drill || result || sending || gated) return;
     sending = true;
     const ms = elapsed();
     try {
-      const res = await sendAttempt(drill.id, ms, cell, value);
+      const res = await sendAttempt(drill.id, ms, cell, value, hinted ? 1 : 0);
       result = res; picked = [cell, value];
       timer.textContent = sec(ms);
       session.n++;
-      if (res.correct) { session.correct++; session.times.push(ms); }
+      if (res.correct && !hinted) { session.correct++; session.times.push(ms); }
       const list = res.answers.map(([c, v]) => drill.kind === "eliminate" ? `${v} из ${cellName(c)}` : `${cellName(c)} = ${v}`);
       const answersText = `Ответ${list.length > 1 ? "ы" : ""} этой техникой: ${list.join(", ")}`;
-      if (res.correct) { msg.textContent = `Верно · ${sec(ms)}`; msg.className = "msg ok"; }
+      if (res.correct && hinted) { msg.textContent = `Верно с подсказкой · ${sec(ms)} — не в зачёт`; msg.className = "msg ok"; }
+      else if (res.correct) { msg.textContent = `Верно · ${sec(ms)}`; msg.className = "msg ok"; }
       else if (res.valid_other_move) {
         msg.textContent = `Ход верный, но найден другой техникой — засчитано нейтрально. ${answersText}`;
         msg.className = "msg other";
       } else { msg.textContent = `Неверно. ${answersText}`; msg.className = "msg bad"; }
       const advance = res.correct && autoNext;
       if (advance) autoTimer = setTimeout(load, AUTO_DELAY);
-      if (res.explanation && !advance) {
-        why.textContent = "";
-        why.append(h("b", {}, "Почему: "), res.explanation, " ",
-          res.theory ? h("a", { href: `#/theory/${res.theory}` }, "Теория →") : null);
-        why.hidden = false;
-      }
+      if (!advance) showWhy(res);
       renderStrip(); render(); refreshTechs();
     } catch (e) {
       msg.textContent = e.message; msg.className = "msg bad";
@@ -218,6 +262,7 @@ export function mount(el, params, query) {
     }
     const d = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
     if (d) { onDigit(+d[1]); e.preventDefault(); return; }
+    if (e.code === "KeyH") { onHint(); e.preventDefault(); return; }
     if (e.key.startsWith("Arrow") && drill && !result) {
       // only empty cells take an answer, so the arrows jump over filled ones (wrapping within the row / column)
       if (sel < 0) sel = values.indexOf(0);

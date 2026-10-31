@@ -1,6 +1,7 @@
 """Game analytics: replay, metrics from moves, pause review and overall statistics."""
 import statistics
 
+from drills import NEUTRAL
 from sudoku_core import TECH_TIER, TECH_TITLE, easiest_steps, parse, to_str, unit_name
 
 LONG_PAUSE_MS = 20000
@@ -168,7 +169,7 @@ def stats(conn) -> dict:
     attempts = {}
     for t, correct, ms in conn.execute(
             "SELECT d.technique, a.correct, a.time_ms FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
-            " WHERE a.valid_other = 0"):  # a true move by another technique is neither right nor wrong
+            f" WHERE NOT {NEUTRAL}"):  # a true move by another technique / right after a hint: neither right nor wrong
         attempts.setdefault(t, []).append((correct, ms))
     techniques = []
     for t in TECH_TIER:

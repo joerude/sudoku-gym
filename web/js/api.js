@@ -41,8 +41,10 @@ export const getReview = id => call("GET", `/api/games/${id}/review`);
 export const getStats = () => call("GET", "/api/stats");
 export const drillTechniques = () => call("GET", "/api/drills/techniques");
 export const nextDrill = technique => call("GET", `/api/drills/next${qs({ technique })}`);
-export const sendAttempt = (id, timeMs, cell, value) =>
-  call("POST", `/api/drills/${id}/attempt`, { time_ms: Math.round(timeMs), cell, value });
+export const sendAttempt = (id, timeMs, cell, value, hint = 0) =>
+  call("POST", `/api/drills/${id}/attempt`, { time_ms: Math.round(timeMs), cell, value, hint });
+export const drillHint = id => call("GET", `/api/drills/${id}/hint`);
+export const revealDrill = (id, timeMs) => call("POST", `/api/drills/${id}/reveal`, { time_ms: Math.round(timeMs) });
 export const getTheory = () => call("GET", "/api/theory");
 export const getTheoryPage = slug => call("GET", `/api/theory/${encodeURIComponent(slug)}`);
 
