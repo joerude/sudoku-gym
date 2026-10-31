@@ -12,7 +12,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     puzzle, gameId, mode, limit,
     given: givens.map(Boolean), vals: givens.slice(), sol: toDigits(puzzle.solution),
     notes: Array(81).fill(0), sel: givens.indexOf(0), notesMode: false, autoNotes: true,
-    undo: [], showBad: new Set(), mistakes: 0, seq: 0,
+    undo: [], redo: [], showBad: new Set(), mistakes: 0, seq: 0,
     start: performance.now(), end: null, status: "active", msg: null, result: null,
   };
   const queue = createMoveQueue(gameId, { onError: onQueueError });
@@ -45,7 +45,20 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
                             : "Сетка заполнена, но есть ошибки. Ищи — таймер идёт.", "bad");
   }
 
-  function pushUndo(i) { S.undo.push({ i, val: S.vals[i], notes: S.notes.slice() }); }
+  // a new action invalidates what was undone, as in any editor
+  function pushUndo(i) { S.undo.push({ i, val: S.vals[i], notes: S.notes.slice() }); S.redo.length = 0; }
+  /** The current state of the cells an undo/redo entry touches — what the opposite stack needs to come back. */
+  const snapshot = e => ({ batch: (e.batch || [e]).map(({ i }) => ({ i, val: S.vals[i] })), notes: S.notes.slice() });
+  /** Put the cells and notes of an entry back; logged as «undo» (a restore, not a new placement or mistake). */
+  function restore(e) {
+    for (const { i, val } of e.batch || [e]) {
+      S.vals[i] = val; S.sel = i; S.showBad.delete(i);
+      log("undo", i, val);
+    }
+    S.notes = e.notes;
+    afterPlace();
+    onChange();
+  }
 
   const api = {
     S, elapsed, queue,
@@ -93,7 +106,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       const cells = [];
       for (let i = 0; i < 81; i++) if (!S.given[i] && (S.vals[i] || S.notes[i])) cells.push({ i, val: S.vals[i] });
       if (!cells.length) return;
-      S.undo.push({ batch: cells, notes: S.notes.slice() });
+      S.undo.push({ batch: cells, notes: S.notes.slice() }); S.redo.length = 0;
       for (const { i } of cells) { S.vals[i] = 0; log("erase", i); }
       S.notes = Array(81).fill(0); S.showBad.clear();
       say(null);
@@ -103,13 +116,16 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       if (locked()) return;
       const u = S.undo.pop();
       if (!u) return;
-      for (const { i, val } of u.batch || [u]) {
-        S.vals[i] = val; S.sel = i; S.showBad.delete(i);
-        log("undo", i, val);
-      }
-      S.notes = u.notes;
-      afterPlace();
-      onChange();
+      S.redo.push(snapshot(u));
+      restore(u);
+    },
+    /** Bring back what the last undo took away (until a new action clears it). */
+    redoLast() {
+      if (locked()) return;
+      const r = S.redo.pop();
+      if (!r) return;
+      S.undo.push(snapshot(r));
+      restore(r);
     },
     check() {
       if (locked()) return;

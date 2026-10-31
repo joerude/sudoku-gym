@@ -133,7 +133,8 @@ export function mount(el, params, query) {
       h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer,
         notesBtn, newTop, zenButton("mini")), boardEl, notesLabel, padEl,
       h("div", { class: "bar", style: "margin-top:10px" },
-        h("button", { type: "button", id: "undoBtn", onclick: () => G?.undoLast() }, "↶ отменить"),
+        h("button", { type: "button", id: "undoBtn", title: "Отменить (Ctrl+Z)", onclick: () => G?.undoLast() }, "↶ отменить"),
+        h("button", { type: "button", id: "redoBtn", title: "Вернуть отменённое (Ctrl+Y или Ctrl+Shift+Z)", onclick: () => G?.redoLast() }, "↷ вернуть"),
         h("button", { type: "button", id: "checkBtn", title: "Подсветить ошибки (учитывается в итогах)", onclick: () => G?.check() }, "Проверить"),
         clearBtn, giveUpBtn,
         h("label", { class: "check zen-hide" }, autoBox, "автоочистка заметок"),
@@ -144,6 +145,7 @@ export function mount(el, params, query) {
       h("section", { class: "zen-hide" }, h("h2", {}, "Клавиши"), h("p", { class: "hint", style: "margin:0", html:
         "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
+        "<kbd>Ctrl+Y</kbd> — вернуть, " +
         "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти). " +
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." }))));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
@@ -200,6 +202,7 @@ function refresh() {
     ui.badge.textContent = "партия не начата"; ui.errs.textContent = "";
     ui.root?.classList.remove("notes-on");
     ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
+    ui.root.querySelector("#undoBtn").disabled = ui.root.querySelector("#redoBtn").disabled = true;
     if (pendingMsg) { setMsg(pendingMsg.text, pendingMsg.cls); pendingMsg = null; }
     else if (!ui.msg.textContent) setMsg("Выбери уровень и нажми «Новая партия».");
     return;
@@ -223,6 +226,8 @@ function refresh() {
   ui.notesBtn.textContent = S.notesMode ? "✎ заметки: вкл" : "✎ заметки";
   ui.root.classList.toggle("notes-on", !!S.notesMode && !over);
   ui.clearBtn.disabled = ui.giveUpBtn.disabled = over;
+  ui.root.querySelector("#undoBtn").disabled = over || !S.undo.length;
+  ui.root.querySelector("#redoBtn").disabled = over || !S.redo.length;
   ui.autoBox.checked = S.autoNotes;
   if (S.msg) setMsg(S.msg.text, S.msg.cls);
   else if (!over) setMsg("");
@@ -325,6 +330,8 @@ function handleKey(e) {
     }
     return;
   }
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && (e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey))) { G.redoLast(); e.preventDefault(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" || (e.ctrlKey && e.code === "KeyZ")) {
     G.undoLast(); e.preventDefault(); return;
   }

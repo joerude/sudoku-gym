@@ -236,6 +236,19 @@ try {
   const mv3 = (await api(`/api/games/${g3.id}`)).moves.map(m => `${m.kind}:${m.cell ?? "-"}:${m.value ?? "-"}`);
   ok(mv3.join(" ") === `note:${c3}:3 note:${c3}:7 place:${c3}:${g3.solution[c3]} undo:${c3}:0 check:-:-`,
      "move log: note, note, place, undo (restored 0), check — flushed by the 1 s queue", mv3.join(" "));
+  // redo: Ctrl+Y / Ctrl+Shift+Z bring back what Ctrl+Z took; a new action clears it
+  await page.keyboard.press("Control+y");
+  ok((await page.textContent(cellSel(c3))).trim() === g3.solution[c3], "Ctrl+Y brings the undone digit back");
+  ok(await page.$eval("#redoBtn", e => e.disabled), "«вернуть» disabled when there is nothing to redo");
+  await page.keyboard.press("Control+z");
+  await page.keyboard.press("Control+Shift+z");
+  ok((await page.textContent(cellSel(c3))).trim() === g3.solution[c3], "Ctrl+Shift+Z redoes too");
+  await page.keyboard.press("Control+z");
+  ok(!(await page.$eval("#redoBtn", e => e.disabled)), "«вернуть» enabled after an undo");
+  await page.keyboard.press("Shift+Digit5");
+  ok(await page.$eval("#redoBtn", e => e.disabled), "a new action clears the redo history");
+  await page.click("#redoBtn", { force: true }).catch(() => {});
+  ok((await page.textContent(cellSel(c3))).trim() !== g3.solution[c3], "nothing comes back after a new action");
   // no game after a reload: a digit explains what to do, Enter starts a game
   await page.reload();
   await page.waitForSelector("#newGame");
