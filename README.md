@@ -30,5 +30,3 @@ python3 tools/regrade.py                 # recompute tech_grade after technique 
 | `drills.py` | drill generation, adaptive pick, technique unlocks, explanations |
 | `server.py` | HTTP API and static files from `web/` |
 | `web/` | UI (vanilla JS) |
-
-Design docs and plans are in `docs/superpowers/`.

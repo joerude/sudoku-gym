@@ -3,3 +3,6 @@ data/
 __pycache__/
 *.pyc
 node_modules/
+
+# design specs and plans — local only
+docs/superpowers/
