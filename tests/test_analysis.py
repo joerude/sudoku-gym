@@ -182,6 +182,15 @@ class StatsTest(unittest.TestCase):
         self.assertEqual(rec[2], {"level": "medium", "mode": "original", "best_ms": None, "game_id": None, "at": None,
                                   "solved": 0})  # failed/abandoned/active games never count
 
+    def test_records_ignore_games_with_checks(self):
+        easy = self.conn.execute("SELECT id FROM puzzles WHERE bank_id = 'e1'").fetchone()[0]
+        checked = make_game(self.conn, easy, [], "original", "solved", "2026-10-31T09:00:00+00:00", 50000, 0, 3)
+        self.conn.execute("UPDATE games SET checks = 2 WHERE id = ?", (checked,))
+        self.conn.commit()
+        rec = records(self.conn)[0]
+        self.assertEqual((rec["best_ms"], rec["solved"]), (100000, 3))  # the faster checked game is not a record
+        self.assertNotEqual(rec["game_id"], checked)
+
     def test_records_tie_keeps_the_first(self):
         easy = self.conn.execute("SELECT id FROM puzzles WHERE bank_id = 'e1'").fetchone()[0]
         later = make_game(self.conn, easy, [], "original", "solved", "2026-10-31T09:00:00+00:00", 100000, 0, 3)

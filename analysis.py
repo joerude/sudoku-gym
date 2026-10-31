@@ -141,11 +141,12 @@ def _median(xs):
 def records(conn) -> list:
     """Personal best per level × mode (all four levels, both modes; empty ones with None).
 
-    Only solved games count; on a tie the earlier game keeps the record."""
+    Only solved games without «Проверить» count (a check reveals mistakes); on a tie the earlier game keeps it."""
     best = {}
     for gid, level, mode, ms, at in conn.execute(
             "SELECT g.id, p.level, g.mode, g.time_ms, g.started_at FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
-            " WHERE g.status = 'solved' AND g.time_ms IS NOT NULL ORDER BY g.time_ms, g.id"):
+            " WHERE g.status = 'solved' AND g.time_ms IS NOT NULL AND COALESCE(g.checks, 0) = 0"
+            " ORDER BY g.time_ms, g.id"):
         key = (level, mode)
         if key in best:
             best[key]["solved"] += 1

@@ -130,7 +130,7 @@ try {
   await page.waitForSelector("#reward.in");
   ok((await page.textContent("#rewardTime")).trim() === (await page.textContent("#timer")).trim(), "reward: shows the solve time");
   await page.waitForFunction(() => !/^…$/.test(document.querySelector(".reward-compare").textContent));
-  ok((await page.textContent(".reward-compare")).length > 5, "reward: compares with own results",
+  ok(/рекорд/.test(await page.textContent(".reward-compare")), "reward: a game without «Проверить» claims the record",
      await page.textContent(".reward-compare"));
   ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: page turns green");
   await page.waitForSelector("#reward #speedChart .sc-pace");

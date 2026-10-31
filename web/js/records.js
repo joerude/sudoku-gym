@@ -20,9 +20,10 @@ export function recordsCard({ title = "Рекорды", id = "records" } = {}) {
     const levels = [...new Set(rows.map(r => r.level))];
     const cell = r => {
       if (r.best_ms === null) return h("td", { class: "num muted" }, "—");
-      return h("td", { class: "num", title: `${dateRu(r.at)} · решено партий: ${r.solved}` },
+      return h("td", { class: "num", title: `${dateRu(r.at)} · решено без проверки: ${r.solved}` },
         h("a", { href: `#/review/${r.game_id}` }, fmtTime(r.best_ms)));
     };
+    body.append(h("p", { class: "hint", style: "margin:0 0 4px" }, "Только решённые партии без «Проверить»."));
     body.append(h("table", { class: "records" },
       h("thead", {}, h("tr", {}, h("th", {}, "Уровень"), MODES.map(m => h("th", { class: "num" }, m)))),
       h("tbody", {}, levels.map(lv => h("tr", {}, h("td", {}, LEVEL_NAME[lv] || lv),

@@ -1,20 +1,23 @@
 // The reward after a solved game: the page turns green and a dialog with the numbers fades in.
-import { getGame, getStats } from "./api.js";
+import { getGame, getRecords, getStats } from "./api.js";
 import { fmtTime } from "./board.js";
 import { LEVEL_NAME, h } from "./ui.js";
 import { speedChart } from "./speedchart.js";
 
 let current = null;  // the open dialog's close()
 
-/** How this time compares with the player's results on the same level and mode (stats already include it). */
-function compare(r, level, stats) {
+/** How this time compares with the player's results on the same level and mode (stats already include it).
+ *  Records only count games without «Проверить», so a checked game never claims one. */
+function compare(r, level, stats, records) {
   const row = stats?.by_level_mode.find(x => x.level === level && x.mode === r.mode);
+  const rec = records?.find(x => x.level === level && x.mode === r.mode);
+  if (r.checks > 0) return "Использовалась «Проверить» — партия не идёт в рекорды.";
+  if (rec?.game_id === r.id) return rec.solved <= 1 ? "🏆 Первый рекорд на этом уровне и в этом режиме!" : "🏆 Новый личный рекорд!";
   if (!row || row.solved <= 1) return "Первая решённая партия на этом уровне и в этом режиме.";
-  if (r.time_ms <= row.best_ms) return "🏆 Новый личный рекорд!";
   const diff = row.median_ms - r.time_ms;
   const vsMedian = Math.abs(diff) < 1000 ? "на уровне медианы"
     : diff > 0 ? `на ${fmtTime(diff, false)} быстрее медианы` : `на ${fmtTime(-diff, false)} медленнее медианы`;
-  return `${vsMedian} · рекорд ${fmtTime(row.best_ms)} · медиана ${fmtTime(row.median_ms)} (${row.solved} партий)`;
+  return `${vsMedian} · рекорд ${rec?.best_ms ? fmtTime(rec.best_ms) : "—"} · медиана ${fmtTime(row.median_ms)} (${row.solved} партий)`;
 }
 
 /** Show the dialog for a solved game. onNew starts the next game; the dialog closes itself on Esc or a backdrop click. */
@@ -57,7 +60,8 @@ export function showReward(r, puzzle, { onNew }) {
   document.body.append(overlay);
   requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add("in")));  // let the start state paint
   current = close;
-  getStats().then(s => { line.textContent = compare(r, puzzle.level, s); }).catch(() => { line.textContent = ""; });
+  Promise.all([getStats(), getRecords()]).then(([s, rec]) => { line.textContent = compare(r, puzzle.level, s, rec); })
+    .catch(() => { line.textContent = ""; });
   getGame(r.id).then(g => { if (g.moves.length) chartBox.append(speedChart(g.moves, r.time_ms)); }).catch(() => {});
 }
 
