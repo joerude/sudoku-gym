@@ -110,13 +110,11 @@ def api_puzzle(conn, m, q, body):
     return _puzzle_out(conn, row)
 
 
-def api_add_puzzle(conn, m, q, body):
+def _add_custom(conn, givens, level="custom"):
     """An entered or pasted grid: validated, graded and stored under the chosen level, 'custom' by default
-    (idempotent by level and givens). It is never served by level selection."""
-    givens = body.get("givens")
+    (idempotent by level and givens) → the puzzle row. It is never served by level selection."""
     if not isinstance(givens, str):
         raise ApiError(400, tr("поле givens обязательно"))
-    level = body.get("level", "custom")
     if level != "custom" and level not in LEVELS:
         raise ApiError(400, tr("неизвестный уровень: {level}", level=level))
     try:
@@ -133,9 +131,12 @@ def api_add_puzzle(conn, m, q, body):
     conn.execute("INSERT OR IGNORE INTO puzzles (bank_id, level, givens, solution, se_rating, tech_grade)"
                  " VALUES (?, ?, ?, ?, NULL, ?)", (bank_id, level, givens, to_str(solve(g)), grade(g)))
     conn.commit()
-    row = conn.execute("SELECT id, level, givens, solution, tech_grade FROM puzzles WHERE bank_id = ?",
-                       (bank_id,)).fetchone()
-    return _puzzle_out(conn, row)
+    return conn.execute("SELECT id, level, givens, solution, tech_grade FROM puzzles WHERE bank_id = ?",
+                        (bank_id,)).fetchone()
+
+
+def api_add_puzzle(conn, m, q, body):
+    return _puzzle_out(conn, _add_custom(conn, body.get("givens"), body.get("level", "custom")))
 
 
 def api_puzzle_options(conn, m, q, body):
@@ -332,6 +333,51 @@ def api_favorite_remove(conn, m, q, body):
     return {"fav": False, "counts": favorite_counts(conn)}
 
 
+def api_favorites_export(conn, m, q, body):
+    """Starred puzzles and drills by keys that survive another database: bank_id, (technique, board)."""
+    puzzles = conn.execute("SELECT p.bank_id FROM favorites f JOIN puzzles p ON p.id = f.ref_id"
+                           " WHERE f.kind = 'puzzle' ORDER BY f.at, f.ref_id")
+    drill_rows = conn.execute("SELECT d.technique, d.board FROM favorites f JOIN drills d ON d.id = f.ref_id"
+                              " WHERE f.kind = 'drill' ORDER BY f.at, f.ref_id")
+    return {"puzzles": [{"bank_id": r[0]} for r in puzzles],
+            "drills": [{"technique": r[0], "board": r[1]} for r in drill_rows]}
+
+
+def api_favorites_import(conn, m, q, body):
+    """Adds the exported favourites (never removes); an unknown custom-[<level>-]<givens> puzzle is created again."""
+    puzzles, drill_refs = body.get("puzzles", []), body.get("drills", [])
+    if not all(isinstance(x, list) and all(isinstance(e, dict) for e in x) for x in (puzzles, drill_refs)):
+        raise ApiError(400, tr("puzzles и drills должны быть списками объектов"))
+    found, missing = [], 0
+    for p in puzzles:
+        bank_id = p.get("bank_id")
+        row = conn.execute("SELECT id FROM puzzles WHERE bank_id = ?", (bank_id,)).fetchone() \
+            if isinstance(bank_id, str) else None
+        if row is None and isinstance(bank_id, str) and bank_id.startswith("custom-"):
+            level, _, givens = bank_id[len("custom-"):].rpartition("-")  # givens never contain "-"
+            try:
+                row = _add_custom(conn, givens, level or "custom")
+            except ApiError:
+                row = None
+        if row is None:
+            missing += 1
+        else:
+            found.append(("puzzle", row["id"]))
+    for d in drill_refs:
+        tech, board = d.get("technique"), d.get("board")
+        row = conn.execute("SELECT id FROM drills WHERE technique = ? AND board = ? ORDER BY id", (tech, board)).fetchone() \
+            if isinstance(tech, str) and isinstance(board, str) else None
+        if row is None:
+            missing += 1
+        else:
+            found.append(("drill", row["id"]))
+    at = now_iso()
+    added = sum(conn.execute("INSERT OR IGNORE INTO favorites (kind, ref_id, at) VALUES (?, ?, ?)",
+                             (kind, ref_id, at)).rowcount for kind, ref_id in found)
+    conn.commit()
+    return {"added": added, "missing": missing, "counts": favorite_counts(conn)}
+
+
 def _theory_en(slug: str) -> dict:
     """{title, body_md} from theory/en/<slug>.md for an English request; {} keeps the Russian page from the DB."""
     path = os.path.join(THEORY_EN, slug + ".md")
@@ -375,6 +421,8 @@ ROUTES = [
     ("GET", r"/api/drills/(\d+)/hint", api_drill_hint),
     ("POST", r"/api/drills/(\d+)/reveal", api_drill_reveal),
     ("GET", r"/api/favorites", api_favorites),
+    ("GET", r"/api/favorites/export", api_favorites_export),
+    ("POST", r"/api/favorites/import", api_favorites_import),
     ("PUT", r"/api/favorites/([a-z]+)/(\d+)", api_favorite_add),
     ("DELETE", r"/api/favorites/([a-z]+)/(\d+)", api_favorite_remove),
     ("GET", r"/api/theory", api_theory_list),

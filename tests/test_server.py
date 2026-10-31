@@ -286,6 +286,53 @@ class ServerTest(unittest.TestCase):
         self.api("PUT", "/api/favorites/drill/999999", status=404)
         self.api("PUT", "/api/favorites/game/1", status=404)
 
+    def test_favorites_transfer(self):
+        pid = self.hard[1]
+        custom = self.api("POST", "/api/puzzles", {"givens": L2[2][1]})
+        custom_med = self.api("POST", "/api/puzzles", {"givens": L2[2][1], "level": "medium"})
+        d = self.api("GET", "/api/drills/next?technique=naked_single")
+        favs = (("puzzle", pid), ("puzzle", custom["id"]), ("puzzle", custom_med["id"]), ("drill", d["id"]))
+        for kind, ref in favs:
+            self.api("PUT", f"/api/favorites/{kind}/{ref}")
+        exp = self.api("GET", "/api/favorites/export")
+        self.assertEqual(len(exp["puzzles"]), 3)
+        self.assertIn({"bank_id": "custom-" + L2[2][1]}, exp["puzzles"])
+        self.assertIn({"bank_id": "custom-medium-" + L2[2][1]}, exp["puzzles"])
+        self.assertEqual(exp["drills"], [{"technique": d["technique"], "board": d["board"]}])
+
+        # clear, then import back: everything returns; a second import adds nothing
+        for kind, ref in favs:
+            self.api("DELETE", f"/api/favorites/{kind}/{ref}")
+        body = {**exp, "puzzles": exp["puzzles"] + [{"bank_id": "no-such-puzzle"}],
+                "drills": exp["drills"] + [{"technique": "x_wing", "board": "0" * 81}]}
+        res = self.api("POST", "/api/favorites/import", body)
+        self.assertEqual((res["added"], res["missing"], res["counts"]), (4, 2, {"puzzle": 3, "drill": 1}))
+        self.assertEqual(self.api("POST", "/api/favorites/import", exp)["added"], 0)
+
+        # custom puzzles unknown to this DB are created again from their givens, under their level
+        conn = connect(self.db_path)
+        for ref in (custom["id"], custom_med["id"]):
+            conn.execute("DELETE FROM favorites WHERE kind = 'puzzle' AND ref_id = ?", (ref,))
+            conn.execute("DELETE FROM puzzles WHERE id = ?", (ref,))
+        conn.commit(); conn.close()
+        res = self.api("POST", "/api/favorites/import", {"puzzles": [{"bank_id": "custom-" + L2[2][1]},
+                                                                     {"bank_id": "custom-medium-" + L2[2][1]},
+                                                                     {"bank_id": "custom-nightmare-" + L2[2][1]}]})
+        self.assertEqual((res["added"], res["missing"]), (2, 1))
+        conn = connect(self.db_path)
+        levels = dict(conn.execute("SELECT bank_id, level FROM puzzles WHERE givens = ? AND bank_id LIKE 'custom-%'",
+                                   (L2[2][1],)).fetchall())
+        conn.close()
+        self.assertEqual(levels, {"custom-" + L2[2][1]: "custom", "custom-medium-" + L2[2][1]: "medium"})
+
+        self.api("POST", "/api/favorites/import", {"puzzles": "x"}, status=400)
+        self.api("POST", "/api/favorites/import", {"drills": [1]}, status=400)
+        # leave no favourites or custom puzzles behind for other tests (the DB is shared, /api/health counts puzzles)
+        conn = connect(self.db_path)
+        conn.execute("DELETE FROM favorites")
+        conn.execute("DELETE FROM puzzles WHERE givens = ? AND bank_id LIKE 'custom-%'", (L2[2][1],))
+        conn.commit(); conn.close()
+
     def test_english_by_header(self):
         en = {"X-Lang": "en"}
         code, _, data = self.raw("GET", "/api/theory/naked-single", headers=en)

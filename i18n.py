@@ -114,6 +114,7 @@ EN = {
     "упражнений нет": "no drills",
     "упражнение не найдено": "drill not found",
     "в избранное можно добавить только: {kinds}": "only these can be favourites: {kinds}",
+    "puzzles и drills должны быть списками объектов": "puzzles and drills must be lists of objects",
     "страница теории не найдена": "theory page not found",
     "некорректный JSON": "invalid JSON",
     "тело запроса должно быть JSON-объектом": "the request body must be a JSON object",
