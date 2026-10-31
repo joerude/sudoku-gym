@@ -67,7 +67,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
         S.notes[i] ^= 1 << v;
         log("note", i, v);
       } else {
-        if (S.vals[i] === v) return;
+        if (S.vals[i] === v) return this.erase();  // the same digit again clears the cell
         pushUndo(i);
         S.vals[i] = v; S.notes[i] = 0; S.showBad.delete(i);
         if (S.autoNotes) for (const p of PEERS[i]) S.notes[p] &= ~(1 << v);

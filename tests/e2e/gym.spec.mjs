@@ -213,6 +213,15 @@ try {
   ok((await page.textContent(cellSel(cE))).trim() === gEnter.solution[cE], "digit reaches the board while a select has focus");
   ok(await page.evaluate(() => document.activeElement.id !== "level"), "the select lets go of focus");
   ok(await page.$eval("#level", e => e.value) !== gEnter.solution[cE], "the digit did not change the select");
+  // the same digit again clears the cell (keyboard and pad)
+  await page.keyboard.press(`Digit${gEnter.solution[cE]}`);
+  ok((await page.textContent(cellSel(cE))).trim() === "", "same digit again clears the cell");
+  await page.click(`.pad button[data-digit="${gEnter.solution[cE]}"]`);
+  await page.click(`.pad button[data-digit="${gEnter.solution[cE]}"]`);
+  ok((await page.textContent(cellSel(cE))).trim() === "", "same pad digit twice: placed, then cleared");
+  await page.waitForTimeout(1300);
+  const kinds = (await api(`/api/games/${gEnter.id}`)).moves.slice(-3).map(m => m.kind).join(" ");
+  ok(kinds === "erase place erase", "clearing by the same digit is logged as erase", kinds);
   await typeAt(page, c3, 5);
 
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------
