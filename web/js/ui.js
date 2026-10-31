@@ -49,6 +49,36 @@ export function ignoreKey(e) {
   return false;
 }
 
+/** A yes/no question over the page. Enter confirms, Esc or a click outside cancels, and no key reaches the page
+ *  underneath while it is open. Returns close(), so a page can drop the dialog when it unmounts. */
+export function confirmDialog({ title, text, ok, cancel = "Продолжить", onOk, onClose = () => {} }) {
+  const okBtn = h("button", { type: "button", class: "danger", id: "confirmOk" }, ok);
+  const card = h("div", { class: "confirm-card", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "confirmTitle", tabindex: "-1" },
+    h("h2", { id: "confirmTitle" }, title),
+    text && h("p", { class: "hint", style: "margin:0" }, text),
+    h("div", { class: "bar" }, h("button", { type: "button", id: "confirmCancel", onclick: () => close() }, cancel), okBtn),
+    h("p", { class: "hint", style: "margin:0" }, h("kbd", {}, "Enter"), ` — ${ok.toLowerCase()}, `, h("kbd", {}, "Esc"), ` — ${cancel.toLowerCase()}`));
+  const overlay = h("div", { class: "confirm", id: "confirm", onclick: e => { if (e.target === overlay) close(); } }, card);
+  let open = true;
+  const close = () => {
+    if (!open) return;
+    open = false;
+    window.removeEventListener("keydown", onKey, true);
+    overlay.remove();
+    onClose();
+  };
+  const onKey = e => {
+    e.stopPropagation();
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+    else if (e.key === "Enter") { e.preventDefault(); close(); onOk(); }
+  };
+  okBtn.onclick = () => { close(); onOk(); };
+  window.addEventListener("keydown", onKey, true);
+  document.body.append(overlay);
+  card.focus();
+  return close;
+}
+
 /** What the page keyboard handler did with the last key — shown by the ?debug key log. */
 export const keyTrace = { page: null, skip: null };
 

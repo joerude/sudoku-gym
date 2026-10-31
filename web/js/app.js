@@ -30,7 +30,7 @@ let cleanup = null;
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, "");
   const [path, qs = ""] = raw.split("?");
-  return { path: path || "today", query: Object.fromEntries(new URLSearchParams(qs)) };
+  return { path: path || "play", query: Object.fromEntries(new URLSearchParams(qs)) };
 }
 
 function route() {
@@ -38,7 +38,7 @@ function route() {
   if (cleanup) { try { cleanup(); } catch (e) { console.warn(e); } cleanup = null; }
   app.textContent = "";
   const hit = ROUTES.map(([re, fn, nav]) => [re.exec(path), fn, nav]).find(([m]) => m);
-  if (!hit) { location.replace("#/today"); return; }
+  if (!hit) { location.replace("#/play"); return; }
   const [m, fn, nav] = hit;
   for (const a of document.querySelectorAll("#nav a")) {
     const on = a.dataset.route === nav;
@@ -62,10 +62,17 @@ const themeBtn = themeButton();  // re-synced on every route: #/settings may hav
 document.querySelector(".top-in").append(themeBtn);
 initZen();
 
-// Z toggles zen mode on the board pages, Esc leaves it.
+// Z toggles zen mode on the board pages. Esc leaves zen first; otherwise it goes to «Играть» (the main page),
+// and there a game in progress asks before it is thrown away. Dialogs (reward, confirm) catch their own Esc.
 document.addEventListener("keydown", e => {
-  if (!document.body.classList.contains("zen-page") || typingInto(e) || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.code === "KeyZ" || (e.key === "Escape" && isZen())) { setZen(e.key === "Escape" ? false : !isZen()); e.preventDefault(); }
+  if (typingInto(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const zenPage = document.body.classList.contains("zen-page");
+  if (zenPage && e.code === "KeyZ") { setZen(!isZen()); e.preventDefault(); return; }
+  if (e.key !== "Escape") return;
+  if (zenPage && isZen()) setZen(false);
+  else if (parseHash().path !== "play") location.hash = "#/play";
+  else play.escape();
+  e.preventDefault();
 });
 
 // http://127.0.0.1:8765/?debug — shows what each key press reaches, to diagnose keyboard problems in a browser.

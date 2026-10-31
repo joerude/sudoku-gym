@@ -281,6 +281,31 @@ try {
   const kinds = (await api(`/api/games/${gEnter.id}`)).moves.slice(-3).map(m => m.kind).join(" ");
   ok(kinds === "erase place erase", "clearing by the same digit is logged as erase", kinds);
   await typeAt(page, c3, 5);
+  // Esc mid-game asks first: the dialog takes the keyboard, Esc keeps playing, Enter abandons
+  await page.click(cellSel(cE));
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#confirm");
+  await page.keyboard.press(`Digit${gEnter.solution[cE]}`);
+  ok((await page.textContent(cellSel(cE))).trim() === "", "Esc mid-game: confirm dialog open, digits don't reach the board");
+  await shot(page, "play-esc-confirm");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#confirm", { state: "detached" });
+  ok((await api(`/api/games/${gEnter.id}`)).status === "active", "Esc in the dialog: the game goes on");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#confirm");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector("#resultsCard");
+  ok(/брошена/.test(await page.textContent("#resultsCard")) && (await api(`/api/games/${gEnter.id}`)).status === "abandoned",
+     "Enter in the dialog abandons the game");
+  await page.keyboard.press("Escape");
+  ok(!(await page.$("#confirm")), "Esc with no game in progress: nothing to ask");
+  // «Играть» is the main page: the empty route and Esc from any other page lead there
+  await page.goto(`${BASE}/#/stats`);
+  await page.waitForSelector("#nav a.active[data-route=stats]");
+  await page.keyboard.press("Escape");
+  ok(await page.waitForFunction(() => location.hash === "#/play").then(() => true, () => false), "Esc on another page goes to «Играть»");
+  await page.goto(`${BASE}/`);
+  ok(await page.waitForSelector("#nav a.active[data-route=play]").then(() => true, () => false), "the main page is «Играть»");
 
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------
   const ascii = `1 . . | . . 6 | . . .

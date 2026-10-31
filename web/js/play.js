@@ -4,7 +4,7 @@ import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
 import { closeReward, showReward } from "./reward.js";
 import { recordsCard } from "./records.js";
-import { LEVEL_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, metricsGrid, statusLine, zenButton } from "./ui.js";
+import { LEVEL_NAME, alignSideToBoard, confirmDialog, createFav, errorBox, h, ignoreKey, keyTrace, metricsGrid, statusLine, zenButton } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
@@ -19,6 +19,7 @@ let ui = null;         // DOM refs while mounted
 let pendingMsg = null; // message to show on next refresh
 let digit = 0;         // last digit pressed: highlighted everywhere until a filled cell is selected
 let favCount = null;   // starred puzzles (null until /api/favorites answers)
+let asking = null;     // close() of the open «Бросить партию?» dialog
 
 const bits = m => { const out = []; for (let v = 1; v <= 9; v++) if (m & (1 << v)) out.push(v); return out; };
 
@@ -146,7 +147,7 @@ export function mount(el, params, query) {
         "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
         "<kbd>Ctrl+Y</kbd> — вернуть, " +
-        "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти). " +
+        "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением). " +
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." }))));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
   el.append(ui.root);
@@ -176,7 +177,7 @@ export function mount(el, params, query) {
   getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
   if (G?.S.result) showResults();
-  return () => { closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
+  return () => { asking?.(); closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
 }
 
 /** Highlight the record for the level and mode being played (or chosen for the next game). */
@@ -319,7 +320,18 @@ function press(v, asNote) {
   refresh();
 }
 
+/** Esc on «Играть» (app.js): a game in progress is thrown away only after a yes in the dialog. */
+export function escape() {
+  if (!ui || asking || G?.S.status !== "active") return;
+  asking = confirmDialog({
+    title: "Бросить партию?", text: "Партия запишется как брошенная.", ok: "Бросить",
+    onOk: () => { if (G?.S.status !== "active") return; G.S.msg = { text: "Партия брошена", cls: "bad" }; endGame("abandoned"); },
+    onClose: () => { asking = null; },
+  });
+}
+
 function handleKey(e) {
+  if (asking) return;  // the dialog has the keyboard
   if (ignoreKey(e)) return;
   if (e.altKey) { keyTrace.skip = "зажат Alt"; return; }
   if (!G) {  // no game yet (e.g. after a page reload): say so instead of silently ignoring the key
