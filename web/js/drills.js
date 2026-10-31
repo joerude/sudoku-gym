@@ -88,7 +88,7 @@ export function mount(el, params, query) {
     candBox.checked = elim || showCands;
     candBox.disabled = elim;
     board.render({
-      values, given: values.map(Boolean), sel: result ? -1 : sel, highlight: !elim,
+      values, given: values.map(Boolean), sel: result ? -1 : sel, highlight: !elim || sel >= 0,
       notes: i => (elim || showCands ? drill.candidates[i] : null), notesBig: elim, pickable: elim && !result,
       ghost,
       cellClass: i => {
@@ -104,7 +104,7 @@ export function mount(el, params, query) {
         return ansSet.has(`${i}:${v}`) ? "c-ans" : "";
       },
     });
-    padEl.hidden = elim;
+    padEl.hidden = elim && (sel < 0 || !!result);
     nextBtn.textContent = result ? "Дальше" : "Пропустить";
   }
 
@@ -122,7 +122,7 @@ export function mount(el, params, query) {
       if (slug) theoryLink.href = `#/theory/${slug}`;
       prompt.textContent = drill.prompt;
       how.textContent = drill.kind === "eliminate"
-        ? "Нажми на кандидата (маленькую цифру), который убирается."
+        ? "Нажми на кандидата, который убирается, — или выбери клетку, затем цифру (клавиатура или кнопки)."
         : "Выбери клетку, затем цифру (клавиатура или кнопки).";
       start = performance.now();
       render();
@@ -133,12 +133,15 @@ export function mount(el, params, query) {
   }
 
   function onCell(i) {
-    if (!drill || result || drill.kind !== "place" || values[i]) return;
+    if (!drill || result || values[i]) return;
     sel = i; render();
   }
   function onDigit(v) {
-    if (!drill || result || drill.kind !== "place") return;
+    if (!drill || result) return;
     if (sel < 0 || values[sel]) { msg.textContent = "Сначала выбери пустую клетку"; msg.className = "msg"; return; }
+    if (drill.kind === "eliminate" && !drill.candidates[sel].includes(v)) {
+      msg.textContent = `В ${cellName(sel)} нет кандидата ${v}`; msg.className = "msg"; return;
+    }
     answer(sel, v);
   }
 
@@ -181,7 +184,7 @@ export function mount(el, params, query) {
     }
     const d = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
     if (d) { onDigit(+d[1]); e.preventDefault(); return; }
-    if (e.key.startsWith("Arrow") && drill?.kind === "place" && !result) {
+    if (e.key.startsWith("Arrow") && drill && !result) {
       const i = sel < 0 ? 0 : sel, r = ROW(i), k = COL(i);
       sel = { ArrowUp: ((r + 8) % 9) * 9 + k, ArrowDown: ((r + 1) % 9) * 9 + k,
               ArrowLeft: r * 9 + (k + 8) % 9, ArrowRight: r * 9 + (k + 1) % 9 }[e.key];

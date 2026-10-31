@@ -28,8 +28,10 @@ function pauseCard(p, game, n) {
     const elim = new Map();
     for (const [c, v] of s?.eliminations || []) elim.set(c, [...(elim.get(c) || []), v]);
     const ghost = new Map(s && s.cell !== null && s.cell !== undefined ? [[s.cell, s.value]] : []);
+    // a step on a cell holding the player's wrong digit: show the right digit there (still marked red)
+    const shown = ghost.size ? values.map((v, i) => (ghost.has(i) && wrong.has(i) ? 0 : v)) : values;
     board.render({
-      values, given, ghost,
+      values: shown, given, ghost,
       cellClass: i => [wrong.has(i) ? "bad" : "", unit.has(i) ? "unit" : "", ghost.has(i) ? "ans" : ""].filter(Boolean),
       notes: i => (elim.has(i) && !values[i] ? cands[i] : null),
       candClass: (i, v) => (elim.get(i)?.includes(v) ? "c-x" : ""),

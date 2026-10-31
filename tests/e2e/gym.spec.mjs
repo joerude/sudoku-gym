@@ -277,6 +277,17 @@ try {
   ok(await page.$$eval("#drillBoard span.c-bad", els => els.length === 1), "eliminate drill: wrong → red");
   ok(await page.$$eval("#drillBoard span.c-ans", els => els.length >= 1), "eliminate drill: answers shown");
   ok(/Решено: 2\/4/.test(await page.textContent("#session")), "session strip counts attempts");
+  rp = drillResp();
+  await page.locator("body").press("Space");
+  d = await (await rp).json();
+  inf = info(d.id);
+  ok(await page.$eval("#drillBoard + .pad, .pad", e => e.hidden), "eliminate drill: pad hidden until a cell is picked");
+  const [kc, kv] = inf.answers[0];
+  await page.$eval(`#drillBoard .cell[data-cell="${kc}"]`, e => e.click());  // the cell itself, not a candidate
+  ok(!(await page.$eval(".pad", e => e.hidden)), "eliminate drill: pad shown after picking a cell");
+  await page.locator("body").press(`Digit${kv}`);
+  await page.waitForSelector("#drillMsg.ok");
+  ok(true, "eliminate drill: cell + keyboard digit answers");
 
   // --- 6. stats -------------------------------------------------------------------------------
   await page.goto(`${BASE}/#/stats`);

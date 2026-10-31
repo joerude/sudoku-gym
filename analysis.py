@@ -103,6 +103,17 @@ def _step_dict(st) -> dict:
             "eliminations": [list(e) for e in st.eliminations]}
 
 
+def _distinct(steps) -> list:
+    """One step per move: a placement found as both naked and hidden single, or the same eliminations, appear once."""
+    seen, out = set(), []
+    for st in steps:
+        key = (st.cell, st.value) if st.cell is not None else frozenset(st.eliminations)
+        if key not in seen:
+            seen.add(key)
+            out.append(st)
+    return out
+
+
 def review(conn, game_id: int) -> dict | None:
     """Long pauses with the position before each and the easiest steps available there."""
     game = game_info(conn, game_id)
@@ -118,7 +129,7 @@ def review(conn, game_id: int) -> dict | None:
         for i in wrong:
             clean[i] = 0
         out.append({**p, "board": to_str(board), "had_errors": bool(wrong), "wrong_cells": wrong,
-                    "steps": [_step_dict(s) for s in easiest_steps(clean)[:MAX_REVIEW_STEPS]]})
+                    "steps": [_step_dict(s) for s in _distinct(easiest_steps(clean))[:MAX_REVIEW_STEPS]]})
     return {"game": game, "pauses": out}
 
 

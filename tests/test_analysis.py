@@ -113,6 +113,13 @@ class ReviewTest(unittest.TestCase):
         self.assertEqual((first["had_errors"], first["wrong_cells"]), (False, []))
         self.assert_steps_ok(first, board)
 
+    def test_review_steps_are_distinct_moves(self):
+        gid = make_game(self.conn, self.pid, [mv(1, 30000, "place", 1, 4, 1)])
+        steps = review(self.conn, gid)["pauses"][0]["steps"]
+        moves = [(s["cell"], s["value"]) for s in steps]
+        self.assertEqual(len(moves), len(set(moves)))
+        self.assertEqual(len(steps), 6)  # the start position of L1-1 has more than 6 distinct singles
+
     def test_review_with_errors_and_start_pause(self):
         moves = [mv(1, 25000, "place", 2, 9, 0), mv(2, 60000, "place", 1, 4, 1)]
         gid = make_game(self.conn, self.pid, moves)
