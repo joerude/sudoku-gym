@@ -1,6 +1,6 @@
 # Sudoku Gym
 
-A local trainer for speed sudoku (Russian UI). It has 20,000 puzzles filterable by technique, original and hardcore modes as on usdoku, a review of your pauses after each game, "find the move" drills for 10 techniques with explanations, theory pages and stats. Claude Code coaches through the `sudoku-speed-coach` skill (`.claude/skills/`) and reads progress straight from the database.
+A local trainer for speed sudoku, in Russian or English (RU/EN in the header; the first visit follows the browser language). It has 20,000 puzzles filterable by technique, original and hardcore modes as on usdoku, a review of your pauses after each game, "find the move" drills for 10 techniques with explanations, theory pages and stats. Claude Code coaches through the `sudoku-speed-coach` skill (`.claude/skills/`) and reads progress straight from the database.
 
 Inspired by [Monkeytype](https://monkeytype.com) (themes, fonts, minimal look) and [lichess](https://lichess.org) (zen mode, puzzle-style drills).
 
