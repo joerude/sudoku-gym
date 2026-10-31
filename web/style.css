@@ -286,3 +286,27 @@ body.zen.zen-page .layout { grid-template-columns: var(--zen-w); grid-template-r
   --board: auto; --side: auto; --side-align: stretch; --side-w: none; }
 body.zen.zen-page .layout > .main-col { grid-row: auto; }
 body.zen.zen-page .layout > .first-mobile { order: 0; }
+
+/* reward after a solved game: green page tint + a dialog that fades in */
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--ok); opacity: 0; transition: opacity .6s ease; }  /* a tint layer, so theme colours stay instant */
+body.won::before { opacity: .12; }
+body.won .main-col .grid { border-color: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 35%, transparent); }
+.reward { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: color-mix(in srgb, var(--ok) 18%, rgb(0 0 0 / .35)); opacity: 0; transition: opacity .25s ease; }
+.reward.in { opacity: 1; }
+.reward-card { width: min(440px, 100%); background: var(--surface); color: var(--ink); border: 1px solid var(--ok);
+  border-radius: 14px; padding: 22px 20px 16px; text-align: center; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / .25); transform: translateY(14px) scale(.97); transition: transform .3s cubic-bezier(.2, .8, .2, 1); }
+.reward.in .reward-card { transform: none; }
+.reward-badge { width: 48px; height: 48px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--ok); color: var(--surface); font-size: 26px; font-weight: 700; }
+.reward-card h2 { margin: 0; font-size: 20px; color: var(--ok); }
+.reward-time { font: 600 40px/1 var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
+.reward-compare { margin: 0; font-size: 14px; }
+.reward-card .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 4px 0; }
+.reward-actions { justify-content: center; margin: 4px 0 0; }
+@media (prefers-reduced-motion: reduce) {
+  body::before, .reward, .reward-card { transition: none; }
+  .reward-card { transform: none; }
+}

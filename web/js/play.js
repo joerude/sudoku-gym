@@ -2,6 +2,7 @@
 import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
 import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
+import { closeReward, showReward } from "./reward.js";
 import { LEVEL_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, metricsGrid, statusLine, zenButton } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
@@ -150,7 +151,7 @@ export function mount(el, params, query) {
   getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
   if (G?.S.result) showResults();
-  return () => { unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); ui = null; };
+  return () => { closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); ui = null; };
 }
 
 function setMsg(text, cls = "") {
@@ -213,6 +214,7 @@ async function endGame(status) {
   }
   refresh();
   showResults();
+  if (G.S.status === "solved" && G.S.result) showReward(G.S.result, G.S.puzzle, { onNew: () => newGame(false) });
 }
 
 let busy = false;
@@ -221,6 +223,7 @@ async function begin(getPuzzleFn, hideGrade) {
   busy = true;
   ui?.setup.buttons.forEach(b => { b.disabled = true; });
   try {
+    closeReward();
     if (G && G.S.status === "active") await G.finish("abandoned").catch(() => {});
     const puzzle = await getPuzzleFn();
     const limit = prefs.mode === "original" ? (prefs.limit === "none" ? null : Number(prefs.limit)) : null;

@@ -126,6 +126,18 @@ try {
   ok(s1.moves.length === empties.length + 1 && s1.moves.every((m, k) => m.seq === k + 1), "all moves stored in order");
   ok(s1.moves.every((m, k) => k === 0 || m.t_ms >= s1.moves[k - 1].t_ms), "move times are monotonic");
   ok(await page.$eval("#timer", e => e.classList.contains("done")), "timer stopped");
+  // reward: green page + a dialog with the numbers fades in; Esc closes it, the green stays with the results
+  await page.waitForSelector("#reward.in");
+  ok((await page.textContent("#rewardTime")).trim() === (await page.textContent("#timer")).trim(), "reward: shows the solve time");
+  await page.waitForFunction(() => !/^…$/.test(document.querySelector(".reward-compare").textContent));
+  ok((await page.textContent(".reward-compare")).length > 5, "reward: compares with own results",
+     await page.textContent(".reward-compare"));
+  ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: page turns green");
+  await page.waitForTimeout(400);  // let the fade-in finish
+  await shot(page, "play-reward");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#reward", { state: "detached" });
+  ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: Esc closes the dialog, green stays");
   await shot(page, "play-solved");
   await page.click("#reviewLink");
   await page.waitForSelector("#noPauses, .pause-item");
@@ -169,6 +181,7 @@ try {
   await page.waitForSelector("#resultsCard");
   ok(/провал/.test(await page.textContent("#resultsCard")), "original: failed after 3 mistakes");
   ok(await page.$eval("#board .grid", e => e.classList.contains("locked")), "board locked");
+  ok(!(await page.$("#reward")) && !(await page.evaluate(() => document.body.classList.contains("won"))), "no reward for a failed game");
   await page.click(cellSel(e2[3])); await page.keyboard.press(g2.solution[e2[3]]);
   ok((await page.textContent(cellSel(e2[3]))).trim() === "", "locked board ignores input");
   const s2 = await api(`/api/games/${g2.id}`);
