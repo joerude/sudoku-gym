@@ -320,17 +320,48 @@ try {
 . 1 3 | 5 9 . | . . 8
 . . . | 4 . . | . . 5`;
   // Firefox drops clipboardData from a synthetic ClipboardEvent, so the paste path is checked in Chromium only.
+  const own = "100006000600035120032000000000140030860000092050029000000000370013590008000400005";
+  const boardDigits = () => page.$$eval("#board .cell", els => els.map(c => c.textContent.trim() || "0").join(""));
   if (BROWSER === "chromium") {
-    const g4full = await waitGame(page, () => page.evaluate(text => {
+    // the pasted grid opens in the editor first, to look it over and pick the level; Enter starts it
+    await page.evaluate(text => {
       const dt = new DataTransfer(); dt.setData("text/plain", text);
       document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
-    }, ascii));
+    }, ascii);
+    await page.waitForSelector("#customEditor:not([hidden])");
+    ok(await boardDigits() === own && (await page.textContent("#badge")).includes("ввод условия"), "Ctrl+V opens the grid in the editor");
+    await setSelect(page, "customLevel", "custom");
+    const g4full = await waitGame(page, () => page.keyboard.press("Enter"));
     ok((await page.textContent("#badge")).includes("своя сетка"), "custom badge");
     ok(g4full.level === "custom" && g4full.givens === "100006000600035120032000000000140030860000092050029000000000370013590008000400005",
        "Ctrl+V ASCII grid loads a custom puzzle");
     ok((await api(`/api/games/${gEnter.id}`)).status === "abandoned", "previous active game finished as abandoned");
     ok((await page.textContent(cellSel(0))).trim() === "1" && (await page.textContent(cellSel(5))).trim() === "6", "custom grid on board");
   }
+
+  // --- 4c. «✎ Своя сетка»: the grid typed in, repeats are red, it starts as a game of the chosen level ---
+  await page.click("#customGame");
+  await page.waitForSelector("#customEditor:not([hidden])");
+  ok(await boardDigits() === "0".repeat(81), "editor opens empty");
+  await page.click(cellSel(0));
+  await page.keyboard.type(own);
+  ok(await boardDigits() === own, "typing 81 digits (0 = empty) fills the grid row by row");
+  await page.click(cellSel(1)); await page.keyboard.press("1");
+  ok(await page.$eval(cellSel(0), c => c.classList.contains("bad")) && await page.$eval("#customStart", b => b.disabled),
+     "a repeated digit is red and blocks the start");
+  await page.keyboard.press("Backspace");  // the cursor moved on to an empty cell: Backspace erases the one before
+  ok(await boardDigits() === own && !(await page.$eval("#customStart", b => b.disabled)), "Backspace takes the repeat back");
+  await setSelect(page, "customLevel", "medium");
+  await setSelect(page, "customMode", "hardcore");
+  const g4c = await waitGame(page, () => page.click("#customStart"));
+  ok(g4c.level === "medium" && g4c.mode === "hardcore" && g4c.givens === own && g4c.status === "active",
+     "own grid starts as a game of the chosen level and mode");
+  ok(await page.$eval("#customEditor", e => e.hidden), "the editor closes when the game starts");
+  await page.click("#customGame");  // a game without moves is let go without asking
+  await page.waitForSelector("#customEditor:not([hidden])");
+  ok((await api(`/api/games/${g4c.id}`)).status === "abandoned", "opening the editor abandons a game without moves");
+  await page.keyboard.press("Escape");
+  ok(await page.$eval("#customEditor", e => e.hidden) && await boardDigits() === own, "Esc closes the editor, back to the last board");
 
   // --- 4b. «Очистить» wipes own digits and notes (one undo brings them back); «Сдаться» asks twice ---
   const g4b = await startGame(page, { level: "easy", mode: "hardcore", grade: "" });

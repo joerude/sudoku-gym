@@ -200,8 +200,8 @@ export default {
   "Сколько каждой цифры осталось поставить": "How many of each digit are left to place",
   "счётчик цифр": "digit counter",
   "Клавиши": "Keys",
-  "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, <kbd>Ctrl+Y</kbd> — вернуть, <kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением). <kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу.":
-    "<kbd>1–9</kbd> digit, <kbd>Shift</kbd>+digit — note, <kbd>N</kbd>/<kbd>Space</kbd> — notes mode, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — erase, arrows — move, <kbd>Ctrl+Z</kbd> — undo, <kbd>Ctrl+Y</kbd> — redo, <kbd>F</kbd> — favourite, <kbd>Z</kbd> — zen mode (<kbd>Esc</kbd> — leave), <kbd>Esc</kbd> — abandon the game (asks first). <kbd>Ctrl+V</kbd> of a grid (81 digits, 0 or . for empty, <kbd>|</kbd> and <kbd>-</kbd> allowed) loads your own puzzle.",
+  "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, <kbd>Ctrl+Y</kbd> — вернуть, <kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением). <kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».":
+    "<kbd>1–9</kbd> digit, <kbd>Shift</kbd>+digit — note, <kbd>N</kbd>/<kbd>Space</kbd> — notes mode, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — erase, arrows — move, <kbd>Ctrl+Z</kbd> — undo, <kbd>Ctrl+Y</kbd> — redo, <kbd>F</kbd> — favourite, <kbd>Z</kbd> — zen mode (<kbd>Esc</kbd> — leave), <kbd>Esc</kbd> — abandon the game (asks first). <kbd>Ctrl+V</kbd> of a grid (81 digits, 0 or . for empty, <kbd>|</kbd> and <kbd>-</kbd> allowed) opens it in “Own grid”.",
   "партия не начата": "no game started",
   "Выбери уровень и нажми «Новая партия».": "Pick a level and press “New game”.",
   "техника: {title}": "technique: {title}",
@@ -214,6 +214,19 @@ export default {
   "Ходы пока не отправлены: {error}. Повторю.": "Moves not sent yet: {error}. Retrying.",
   "Нужно ровно 81 клетку (цифры, 0 или . — пусто)": "Exactly 81 cells needed (digits, 0 or . for empty)",
   "Партия не начата — нажми «Новая партия» или Enter.": "No game started — press “New game” or Enter.",
+
+  // own grid editor
+  "Ввести задачу самому (например, с usdoku) и решить её как обычную партию": "Enter a puzzle yourself (from usdoku, say) and solve it as a normal game",
+  "✎ Своя сетка": "✎ Own grid",
+  "Своя сетка": "Own grid",
+  "▶ Начать": "▶ Start",
+  "Отмена": "Cancel",
+  "Кликни клетку и введи цифры условия — например, перепиши задачу с usdoku. <kbd>1–9</kbd> — цифра, <kbd>0</kbd> — пусто (курсор идёт дальше, так строку можно набрать подряд), <kbd>Backspace</kbd> — стереть, стрелки — перемещение, <kbd>Esc</kbd> — отмена. <kbd>Ctrl+V</kbd> вставляет сетку целиком (81 цифра, 0 или . — пусто).":
+    "Click a cell and type the givens — copy a puzzle from usdoku, say. <kbd>1–9</kbd> — digit, <kbd>0</kbd> — empty (the cursor moves on, so a row can be typed straight through), <kbd>Backspace</kbd> — erase, arrows — move, <kbd>Esc</kbd> — cancel. <kbd>Ctrl+V</kbd> pastes a whole grid (81 digits, 0 or . for empty).",
+  "Цифр: {n} · повторы в строке, столбце или квадрате — исправь красные клетки": "Digits: {n} · repeats in a row, column or box — fix the red cells",
+  "Цифр: {n} · нужно хотя бы 17": "Digits: {n} · at least 17 needed",
+  "Цифр: {n} · Enter — начать": "Digits: {n} · Enter — start",
+  "своя сетка · ввод условия": "own grid · entering the givens",
 
   // records, reward
   "Рекорды": "Records",

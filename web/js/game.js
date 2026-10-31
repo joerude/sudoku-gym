@@ -1,7 +1,7 @@
 // One game in progress: grid state, notes, undo, mistakes, move log (seq + t_ms) → buffered queue.
 import { tr } from "./i18n.js";
 import { createMoveQueue, finishGame } from "./api.js";
-import { PEERS, ROW, COL, toDigits } from "./board.js";
+import { PEERS, stepCell, toDigits } from "./board.js";
 
 /**
  * startGame({puzzle, gameId, mode, limit, onChange, onEnd})
@@ -65,9 +65,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     S, elapsed, queue,
     select(i) { S.sel = i; onChange(); },
     move(key) {
-      const i = S.sel < 0 ? 0 : S.sel, r = ROW(i), k = COL(i);
-      S.sel = { ArrowUp: ((r + 8) % 9) * 9 + k, ArrowDown: ((r + 1) % 9) * 9 + k,
-                ArrowLeft: r * 9 + (k + 8) % 9, ArrowRight: r * 9 + (k + 1) % 9 }[key];
+      S.sel = stepCell(S.sel < 0 ? 0 : S.sel, key);
       onChange();
     },
     toggleNotes() { S.notesMode = !S.notesMode; onChange(); },

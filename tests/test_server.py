@@ -373,6 +373,18 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(self.api("GET", "/api/puzzle?level=random&grade=1")["level"], "easy")
         self.api("GET", "/api/puzzle?level=custom", status=400)
         self.assertEqual([x["level"] for x in self.api("GET", "/api/puzzle/options")["levels"]], LEVELS)
+        # entered under a level: a puzzle of that level (records, trends), still never served by selection
+        options = self.api("GET", "/api/puzzle/options")
+        lv = self.api("POST", "/api/puzzles", {"givens": givens, "level": "medium"})
+        self.assertEqual((lv["level"], lv["givens"], lv["solution"]), ("medium", givens, solution))
+        self.assertNotIn(lv["id"], (p["id"], self.easy[name]))
+        self.assertEqual(self.api("POST", "/api/puzzles", {"givens": givens, "level": "medium"})["id"], lv["id"])
+        self.assertEqual(self.api("GET", "/api/puzzle/options"), options)
+        for _ in range(20):
+            self.assertNotEqual(self.api("GET", "/api/puzzle?level=medium")["id"], lv["id"])
+        self.assertEqual(self.api("GET", f"/api/games/{self.new_game(lv['id'], 'original')}")["level"], "medium")
+        self.assertEqual(self.api("POST", "/api/puzzles", {"givens": givens, "level": "nightmare"}, status=400)["error"],
+                         "неизвестный уровень: nightmare")
         bad = self.api("POST", "/api/puzzles", {"givens": "11" + "0" * 79}, status=400)
         self.assertEqual(bad["error"], "нет решения")
         multi = self.api("POST", "/api/puzzles", {"givens": "1" + "0" * 80}, status=400)

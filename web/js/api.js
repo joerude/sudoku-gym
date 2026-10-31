@@ -31,7 +31,7 @@ const qs = params => {
 
 export const getOptions = () => call("GET", "/api/puzzle/options");
 export const getPuzzle = (level, grade) => call("GET", `/api/puzzle${qs({ level, grade })}`);
-export const addPuzzle = givens => call("POST", "/api/puzzles", { givens });
+export const addPuzzle = (givens, level) => call("POST", "/api/puzzles", { givens, level });
 export const createGame = (puzzleId, mode, limit) =>
   call("POST", "/api/games", mode === "original" ? { puzzle_id: puzzleId, mode, mistake_limit: limit }
                                                  : { puzzle_id: puzzleId, mode });

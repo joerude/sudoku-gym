@@ -68,6 +68,10 @@ def _puzzle_out(conn, row) -> dict:
     return {**dict(row), "grade_title": tr(GRADE_TITLE.get(row["tech_grade"], "")), "fav": is_favorite(conn, "puzzle", row["id"])}
 
 
+# entered or pasted grids (api_add_puzzle) are played on purpose: never served by level selection, nor counted in options
+BANK_ONLY = "bank_id NOT LIKE 'custom-%'"
+
+
 def api_puzzle(conn, m, q, body):
     if q.get("favorite") == "1":  # a starred puzzle, least recently played first
         row = conn.execute(
@@ -85,12 +89,12 @@ def api_puzzle(conn, m, q, body):
         if not q["grade"].isdigit() or not 1 <= int(q["grade"]) <= 5:
             raise ApiError(400, tr("grade должен быть 1..5"))
         grade = int(q["grade"])
-    cond, args = "", []
+    cond, args = f" AND {BANK_ONLY}", []
     if grade is not None:
-        cond, args = " AND tech_grade = ?", [grade]
+        cond, args = f"{cond} AND tech_grade = ?", [grade]
     if level == "random":
         have = [r[0] for r in conn.execute(f"SELECT DISTINCT level FROM puzzles WHERE 1=1{cond}", args)
-                if r[0] in LEVELS]  # 'custom' (pasted) puzzles are never served at random
+                if r[0] in LEVELS]
         if not have:
             raise ApiError(404, tr("нет задач с такими параметрами"))
         level = random.choice(have)
@@ -107,10 +111,14 @@ def api_puzzle(conn, m, q, body):
 
 
 def api_add_puzzle(conn, m, q, body):
-    """A pasted grid: validated, graded and stored as level 'custom' (idempotent by givens)."""
+    """An entered or pasted grid: validated, graded and stored under the chosen level, 'custom' by default
+    (idempotent by level and givens). It is never served by level selection."""
     givens = body.get("givens")
     if not isinstance(givens, str):
         raise ApiError(400, tr("поле givens обязательно"))
+    level = body.get("level", "custom")
+    if level != "custom" and level not in LEVELS:
+        raise ApiError(400, tr("неизвестный уровень: {level}", level=level))
     try:
         g = parse(givens)
     except ValueError as e:
@@ -121,18 +129,19 @@ def api_add_puzzle(conn, m, q, body):
     if n > 1:
         raise ApiError(400, tr("решение не единственное"))
     givens = to_str(g)
+    bank_id = "custom-" + ("" if level == "custom" else level + "-") + givens
     conn.execute("INSERT OR IGNORE INTO puzzles (bank_id, level, givens, solution, se_rating, tech_grade)"
-                 " VALUES (?, 'custom', ?, ?, NULL, ?)", ("custom-" + givens, givens, to_str(solve(g)), grade(g)))
+                 " VALUES (?, ?, ?, ?, NULL, ?)", (bank_id, level, givens, to_str(solve(g)), grade(g)))
     conn.commit()
     row = conn.execute("SELECT id, level, givens, solution, tech_grade FROM puzzles WHERE bank_id = ?",
-                       ("custom-" + givens,)).fetchone()
+                       (bank_id,)).fetchone()
     return _puzzle_out(conn, row)
 
 
 def api_puzzle_options(conn, m, q, body):
     counts = {lv: {} for lv in LEVELS}
-    for level, g, n in conn.execute("SELECT level, tech_grade, COUNT(*) FROM puzzles GROUP BY level, tech_grade"
-                                    " ORDER BY level, tech_grade"):
+    for level, g, n in conn.execute(f"SELECT level, tech_grade, COUNT(*) FROM puzzles WHERE {BANK_ONLY}"
+                                    " GROUP BY level, tech_grade ORDER BY level, tech_grade"):
         if level in counts:  # skip 'custom'
             counts[level][str(g)] = n
     return {"levels": [{"level": lv, "grades": grades} for lv, grades in counts.items()],

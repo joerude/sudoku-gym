@@ -19,6 +19,12 @@ export function unitCells(u) {
   return out;
 }
 export const cellName = i => `r${ROW(i) + 1}c${COL(i) + 1}`;
+/** The cell an arrow key moves to from i (wrapping round the edges). */
+export const stepCell = (i, key) => {
+  const r = ROW(i), k = COL(i);
+  return { ArrowUp: ((r + 8) % 9) * 9 + k, ArrowDown: ((r + 1) % 9) * 9 + k,
+           ArrowLeft: r * 9 + (k + 8) % 9, ArrowRight: r * 9 + (k + 1) % 9 }[key];
+};
 export const toDigits = s => [...s].map(Number);
 
 /** Candidates from placed digits only: 81 arrays (empty for filled cells). */

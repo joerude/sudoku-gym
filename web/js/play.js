@@ -1,7 +1,7 @@
 // #/play — game page: setup controls, board, timer, results. The game survives navigation.
 import { tr } from "./i18n.js";
 import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
-import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
+import { PEERS, createBoard, createPad, fmtTime, parseGrid, stepCell, toDigits } from "./board.js";
 import { startGame } from "./game.js";
 import { closeReward, showReward } from "./reward.js";
 import { recordsCard } from "./records.js";
@@ -9,7 +9,7 @@ import { LEVEL_NAME, alignSideToBoard, confirmDialog, createFav, errorBox, h, ig
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
-let prefs = { level: "medium", grade: "", mode: "original", limit: "3", counts: true };
+let prefs = { level: "medium", grade: "", mode: "original", limit: "3", counts: true, customLevel: "medium" };
 try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") }; } catch { /* no storage */ }
 const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ } };
 
@@ -21,6 +21,7 @@ let pendingMsg = null; // message to show on next refresh
 let digit = 0;         // last digit pressed: highlighted everywhere until a filled cell is selected
 let favCount = null;   // starred puzzles (null until /api/favorites answers)
 let asking = null;     // close() of the open «Бросить партию?» dialog
+let edit = null;       // own grid being entered ({vals, sel}); survives navigation like G
 
 const bits = m => { const out = []; for (let v = 1; v <= 9; v++) if (m & (1 << v)) out.push(v); return out; };
 
@@ -32,16 +33,28 @@ function gradeCounts(level) {
   return sum;
 }
 const levelTotal = level => Object.values(gradeCounts(level)).reduce((a, b) => a + b, 0);
+/** Cells whose digit repeats in their row, column or box. */
+const conflicts = vals => new Set(vals.flatMap((v, i) => (v && PEERS[i].some(p => vals[p] === v) ? [i] : [])));
+
+/** Mode and mistake-limit selects bound to prefs: the setup and the grid editor each have a pair. */
+function modeFields(ids) {
+  const mode = h("select", { id: ids.mode, "aria-label": tr("Режим") },
+    h("option", { value: "original" }, tr("original — ошибки видны")), h("option", { value: "hardcore" }, tr("hardcore — без подсветки")));
+  const limit = h("select", { id: ids.limit, "aria-label": tr("Лимит ошибок") },
+    h("option", { value: "3" }, "3"), h("option", { value: "5" }, "5"), h("option", { value: "none" }, tr("без лимита")));
+  const limitField = h("label", { class: "field" }, tr("Лимит ошибок"), limit);
+  const sync = () => { mode.value = prefs.mode; limit.value = prefs.limit; limitField.hidden = prefs.mode !== "original"; };
+  mode.onchange = () => { prefs.mode = mode.value; savePrefs(); sync(); markRecord(); };
+  limit.onchange = () => { prefs.limit = limit.value; savePrefs(); };
+  sync();
+  return { modeField: h("label", { class: "field" }, tr("Режим"), mode), limitField, sync };
+}
 
 function setupSection() {
   const lvl = h("select", { id: "level", "aria-label": tr("Уровень") },
     [...LEVELS, "random"].map(l => h("option", { value: l }, l === "random" ? LEVEL_NAME.random : LEVEL_NAME[l])));
   const grade = h("select", { id: "grade", "aria-label": tr("Техника") });
-  const mode = h("select", { id: "mode", "aria-label": tr("Режим") },
-    h("option", { value: "original" }, tr("original — ошибки видны")), h("option", { value: "hardcore" }, tr("hardcore — без подсветки")));
-  const limit = h("select", { id: "limit", "aria-label": tr("Лимит ошибок") },
-    h("option", { value: "3" }, "3"), h("option", { value: "5" }, "5"), h("option", { value: "none" }, tr("без лимита")));
-  const limitField = h("label", { class: "field" }, tr("Лимит ошибок"), limit);
+  const fields = modeFields({ mode: "mode", limit: "limit" });
   const sync = () => {
     const counts = gradeCounts(lvl.value);
     grade.textContent = "";
@@ -52,18 +65,18 @@ function setupSection() {
     }
     if (prefs.grade && !(counts[prefs.grade] > 0)) prefs.grade = "";
     grade.value = prefs.grade;
-    limitField.hidden = mode.value !== "original";
+    fields.sync();
     for (const o of lvl.options) o.disabled = !!options && levelTotal(o.value) === 0;
   };
-  lvl.value = prefs.level; mode.value = prefs.mode; limit.value = prefs.limit;
+  lvl.value = prefs.level;
   lvl.onchange = () => { prefs.level = lvl.value; savePrefs(); sync(); markRecord(); };
   grade.onchange = () => { prefs.grade = grade.value; savePrefs(); };
-  mode.onchange = () => { prefs.mode = mode.value; savePrefs(); sync(); markRecord(); };
-  limit.onchange = () => { prefs.limit = limit.value; savePrefs(); };
   const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) }, tr("Новая партия"));
   const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, tr("🎲 Случайная партия"));
   const favBtn = h("button", { type: "button", id: "favGame", title: tr("Задача из избранного: сначала та, что давно не игралась"),
     onclick: () => begin(getFavoritePuzzle, false) });
+  const customBtn = h("button", { type: "button", id: "customGame", title: tr("Ввести задачу самому (например, с usdoku) и решить её как обычную партию"),
+    onclick: () => openEditor() }, tr("✎ Своя сетка"));
   const syncFav = () => {
     favBtn.textContent = tr("★ Из избранного") + `${favCount === null ? "" : ` (${favCount})`}`;
     favBtn.disabled = !favCount;
@@ -72,9 +85,40 @@ function setupSection() {
   const box = h("section", { class: "first-mobile" },
     h("h2", {}, tr("Новая партия")),
     h("div", { class: "bar" }, h("label", { class: "field" }, tr("Уровень"), lvl), h("label", { class: "field" }, tr("Техника"), grade)),
-    h("div", { class: "bar" }, h("label", { class: "field" }, tr("Режим"), mode), limitField),
-    h("div", { class: "bar", style: "margin:0" }, newBtn, rndBtn, favBtn));
-  return { box, sync, syncFav, buttons: [newBtn, rndBtn, favBtn] };
+    h("div", { class: "bar" }, fields.modeField, fields.limitField),
+    h("div", { class: "bar", style: "margin:0" }, newBtn, rndBtn, favBtn, customBtn));
+  return { box, sync, syncFav, buttons: [newBtn, rndBtn, favBtn, customBtn] };
+}
+
+/** «Своя сетка»: the board becomes an editor of the givens; this panel holds level, mode and start. */
+function editorSection() {
+  const lvl = h("select", { id: "customLevel", "aria-label": tr("Уровень") },
+    [...LEVELS, "custom"].map(l => h("option", { value: l }, LEVEL_NAME[l])));
+  lvl.onchange = () => { prefs.customLevel = lvl.value; savePrefs(); markRecord(); };
+  const fields = modeFields({ mode: "customMode", limit: "customLimit" });
+  const status = h("p", { class: "hint", id: "customStatus" });
+  const startBtn = h("button", { type: "button", class: "primary", id: "customStart", onclick: () => startCustom() }, tr("▶ Начать"));
+  const box = h("section", { class: "first-mobile", id: "customEditor" },
+    h("h2", {}, tr("Своя сетка")),
+    h("p", { class: "hint", html: tr("Кликни клетку и введи цифры условия — например, перепиши задачу с usdoku. " +
+      "<kbd>1–9</kbd> — цифра, <kbd>0</kbd> — пусто (курсор идёт дальше, так строку можно набрать подряд), " +
+      "<kbd>Backspace</kbd> — стереть, стрелки — перемещение, <kbd>Esc</kbd> — отмена. " +
+      "<kbd>Ctrl+V</kbd> вставляет сетку целиком (81 цифра, 0 или . — пусто).") }),
+    h("div", { class: "bar" }, h("label", { class: "field" }, tr("Уровень"), lvl), fields.modeField, fields.limitField),
+    status,
+    h("div", { class: "bar", style: "margin:0" }, startBtn,
+      h("button", { type: "button", id: "customClear", onclick: () => { edit.vals.fill(0); edit.sel = 0; setMsg(""); refresh(); } }, tr("Очистить")),
+      h("button", { type: "button", id: "customCancel", onclick: () => closeEditor() }, tr("Отмена"))));
+  const sync = conf => {
+    const n = edit.vals.filter(Boolean).length;
+    lvl.value = prefs.customLevel;
+    fields.sync();
+    startBtn.disabled = busy || n < 17 || conf.size > 0;
+    status.style.color = conf.size ? "var(--bad)" : "";
+    status.textContent = conf.size ? tr("Цифр: {n} · повторы в строке, столбце или квадрате — исправь красные клетки", { n })
+      : n < 17 ? tr("Цифр: {n} · нужно хотя бы 17", { n }) : tr("Цифр: {n} · Enter — начать", { n });
+  };
+  return { box, sync, startBtn };
 }
 
 export function mount(el, params, query) {
@@ -127,8 +171,11 @@ export function mount(el, params, query) {
   };
   ui.records = recordsCard();
   ui.records.el.classList.add("zen-hide");
-  ui.board = createBoard(boardEl, { onCell: i => { if (G) { digit = 0; G.select(i); } } });
-  ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => G?.erase() });
+  ui.editor = editorSection();
+  ui.board = createBoard(boardEl, { onCell: i => {
+    if (edit) { edit.sel = i; refresh(); } else if (G) { digit = 0; G.select(i); }
+  } });
+  ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => (edit ? editCell(0, false) : G?.erase()) });
   ui.root = h("div", { class: "layout" },
     h("div", { class: "main-col" },
       // zen and «new game» sit next to the timer: reachable without scrolling, and in zen where the side panel is hidden
@@ -142,14 +189,14 @@ export function mount(el, params, query) {
         h("label", { class: "check zen-hide" }, autoBox, tr("автоочистка заметок")),
         h("label", { class: "check zen-hide", title: tr("Сколько каждой цифры осталось поставить") }, countsBox, tr("счётчик цифр"))),
       ui.msg),
-    setup.box,
+    setup.box, ui.editor.box,
     h("div", {}, ui.results, ui.records.el,
       h("section", { class: "zen-hide" }, h("h2", {}, tr("Клавиши")), h("p", { class: "hint", style: "margin:0", html:
         tr("<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
         "<kbd>Ctrl+Y</kbd> — вернуть, " +
         "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением). " +
-        "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу.") }))));
+        "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».") }))));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
   el.append(ui.root);
   markRecord();
@@ -159,7 +206,7 @@ export function mount(el, params, query) {
   const onKey = e => handleKey(e);
   window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
   keyTrace.page = tr("играть");
-  const tick = setInterval(() => { if (G && ui) ui.timer.textContent = fmtTime(G.elapsed()); }, 100);
+  const tick = setInterval(() => { if (G && ui && !edit) ui.timer.textContent = fmtTime(G.elapsed()); }, 100);
 
   const ready = options ? Promise.resolve(options) : getOptions().then(o => { options = o; });
   ready.then(() => {
@@ -177,13 +224,14 @@ export function mount(el, params, query) {
   }).catch(e => setMsg(e.message, "bad"));
   getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
-  if (G?.S.result) showResults();
+  if (G?.S.result && !edit) showResults();
   return () => { asking?.(); closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
 }
 
 /** Highlight the record for the level and mode being played (or chosen for the next game). */
 function markRecord() {
   if (!ui) return;
+  if (edit) { ui.records.mark(prefs.customLevel === "custom" ? null : prefs.customLevel, prefs.mode); return; }
   const p = G?.S.puzzle;
   if (p && G.S.status === "active") ui.records.mark(p.level, G.S.mode);
   else ui.records.mark(prefs.level === "random" ? null : prefs.level, prefs.mode);
@@ -197,6 +245,9 @@ function setMsg(text, cls = "") {
 function refresh() {
   if (!ui) return;
   ui.root.classList.toggle("playing", G?.S.status === "active");
+  ui.setup.box.hidden = !!edit;
+  ui.editor.box.hidden = !edit;
+  if (edit) { renderEditor(); return; }
   ui.fav.set(G ? G.S.puzzle.id : null, G?.S.puzzle.fav);
   if (!G) {
     ui.board.render({ values: Array(81).fill(0), given: Array(81).fill(false) });
@@ -235,6 +286,23 @@ function refresh() {
   else if (!over) setMsg("");
 }
 
+/** The board as an editor of the grid being entered: its digits are the givens, repeats are red. */
+function renderEditor() {
+  const conf = conflicts(edit.vals);
+  ui.fav.set(null);
+  ui.board.render({ values: edit.vals, given: edit.vals.map(Boolean), sel: edit.sel, highlight: true,
+    cellClass: i => (conf.has(i) ? ["bad"] : []) });
+  ui.pad.update(null);
+  ui.badge.textContent = tr("своя сетка · ввод условия");
+  ui.errs.textContent = "";
+  ui.timer.textContent = fmtTime(0);
+  ui.timer.classList.remove("done");
+  ui.root.classList.remove("notes-on");
+  ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
+  ui.root.querySelector("#undoBtn").disabled = ui.root.querySelector("#redoBtn").disabled = true;
+  ui.editor.sync(conf);
+}
+
 function showResults() {
   if (!ui || !G?.S.result) { if (ui) ui.results.textContent = ""; return; }
   const r = G.S.result, p = G.S.puzzle;
@@ -266,10 +334,12 @@ async function begin(getPuzzleFn, hideGrade) {
   if (busy) return;
   busy = true;
   ui?.setup.buttons.forEach(b => { b.disabled = true; });
+  if (ui) ui.editor.startBtn.disabled = true;
   try {
     closeReward();
     if (G && G.S.status === "active") await G.finish("abandoned").catch(() => {});
     const puzzle = await getPuzzleFn();
+    edit = null;
     const limit = prefs.mode === "original" ? (prefs.limit === "none" ? null : Number(prefs.limit)) : null;
     const { id } = await createGame(puzzle.id, prefs.mode, limit);
     meta = { hideGrade };
@@ -290,6 +360,7 @@ async function begin(getPuzzleFn, hideGrade) {
     busy = false;
     ui?.setup.buttons.forEach(b => { b.disabled = false; });
     ui?.setup.syncFav();
+    if (ui && edit) refresh();  // the server turned the grid down: the editor stays, start is clickable again
   }
 }
 
@@ -306,15 +377,85 @@ function newGame(random) {
   }, true);
 }
 
-/** Ctrl+V of a grid: validate on the server and start it as a custom puzzle. */
+/** Ctrl+V of a grid: it opens in the editor, to look it over and pick the level; Enter starts it. */
 export function loadCustom(text) {
   const givens = parseGrid(text);
-  if (!givens) { setMsg(tr("Нужно ровно 81 клетку (цифры, 0 или . — пусто)"), "bad"); return Promise.resolve(); }
-  return begin(() => addPuzzle(givens), false);
+  if (!givens) { setMsg(tr("Нужно ровно 81 клетку (цифры, 0 или . — пусто)"), "bad"); return; }
+  openEditor(givens);
+}
+
+/** «✎ Своя сетка» (or a paste): the board turns into an editor, empty or with the pasted grid.
+ * A game in progress is abandoned, after a yes in the dialog if it has moves. */
+export function openEditor(givens = null) {
+  if (asking) return;
+  if (edit) {
+    if (givens) { edit.vals = toDigits(givens); edit.sel = 0; }
+    setMsg("");
+    refresh();
+    return;
+  }
+  const go = async () => {
+    if (G?.S.status === "active") {
+      G.S.msg = { text: tr("Партия брошена"), cls: "bad" };
+      await G.finish("abandoned").catch(() => {});
+    }
+    edit = { vals: givens ? toDigits(givens) : Array(81).fill(0), sel: 0 };
+    digit = 0;
+    closeReward();
+    setMsg("");
+    if (ui) ui.results.textContent = "";
+    markRecord();
+    refresh();
+  };
+  if (G?.S.status === "active" && G.S.seq > 0) {
+    asking = confirmDialog({
+      title: tr("Бросить партию?"), text: tr("Партия запишется как брошенная."), ok: tr("Бросить"),
+      onOk: go, onClose: () => { asking = null; },
+    });
+  } else go();
+}
+
+/** «Отмена» or Esc in the editor: back to the board as it was (the last game's results, if any). */
+function closeEditor() {
+  edit = null;
+  setMsg("");
+  markRecord();
+  refresh();
+  showResults();
+}
+
+/** A digit (0 = empty) into the selected cell; typed ones move on, so a row of the grid can be typed straight through. */
+function editCell(v, advance) {
+  if (edit.sel < 0) edit.sel = 0;
+  edit.vals[edit.sel] = v;
+  if (advance) edit.sel = (edit.sel + 1) % 81;
+  setMsg("");
+  refresh();
+}
+
+function startCustom() {
+  if (busy || conflicts(edit.vals).size || edit.vals.filter(Boolean).length < 17) return;
+  const givens = edit.vals.join("");
+  return begin(() => addPuzzle(givens, prefs.customLevel), false);
+}
+
+function editorKey(e) {
+  if (e.ctrlKey || e.metaKey) return;  // Ctrl+V goes to the paste handler
+  const d = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
+  if (d) editCell(+d[1], true);
+  else if (e.key === "Delete") editCell(0, false);
+  else if (e.key === "Backspace") {  // like a text field: on an empty cell it erases the one before
+    if (!edit.vals[edit.sel]) edit.sel = (edit.sel + 80) % 81;
+    editCell(0, false);
+  } else if (e.key.startsWith("Arrow")) { edit.sel = stepCell(edit.sel, e.key); refresh(); }
+  else if (e.key === "Enter") startCustom();
+  else return;
+  e.preventDefault();
 }
 
 /** Digit from the pad or keyboard: highlight it on the board, then place it (or toggle the note). */
 function press(v, asNote) {
+  if (edit) { editCell(v, false); return; }
   if (!G) return;
   digit = v;
   G.input(v, asNote);
@@ -323,7 +464,9 @@ function press(v, asNote) {
 
 /** Esc on «Играть» (app.js): a game in progress is thrown away only after a yes in the dialog. */
 export function escape() {
-  if (!ui || asking || G?.S.status !== "active") return;
+  if (!ui || asking) return;
+  if (edit) { closeEditor(); return; }
+  if (G?.S.status !== "active") return;
   asking = confirmDialog({
     title: tr("Бросить партию?"), text: tr("Партия запишется как брошенная."), ok: tr("Бросить"),
     onOk: () => { if (G?.S.status !== "active") return; G.S.msg = { text: tr("Партия брошена"), cls: "bad" }; endGame("abandoned"); },
@@ -335,6 +478,7 @@ function handleKey(e) {
   if (asking) return;  // the dialog has the keyboard
   if (ignoreKey(e)) return;
   if (e.altKey) { keyTrace.skip = tr("зажат Alt"); return; }
+  if (edit) { editorKey(e); return; }
   if (!G) {  // no game yet (e.g. after a page reload): say so instead of silently ignoring the key
     keyTrace.skip = tr("партия не начата");
     if (e.key === "Enter" && e.target === document.body) { newGame(false); e.preventDefault(); return; }
