@@ -66,11 +66,11 @@ section > h2, .card > h2 { font-size: 12px; font-weight: 600; text-transform: up
 /* --- controls --- */
 .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
 /* minimal look: flat controls on a soft fill, no outline until hover */
-select, button, .btn, input[type="text"] {
+select, button, .btn, input[type="text"], input[type="number"] {
   font: inherit; color: var(--ink); background: var(--peer);
   border: 1px solid transparent; border-radius: 8px; padding: 6px 10px;
 }
-input[type="text"] { border-color: var(--line); background: var(--surface); }
+input[type="text"], input[type="number"] { border-color: var(--line); background: var(--surface); }
 select { max-width: 100%; }
 button, .btn { cursor: pointer; text-decoration: none; display: inline-block; }
 button:hover:not(:disabled), .btn:hover, select:hover { border-color: var(--line); }

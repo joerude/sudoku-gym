@@ -287,6 +287,12 @@ class ServerTest(unittest.TestCase):
         self.api("PUT", "/api/favorites/game/1", status=404)
 
     def test_favorites_transfer(self):
+        def cleanup():  # the DB is shared (/api/health counts puzzles): leave no favourites or custom puzzles behind
+            conn = connect(self.db_path)
+            conn.execute("DELETE FROM favorites")
+            conn.execute("DELETE FROM puzzles WHERE givens = ? AND bank_id LIKE 'custom-%'", (L2[2][1],))
+            conn.commit(); conn.close()
+        self.addCleanup(cleanup)
         pid = self.hard[1]
         custom = self.api("POST", "/api/puzzles", {"givens": L2[2][1]})
         custom_med = self.api("POST", "/api/puzzles", {"givens": L2[2][1], "level": "medium"})
@@ -319,6 +325,9 @@ class ServerTest(unittest.TestCase):
                                                                      {"bank_id": "custom-medium-" + L2[2][1]},
                                                                      {"bank_id": "custom-nightmare-" + L2[2][1]}]})
         self.assertEqual((res["added"], res["missing"]), (2, 1))
+        # a non-string id and a grid that is not uniquely solvable are counted as missing
+        res = self.api("POST", "/api/favorites/import", {"puzzles": [{"bank_id": 5}, {"bank_id": "custom-1" + "0" * 80}]})
+        self.assertEqual((res["added"], res["missing"]), (0, 2))
         conn = connect(self.db_path)
         levels = dict(conn.execute("SELECT bank_id, level FROM puzzles WHERE givens = ? AND bank_id LIKE 'custom-%'",
                                    (L2[2][1],)).fetchall())
@@ -327,11 +336,6 @@ class ServerTest(unittest.TestCase):
 
         self.api("POST", "/api/favorites/import", {"puzzles": "x"}, status=400)
         self.api("POST", "/api/favorites/import", {"drills": [1]}, status=400)
-        # leave no favourites or custom puzzles behind for other tests (the DB is shared, /api/health counts puzzles)
-        conn = connect(self.db_path)
-        conn.execute("DELETE FROM favorites")
-        conn.execute("DELETE FROM puzzles WHERE givens = ? AND bank_id LIKE 'custom-%'", (L2[2][1],))
-        conn.commit(); conn.close()
 
     def test_english_by_header(self):
         en = {"X-Lang": "en"}

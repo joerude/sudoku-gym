@@ -5,7 +5,7 @@ import { exportFavorites, importFavorites } from "./api.js";
 import { loadPrefs, normalizePrefs, savePrefs } from "./appearance.js";
 import { confirmDialog, h } from "./ui.js";
 
-const APP = "sudoku-gym", VERSION = 1;
+const APP = "sudoku-gym", VERSION = 1, MSG_KEY = "gym-transfer-msg";
 
 /** The file's contents for what is stored now. */
 async function buildExport() {
@@ -31,6 +31,13 @@ export function transferSection({ onLook }) {
   const msg = h("p", { class: "msg", id: "transferMsg", role: "status" });
   const say = (text, cls = "") => { msg.textContent = text; msg.className = `msg ${cls}`; };
 
+  // the result of an import that changed the language: shown once, after the reload
+  try {
+    const kept = JSON.parse(sessionStorage.getItem(MSG_KEY) || "null");
+    sessionStorage.removeItem(MSG_KEY);
+    if (kept && typeof kept.text === "string") say(kept.text, kept.cls === "other" ? "other" : "ok");
+  } catch { /* no storage */ }
+
   function download(data) {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     const a = h("a", { href: url, download: `sudoku-gym-settings-${new Date().toLocaleDateString("sv")}.json` });
@@ -41,12 +48,18 @@ export function transferSection({ onLook }) {
   }
 
   async function apply(d) {
-    if (d.favorites) {
-      const r = await importFavorites(d.favorites);
-      say(tr("Избранное: добавлено {added}, не найдено {missing}", r), r.missing ? "other" : "ok");
-    } else say(tr("Вид применён"), "ok");
     if (d.appearance) { savePrefs(d.appearance); onLook(d.appearance); }
-    if (d.lang && d.lang !== lang) setLang(d.lang);  // reloads the page: last
+    let text = "", cls = "ok";
+    if (d.favorites) {
+      try {
+        const r = await importFavorites(d.favorites);
+        text = tr("Избранное: добавлено {added}, не найдено {missing}", r); cls = r.missing ? "other" : "ok";
+      } catch (e) { say(e.message, "bad"); return; }  // stay on the page, in this language, so the error is seen
+    } else if (d.appearance) { text = tr("Вид применён"); }
+    if (d.lang && d.lang !== lang) {
+      if (text) try { sessionStorage.setItem(MSG_KEY, JSON.stringify({ text, cls })); } catch { /* no storage */ }
+      setLang(d.lang);  // reloads the page: last
+    } else if (text) say(text, cls);
   }
 
   function ask(text) {

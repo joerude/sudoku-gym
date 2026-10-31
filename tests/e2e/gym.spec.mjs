@@ -621,7 +621,8 @@ try {
   await page.waitForSelector("#confirm");
   await page.click("#confirmOk");
   await page.waitForFunction(() => /добавлено/.test(document.querySelector("#transferMsg").textContent));
-  ok((await look()).theme === "dark" && (await api("/api/favorites")).puzzle >= 1, "import: nord and the favourite are back");
+  ok((await page.evaluate(() => JSON.parse(localStorage.getItem("gym-appearance")).theme)) === "nord" && (await api("/api/favorites")).puzzle >= 1,
+     "import: nord and the favourite are back");
   await page.setInputFiles("#importFile", { name: "x.json", mimeType: "application/json", buffer: Buffer.from("{\"a\":1}") });
   await page.waitForFunction(() => /не файл настроек/.test(document.querySelector("#transferMsg").textContent));
   ok(!(await page.$("#confirm")), "import: a foreign file is refused without a dialog");

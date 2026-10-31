@@ -57,7 +57,7 @@ function modeFields(ids) {
   mode.onchange = () => { prefs.mode = mode.value; savePrefs(); sync(); markRecord(); };
   // a valid number is taken as you type; leaving the field with a bad one puts the last valid number back
   limit.oninput = () => { const n = toLimit(limit.value); if (n) { prefs.limit = prefs.limitN = n; savePrefs(); } };
-  limit.onchange = () => { if (!toLimit(limit.value)) limit.value = prefs.limitN; };
+  limit.onchange = () => { limit.value = prefs.limitN; };
   noLimit.onchange = () => { prefs.limit = noLimit.checked ? "none" : prefs.limitN; savePrefs(); sync(); };
   sync();
   return { modeField: h("label", { class: "field" }, tr("Режим"), mode), limitField, sync };
@@ -431,6 +431,7 @@ export function openEditor(givens = null) {
 /** «Отмена» or Esc in the editor: back to the board as it was (the last game's results, if any). */
 function closeEditor() {
   edit = null;
+  ui?.setup.sync();  // the editor's own mode/limit fields may have changed the prefs
   setMsg("");
   markRecord();
   refresh();
