@@ -98,6 +98,7 @@ section, .card { background: var(--surface); border: 1px solid var(--line); bord
 .layout { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 0 24px; align-items: start; }
 .layout { grid-template-rows: auto 1fr; }
 .layout > .main-col { grid-row: span 2; }
+.layout > .main-col + * { margin-top: var(--side-offset, 0px); }  /* set by alignSideToBoard */
 @media (max-width: 820px) {
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .layout > .main-col { grid-row: auto; }

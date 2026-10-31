@@ -2,7 +2,7 @@
 import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
 import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
-import { LEVEL_NAME, createFav, errorBox, h, ignoreKey, metricsGrid, statusLine, zenButton } from "./ui.js";
+import { LEVEL_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, metricsGrid, statusLine, zenButton } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
@@ -126,9 +126,11 @@ export function mount(el, params, query) {
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." }))));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
   el.append(ui.root);
+  const unalign = alignSideToBoard(ui.root);
 
   const onKey = e => handleKey(e);
   window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
+  keyTrace.page = "играть";
   const tick = setInterval(() => { if (G && ui) ui.timer.textContent = fmtTime(G.elapsed()); }, 100);
 
   const ready = options ? Promise.resolve(options) : getOptions().then(o => { options = o; });
@@ -148,7 +150,7 @@ export function mount(el, params, query) {
   getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
   if (G?.S.result) showResults();
-  return () => { window.removeEventListener("keydown", onKey, true); clearInterval(tick); clearTimeout(armed); ui = null; };
+  return () => { unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); ui = null; };
 }
 
 function setMsg(text, cls = "") {
@@ -272,8 +274,10 @@ function press(v, asNote) {
 }
 
 function handleKey(e) {
-  if (ignoreKey(e) || e.altKey) return;
+  if (ignoreKey(e)) return;
+  if (e.altKey) { keyTrace.skip = "зажат Alt"; return; }
   if (!G) {  // no game yet (e.g. after a page reload): say so instead of silently ignoring the key
+    keyTrace.skip = "партия не начата";
     if (e.key === "Enter" && e.target === document.body) { newGame(false); e.preventDefault(); return; }
     if (/^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
       setMsg("Партия не начата — нажми «Новая партия» или Enter.", "bad"); e.preventDefault();

@@ -8,7 +8,7 @@ import * as drills from "./drills.js";
 import * as stats from "./stats.js";
 import * as theory from "./theory.js";
 import * as today from "./today.js";
-import { errorBox, initZen, isZen, setZen, themeButton, typingInto } from "./ui.js";
+import { errorBox, initZen, isZen, keyTrace, setZen, themeButton, typingInto } from "./ui.js";
 
 const ROUTES = [
   [/^today$/, today.mount, "today"],
@@ -75,14 +75,24 @@ if (new URLSearchParams(location.search).has("debug")) {
   box.textContent = "нажми клавишу…";
   document.body.append(box);
   const log = [];
+  const show = () => {
+    const env = `обработчик клавиш: ${keyTrace.page || "НЕТ"} · страница редактируемая: `
+      + `${document.body.isContentEditable || document.designMode === "on" ? "ДА" : "нет"}`;
+    box.textContent = [env, ...log.slice(0, 8)].join("\n");
+  };
   window.addEventListener("keydown", e => {
     const t = e.target, a = document.activeElement;
     setTimeout(() => {  // after the page handlers ran
       log.unshift(`${e.key} (${e.code}) → ${t.tagName}${t.id ? "#" + t.id : ""}, фокус ${a?.tagName}${a?.id ? "#" + a.id : ""}, `
-        + (e.defaultPrevented ? "обработано" : "НЕ обработано"));
-      box.textContent = log.slice(0, 8).join("\n");
+        + (e.defaultPrevented ? "обработано" : "НЕ обработано") + (keyTrace.skip ? ` — ${keyTrace.skip}` : ""));
+      show();
     });
   }, true);
+  const err = text => { log.unshift(`ОШИБКА: ${text}`); show(); };
+  window.addEventListener("error", e => err(`${e.message} (${(e.filename || "").split("/").pop()}:${e.lineno})`));
+  window.addEventListener("unhandledrejection", e => err(String(e.reason?.message || e.reason)));
+  window.addEventListener("hashchange", () => setTimeout(show));
+  setTimeout(show);
 }
 
 // After a mouse click (detail > 0) drop focus from buttons/checkboxes, and after picking an option from a select,

@@ -1,7 +1,7 @@
 // #/drills — "find the move" drills: place (cell + digit) and eliminate (click the removed candidate).
 import { drillHint, drillTechniques, getFavorites, nextDrill, revealDrill, sendAttempt } from "./api.js";
 import { ROW, COL, cellName, createBoard, createPad, toDigits, unitCells } from "./board.js";
-import { TIER_NAME, createFav, errorBox, h, ignoreKey, pct, sec, zenButton } from "./ui.js";
+import { TIER_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, pct, sec, zenButton } from "./ui.js";
 
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
 const progress = t => t.mastered ? "✓" : t.unlocked ? `${Math.min(t.correct, UNLOCK)}/${UNLOCK}` : "";
@@ -78,6 +78,7 @@ export function mount(el, params, query) {
       h("p", { class: "hint", style: "margin:8px 0 0" }, h("kbd", {}, "F"), " — в избранное, ", h("kbd", {}, "Z"),
         " — zen-режим (", h("kbd", {}, "Esc"), " — выйти)."))));
   const how = el.querySelector("#drillHow");
+  const unalign = alignSideToBoard(el.querySelector(".layout"));
 
   function renderChips() {
     chips.textContent = "";
@@ -186,7 +187,10 @@ export function mount(el, params, query) {
     render();
   }
   function onDigit(v) {
-    if (!drill || result || gated) return;
+    if (!drill || result || gated) {
+      keyTrace.skip = !drill ? "упражнение не загружено" : gated ? "упражнение не начато (плашка «Начать»)" : "ответ уже дан";
+      return;
+    }
     digit = v;
     if (sel < 0 || values[sel]) { render(); return; }
     if (drill.kind === "eliminate" && !drill.candidates[sel].includes(v)) {
@@ -265,7 +269,8 @@ export function mount(el, params, query) {
   }
 
   const onKey = e => {
-    if (ignoreKey(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (ignoreKey(e)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) { keyTrace.skip = "зажат Ctrl/Alt/Meta"; return; }
     if (e.key === "Enter" || e.code === "Space") {
       // a control focused from the keyboard (Tab) keeps its own Enter/Space; one focused by a mouse click does not
       if (e.target !== nextBtn && e.target.matches("button:focus-visible, input:focus-visible")) return;
@@ -301,6 +306,7 @@ export function mount(el, params, query) {
   };
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
+  keyTrace.page = "упражнения";
 
   renderStrip();
   getFavorites().then(c => { favCount = c.drill; if (techs.length) renderChips(); }).catch(() => {});
@@ -311,7 +317,7 @@ export function mount(el, params, query) {
     load();
   }).catch(e => chips.append(errorBox(e)));
   return () => {
-    window.removeEventListener("keydown", onKey, true); document.removeEventListener("visibilitychange", onVisibility);
+    unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; document.removeEventListener("visibilitychange", onVisibility);
     clearInterval(tick); clearTimeout(autoTimer);
   };
 }

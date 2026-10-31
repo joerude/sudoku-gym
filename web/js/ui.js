@@ -38,12 +38,19 @@ export function typingInto(e) {
 // Whether a keydown is not meant for the board. A digit typed while a select still has focus (Firefox keeps it
 // focused when the same option is picked again) goes to the board, and the select lets go of focus.
 export function ignoreKey(e) {
-  if (typingInto(e)) return true;
+  keyTrace.skip = null;
+  if (typingInto(e)) {
+    keyTrace.skip = e.target.isContentEditable ? "страница редактируемая (contentEditable)" : "фокус в поле ввода";
+    return true;
+  }
   if (e.target.tagName !== "SELECT") return false;
-  if (!/^(?:Digit|Numpad)\d$/.test(e.code)) return true;
+  if (!/^(?:Digit|Numpad)\d$/.test(e.code)) { keyTrace.skip = "фокус на выпадающем списке"; return true; }
   e.target.blur();
   return false;
 }
+
+/** What the page keyboard handler did with the last key — shown by the ?debug key log. */
+export const keyTrace = { page: null, skip: null };
 
 export const sec = ms => ms === null || ms === undefined ? "—" : `${(ms / 1000).toFixed(1)} с`;
 export const pct = x => x === null || x === undefined ? "—" : `${Math.round(x * 100)}%`;
@@ -147,4 +154,20 @@ export function themeButton() {
   };
   sync();
   return Object.assign(b, { sync });
+}
+
+/** Two-column pages: move the side column down so its top lines up with the board's top border (desktop only).
+ *  What sits above the board (timer row, column numbers, the drill's task) varies, so it is measured. */
+export function alignSideToBoard(layout) {
+  const wide = matchMedia("(min-width: 821px)");  // same breakpoint as the one-column layout in style.css
+  const sync = () => {
+    const grid = layout.querySelector(".main-col .grid");
+    const off = wide.matches && grid ? grid.getBoundingClientRect().top - layout.getBoundingClientRect().top : 0;
+    layout.style.setProperty("--side-offset", `${Math.max(0, Math.round(off))}px`);
+  };
+  const ro = new ResizeObserver(sync);
+  ro.observe(layout.querySelector(".main-col"));
+  wide.addEventListener("change", sync);
+  sync();
+  return () => { ro.disconnect(); wide.removeEventListener("change", sync); };
 }
