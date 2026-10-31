@@ -51,6 +51,13 @@ function route() {
 }
 
 window.addEventListener("hashchange", route);
+
+// After a mouse click (detail > 0) drop focus from buttons/checkboxes, and after picking an option from a select,
+// so digits, Space and Enter go to the board. Keyboard (Tab) users keep focus as usual.
+document.addEventListener("click", e => {
+  if (e.detail > 0 && e.target.closest("button, label, input[type=checkbox], input[type=radio]")) document.activeElement?.blur?.();
+});
+document.addEventListener("change", e => { if (e.target.tagName === "SELECT") e.target.blur(); });
 route();
 
 // Ctrl+V anywhere outside text inputs: a pasted grid becomes a custom game.

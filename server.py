@@ -372,6 +372,7 @@ class Handler(BaseHTTPRequestHandler):
 
 class GymServer(ThreadingHTTPServer):
     daemon_threads = True
+    request_queue_size = 64  # default backlog of 5 resets connections when the page sends several requests at once
 
     def server_close(self):
         super().server_close()

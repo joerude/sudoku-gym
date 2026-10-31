@@ -2,7 +2,7 @@
 import { addPuzzle, createGame, getOptions, getPuzzle } from "./api.js";
 import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
-import { LEVEL_NAME, errorBox, h, metricsGrid, statusLine } from "./ui.js";
+import { LEVEL_NAME, errorBox, h, metricsGrid, statusLine, typingInto } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
 const PREFS_KEY = "gym-play-prefs";
@@ -221,8 +221,7 @@ export function loadCustom(text) {
 }
 
 function handleKey(e) {
-  const t = e.target.tagName;
-  if (t === "INPUT" || t === "SELECT" || t === "TEXTAREA" || e.altKey || !G) return;
+  if (typingInto(e) || e.target.tagName === "SELECT" || e.altKey || !G) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" || (e.ctrlKey && e.code === "KeyZ")) {
     G.undoLast(); e.preventDefault(); return;
   }

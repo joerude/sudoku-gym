@@ -1,13 +1,16 @@
 // #/drills — "find the move" drills: place (cell + digit) and eliminate (click the removed candidate).
 import { drillTechniques, nextDrill, sendAttempt } from "./api.js";
 import { ROW, COL, cellName, createBoard, createPad, toDigits } from "./board.js";
-import { TIER_NAME, errorBox, h, pct, sec } from "./ui.js";
+import { TIER_NAME, errorBox, h, pct, sec, typingInto } from "./ui.js";
 
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
 const progress = t => t.mastered ? "✓" : t.unlocked ? `${Math.min(t.correct, UNLOCK)}/${UNLOCK}` : "";
 
 let choice = "adaptive";  // 'adaptive' | 'random' | slug
 let showCands = false;     // place drills only; eliminate drills always show candidates
+const AUTO_KEY = "gym.drills.autoNext";
+const readAuto = () => { try { return localStorage.getItem(AUTO_KEY) !== "0"; } catch { return true; } };
+const AUTO_DELAY = 600;     // ms to see the green flash before the next drill
 const session = { n: 0, correct: 0, times: [] };
 
 const median = xs => {
@@ -17,6 +20,7 @@ const median = xs => {
 };
 
 export function mount(el, params, query) {
+  let autoNext = readAuto();
   if (query.technique) choice = query.technique;
   let drill = null, values = [], start = 0, sel = -1, result = null, picked = null, techs = [], loading = false;
 
@@ -28,20 +32,36 @@ export function mount(el, params, query) {
   const strip = h("div", { class: "strip", id: "session" });
   const candBox = h("input", { type: "checkbox", id: "showCands", onchange: e => { showCands = e.target.checked; render(); } });
   const nextBtn = h("button", { type: "button", id: "nextDrill", onclick: () => load() }, "Дальше");
+  const autoBox = h("input", { type: "checkbox", id: "autoNext", onchange: e => {
+    autoNext = e.target.checked;
+    try { localStorage.setItem(AUTO_KEY, autoNext ? "1" : "0"); } catch {}
+  } });
+  autoBox.checked = autoNext;
+  let autoTimer = null;
   const theoryLink = h("a", { id: "drillTheory", class: "hint", style: "margin:0" }, "Как это работает?");
   const why = h("div", { class: "why", id: "drillWhy", hidden: true });
   const chips = h("div", { id: "picker" });
 
   const board = createBoard(boardEl, { onCell: i => onCell(i), onCandidate: (i, v) => answer(i, v) });
   const pad = createPad(padEl, { onDigit: v => onDigit(v) });
+  // The first drill after opening the page waits for «Начать»: reading the page is not solving time.
+  let gated = true, pausedMs = 0, hiddenAt = null;
+  const gate = h("div", { class: "gate", id: "drillGate" },
+    h("button", { type: "button", class: "primary", id: "startDrill", onclick: () => begin() }, "Начать"),
+    h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Пробел"), " / ", h("kbd", {}, "Enter")));
+  const boardWrap = h("div", { class: "board-wrap" }, boardEl, gate);
+  const elapsed = () => performance.now() - start - pausedMs;
   pad.update(null);
 
   el.append(h("div", { class: "layout" },
     h("div", { class: "main-col" },
       h("div", { class: "bar", style: "margin-bottom:4px" }, title, theoryLink, timer), prompt,
-      h("p", { class: "hint", id: "drillHow" }), boardEl, padEl,
-      h("div", { class: "bar", style: "margin-top:10px" }, h("label", { class: "check" }, candBox, "Показывать кандидатов"), nextBtn,
-        h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Enter"), " / ", h("kbd", {}, "Пробел"), " — дальше")),
+      h("p", { class: "hint", id: "drillHow" }), boardWrap, padEl,
+      h("div", { class: "bar", style: "margin-top:10px" }, nextBtn,
+        h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Пробел"), " / ", h("kbd", {}, "Enter"))),
+      h("div", { class: "bar", style: "margin-top:6px" },
+        h("label", { class: "check" }, autoBox, "Автопереход после верного"),
+        h("label", { class: "check" }, candBox, "Показывать кандидатов")),
       msg, why, strip),
     h("section", {}, h("h2", {}, "Техника"), chips)));
   const how = el.querySelector("#drillHow");
@@ -59,9 +79,7 @@ export function mount(el, params, query) {
         h("div", { class: "chips" }, techs.filter(t => t.tier === tier).map(t => chip(t.technique, t.title, t))));
     }
     chips.append(h("p", { class: "hint", style: "margin:8px 0 0" },
-      "Адаптивно и 🎲 дают только открытые техники; адаптивно — самую медленную или ошибочную. " +
-      `Следующая группа открывается, когда каждая техника текущей решена верно ${UNLOCK} раз с точностью от 80%. ` +
-      "🔒-технику всё равно можно выбрать вручную."));
+      `Адаптивно — твоя самая медленная техника. 🔒 откроется после ${UNLOCK} верных на каждой технике группы выше.`));
   }
 
   function refreshTechs() {
@@ -95,12 +113,12 @@ export function mount(el, params, query) {
         if (!result) return [];
         const pat = (result.pattern || []).includes(i) ? ["pat"] : [];
         if (elim) return pat;
-        if (picked && picked[0] === i) return [result.correct ? "ok" : "bad"];
+        if (picked && picked[0] === i) return [result.correct ? "ok" : result.valid_other_move ? "other" : "bad"];
         return ans.has(i) ? ["ans", ...pat] : pat;
       },
       candClass: (i, v) => {
         if (!result) return "";
-        if (picked && picked[0] === i && picked[1] === v) return result.correct ? "c-ok" : "c-bad";
+        if (picked && picked[0] === i && picked[1] === v) return result.correct ? "c-ok" : result.valid_other_move ? "c-other" : "c-bad";
         return ansSet.has(`${i}:${v}`) ? "c-ans" : "";
       },
     });
@@ -109,6 +127,7 @@ export function mount(el, params, query) {
   }
 
   async function load() {
+    clearTimeout(autoTimer); autoTimer = null;
     if (loading) return;
     loading = true;
     msg.textContent = ""; msg.className = "msg";
@@ -124,7 +143,9 @@ export function mount(el, params, query) {
       how.textContent = drill.kind === "eliminate"
         ? "Нажми на кандидата, который убирается, — или выбери клетку, затем цифру (клавиатура или кнопки)."
         : "Выбери клетку, затем цифру (клавиатура или кнопки).";
-      start = performance.now();
+      start = performance.now(); pausedMs = 0; hiddenAt = null;
+      timer.textContent = "0.0 с";
+      gate.hidden = !gated;
       render();
     } catch (e) {
       prompt.textContent = "";
@@ -132,12 +153,18 @@ export function mount(el, params, query) {
     } finally { loading = false; }
   }
 
+  function begin() {
+    if (!gated) return;
+    gated = false; gate.hidden = true;
+    start = performance.now(); pausedMs = 0;
+  }
+
   function onCell(i) {
-    if (!drill || result || values[i]) return;
+    if (!drill || result || gated || values[i]) return;
     sel = i; render();
   }
   function onDigit(v) {
-    if (!drill || result) return;
+    if (!drill || result || gated) return;
     if (sel < 0 || values[sel]) { msg.textContent = "Сначала выбери пустую клетку"; msg.className = "msg"; return; }
     if (drill.kind === "eliminate" && !drill.candidates[sel].includes(v)) {
       msg.textContent = `В ${cellName(sel)} нет кандидата ${v}`; msg.className = "msg"; return;
@@ -147,9 +174,9 @@ export function mount(el, params, query) {
 
   let sending = false;
   async function answer(cell, value) {
-    if (!drill || result || sending) return;
+    if (!drill || result || sending || gated) return;
     sending = true;
-    const ms = performance.now() - start;
+    const ms = elapsed();
     try {
       const res = await sendAttempt(drill.id, ms, cell, value);
       result = res; picked = [cell, value];
@@ -157,13 +184,15 @@ export function mount(el, params, query) {
       session.n++;
       if (res.correct) { session.correct++; session.times.push(ms); }
       const list = res.answers.map(([c, v]) => drill.kind === "eliminate" ? `${v} из ${cellName(c)}` : `${cellName(c)} = ${v}`);
+      const answersText = `Ответ${list.length > 1 ? "ы" : ""} этой техникой: ${list.join(", ")}`;
       if (res.correct) { msg.textContent = `Верно · ${sec(ms)}`; msg.className = "msg ok"; }
-      else {
-        msg.textContent = (res.valid_other_move ? `Верный ход, но это не ${drill.title}. ` : "Неверно. ")
-          + `Ответ${list.length > 1 ? "ы" : ""}: ${list.join(", ")}`;
-        msg.className = "msg bad";
-      }
-      if (res.explanation) {
+      else if (res.valid_other_move) {
+        msg.textContent = `Ход верный, но найден другой техникой — засчитано нейтрально. ${answersText}`;
+        msg.className = "msg other";
+      } else { msg.textContent = `Неверно. ${answersText}`; msg.className = "msg bad"; }
+      const advance = res.correct && autoNext;
+      if (advance) autoTimer = setTimeout(load, AUTO_DELAY);
+      if (res.explanation && !advance) {
         why.textContent = "";
         why.append(h("b", {}, "Почему: "), res.explanation, " ",
           res.theory ? h("a", { href: `#/theory/${res.theory}` }, "Теория →") : null);
@@ -176,11 +205,13 @@ export function mount(el, params, query) {
   }
 
   const onKey = e => {
-    const t = e.target.tagName;
-    if (t === "INPUT" || t === "SELECT" || t === "TEXTAREA" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (typingInto(e) || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Enter" || e.code === "Space") {
-      if (t === "BUTTON" && e.target !== nextBtn) return;
-      e.preventDefault(); load(); return;
+      // a control focused from the keyboard (Tab) keeps its own Enter/Space
+      if (e.target !== document.body && e.target !== nextBtn && e.target.matches("button, input, label")) return;
+      e.preventDefault();
+      if (gated) begin(); else load();
+      return;
     }
     const d = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
     if (d) { onDigit(+d[1]); e.preventDefault(); return; }
@@ -191,7 +222,15 @@ export function mount(el, params, query) {
       e.preventDefault(); render();
     }
   };
-  const tick = setInterval(() => { if (drill && !result) timer.textContent = `${((performance.now() - start) / 1000).toFixed(1)} с`; }, 100);
+  const tick = setInterval(() => {
+    if (drill && !result && !gated && hiddenAt === null) timer.textContent = `${(elapsed() / 1000).toFixed(1)} с`;
+  }, 100);
+  // time while the tab is hidden (another tab, minimised window) does not count
+  const onVisibility = () => {
+    if (document.hidden) hiddenAt = performance.now();
+    else if (hiddenAt !== null) { pausedMs += performance.now() - hiddenAt; hiddenAt = null; }
+  };
+  document.addEventListener("visibilitychange", onVisibility);
   document.addEventListener("keydown", onKey);
 
   renderStrip();
@@ -201,5 +240,8 @@ export function mount(el, params, query) {
     renderChips();
     load();
   }).catch(e => chips.append(errorBox(e)));
-  return () => { document.removeEventListener("keydown", onKey); clearInterval(tick); };
+  return () => {
+    document.removeEventListener("keydown", onKey); document.removeEventListener("visibilitychange", onVisibility);
+    clearInterval(tick); clearTimeout(autoTimer);
+  };
 }

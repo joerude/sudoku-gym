@@ -26,6 +26,13 @@ export function h(tag, attrs = {}, ...children) {
   return e;
 }
 
+// Keys typed into a text field are not game input; checkboxes, buttons and selects are not text fields.
+export function typingInto(e) {
+  const el = e.target;
+  if (el.isContentEditable || el.tagName === "TEXTAREA") return true;
+  return el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "range"].includes(el.type);
+}
+
 export const sec = ms => ms === null || ms === undefined ? "—" : `${(ms / 1000).toFixed(1)} с`;
 export const pct = x => x === null || x === undefined ? "—" : `${Math.round(x * 100)}%`;
 export const dateRu = iso => iso ? new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit",

@@ -225,12 +225,18 @@ try {
     const [[answers, solution, board]] = dbJson("SELECT d.answers, p.solution, d.board FROM drills d JOIN puzzles p ON p.id = d.puzzle_id WHERE d.id = ?", id);
     return { answers: JSON.parse(answers), solution, board };
   };
+  await page.evaluate(() => localStorage.setItem("gym.drills.autoNext", "0"));  // manual «Дальше» for the checks below
   let rp = drillResp();
   await page.goto(`${BASE}/#/drills?technique=naked_single`);
   let d = await (await rp).json();
   await page.waitForFunction(() => document.querySelector("#prompt").textContent.length > 5);
   ok(d.technique === "naked_single" && d.kind === "place", "place drill loaded from query");
   ok(!(await page.$eval("#showCands", e => e.checked)), "place drill: candidates hidden by default");
+  ok(await page.$eval("#drillGate", e => !e.hidden), "drill gate: first drill waits for start");
+  await page.waitForTimeout(700);
+  ok((await page.textContent("#drillTimer")).trim() === "0.0 с", "drill gate: timer does not run before start");
+  await page.locator("body").press("Space");
+  ok(await page.$eval("#drillGate", e => e.hidden), "drill gate: Space starts");
   await shot(page, "drills-place");
   let inf = info(d.id);
   await page.click(`#drillBoard .cell[data-cell="${inf.answers[0][0]}"]`);
@@ -288,6 +294,48 @@ try {
   await page.locator("body").press(`Digit${kv}`);
   await page.waitForSelector("#drillMsg.ok");
   ok(true, "eliminate drill: cell + keyboard digit answers");
+
+  // focus: a mouse click on a checkbox or chip must not swallow digits / Space (Firefox on Linux keeps focus)
+  rp = drillResp();
+  await page.click('#picker button[data-tech="hidden_single_row"]');
+  d = await (await rp).json();
+  ok(await page.evaluate(() => document.activeElement === document.body), "focus: clicked chip releases focus");
+  await page.click("#showCands");  // toggle on…
+  await page.click("#showCands");  // …and off again
+  ok(await page.evaluate(() => document.activeElement === document.body), "focus: clicked checkbox releases focus");
+  inf = info(d.id);
+  const [fc, fv] = inf.answers[0];
+  await page.click(`#drillBoard .cell[data-cell="${fc}"]`);
+  await page.locator("body").press(`Digit${fv}`);
+  await page.waitForSelector("#drillMsg.ok");
+  ok(true, "focus: digit after clicking a checkbox reaches the board");
+
+  // a true move by another technique is amber, not red
+  rp = drillResp();
+  await page.locator("body").press("Space");
+  d = await (await rp).json();
+  inf = info(d.id);
+  const ansCells = new Set(inf.answers.map(a => a[0]));
+  const oc = [...d.board].findIndex((c, i) => c === "0" && !ansCells.has(i));
+  await page.click(`#drillBoard .cell[data-cell="${oc}"]`);
+  await page.locator("body").press(`Digit${inf.solution[oc]}`);
+  await page.waitForSelector("#drillMsg.other");
+  ok(await page.$eval(`#drillBoard .cell[data-cell="${oc}"]`, e => e.classList.contains("other") && !e.classList.contains("bad")),
+     "valid other move: amber, not red");
+
+  // auto-advance after a correct answer
+  await page.click("#autoNext");
+  rp = drillResp();
+  await page.locator("body").press("Space");
+  d = await (await rp).json();
+  inf = info(d.id);
+  const [ac, av] = inf.answers[0];
+  const auto = drillResp();
+  await page.click(`#drillBoard .cell[data-cell="${ac}"]`);
+  await page.locator("body").press(`Digit${av}`);
+  const t0 = Date.now();
+  const nd = await (await auto).json();
+  ok(nd.id !== d.id && Date.now() - t0 < 2000, "auto-advance: next drill after a correct answer");
 
   // --- 6. stats -------------------------------------------------------------------------------
   await page.goto(`${BASE}/#/stats`);
