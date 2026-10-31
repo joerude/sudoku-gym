@@ -2,6 +2,7 @@
 import { getGame, getReview } from "./api.js";
 import { cellName, computeCandidates, createBoard, fmtTime, toDigits, unitCells } from "./board.js";
 import { LEVEL_NAME, createFav, dateRu, errorBox, h, metricsGrid, statusLine } from "./ui.js";
+import { speedChart } from "./speedchart.js";
 
 export function stepText(s) {
   const unit = s.unit_name ? ` (${s.unit_name})` : "";
@@ -68,6 +69,7 @@ export function mount(el, [id]) {
           g.mistake_limit !== null && g.mode === "original" ? ` · лимит ошибок ${g.mistake_limit}` : "",
           ` · ${dateRu(g.started_at)}`),
         metricsGrid(g),
+        full.moves.length ? speedChart(full.moves, g.time_ms) : null,
         h("div", { class: "bar", style: "margin:0" },
           h("a", { class: "btn", href: "#/play" }, "Играть дальше"), h("a", { class: "btn", href: "#/stats" }, "Статистика"),
           fav.el)));

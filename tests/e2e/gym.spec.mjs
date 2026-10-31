@@ -133,6 +133,15 @@ try {
   ok((await page.textContent(".reward-compare")).length > 5, "reward: compares with own results",
      await page.textContent(".reward-compare"));
   ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: page turns green");
+  await page.waitForSelector("#reward #speedChart .sc-pace");
+  ok(await page.evaluate(() => {
+    const c = document.querySelector("#reward #speedChart");
+    return c.querySelector(".sc-pace").getAttribute("d").length > 10 && c.querySelector(".sc-raw")
+      && c.querySelectorAll(".sc-err").length === 1 && c.querySelectorAll(".sc-legend span").length === 4;
+  }), "reward: speed chart with pace, all moves, the 1 mistake and a legend");
+  const svgBox = await page.$eval("#reward .speed-svg", e => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; });
+  await page.mouse.move(svgBox[0] + svgBox[2] * 0.6, svgBox[1] + svgBox[3] / 2);
+  ok(await page.$eval("#reward .sc-tip", e => !e.hidden && /верные:.*\/мин/.test(e.textContent)), "speed chart: hover tooltip");
   await page.waitForTimeout(400);  // let the fade-in finish
   await shot(page, "play-reward");
   await page.keyboard.press("Escape");
@@ -141,6 +150,7 @@ try {
   await shot(page, "play-solved");
   await page.click("#reviewLink");
   await page.waitForSelector("#noPauses, .pause-item");
+  ok(!!(await page.$("#speedChart .sc-pace")), "review: speed chart shown");
   ok(/Разбор партии/.test(await page.textContent("h1")), "review page opens from results");
   ok(page.url().endsWith(`#/review/${g1.id}`), "review URL");
 

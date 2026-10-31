@@ -302,7 +302,7 @@ body.won .main-col .grid { border-color: var(--ok); box-shadow: 0 0 0 3px color-
 .reward { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px;
   background: color-mix(in srgb, var(--ok) 18%, rgb(0 0 0 / .35)); opacity: 0; transition: opacity .25s ease; }
 .reward.in { opacity: 1; }
-.reward-card { width: min(440px, 100%); background: var(--surface); color: var(--ink); border: 1px solid var(--ok);
+.reward-card { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--ok);
   border-radius: 14px; padding: 22px 20px 16px; text-align: center; display: flex; flex-direction: column; gap: 10px;
   box-shadow: 0 18px 50px rgb(0 0 0 / .25); transform: translateY(14px) scale(.97); transition: transform .3s cubic-bezier(.2, .8, .2, 1); }
 .reward.in .reward-card { transform: none; }
@@ -317,3 +317,31 @@ body.won .main-col .grid { border-color: var(--ok); box-shadow: 0 0 0 3px color-
   body::before, .reward, .reward-card { transition: none; }
   .reward-card { transform: none; }
 }
+
+/* speed chart (Monkeytype-style): series colours from the dataviz reference palette, validated for both modes */
+.speed-chart { --sc-pace: #2a78d6; --sc-raw: #eb6834; --sc-err: #d03b3b; text-align: left; margin: 6px 0 4px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .speed-chart { --sc-pace: #3987e5; --sc-raw: #d95926; --sc-err: #e66767; } }
+:root[data-theme="dark"] .speed-chart { --sc-pace: #3987e5; --sc-raw: #d95926; --sc-err: #e66767; }
+.sc-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.sc-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin: 4px 0 2px; }
+.sc-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sc-legend .sw { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--sc-pace); }
+.sc-legend .sw-raw { border-top: 2px dashed var(--sc-raw); }
+.sc-legend .sw-pause { height: 10px; border: 0; background: var(--muted); opacity: .25; border-radius: 2px; }
+.sc-legend .sw-err { font-style: normal; font-weight: 700; color: var(--sc-err); }
+.sc-wrap { position: relative; }
+.speed-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.sc-grid { stroke: var(--line); stroke-width: 1; opacity: .6; }
+.sc-tick { fill: var(--muted); font: 10px var(--font-mono, ui-monospace, monospace); }
+.sc-label { fill: var(--ink); font: 11px var(--font-mono, ui-monospace, monospace); }
+.sc-pace { fill: none; stroke: var(--sc-pace); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.sc-raw { fill: none; stroke: var(--sc-raw); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.sc-err { stroke: var(--sc-err); stroke-width: 2.2; stroke-linecap: round; }
+.sc-pause { fill: var(--muted); opacity: .14; }
+.sc-cross { stroke: var(--muted); stroke-width: 1; }
+.sc-dot-pace, .sc-dot-raw { stroke: var(--surface); stroke-width: 2; }
+.sc-dot-pace { fill: var(--sc-pace); } .sc-dot-raw { fill: var(--sc-raw); }
+.sc-tip { position: absolute; top: 6px; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 8px; font-size: 12px; line-height: 1.4; white-space: nowrap; box-shadow: 0 4px 14px rgb(0 0 0 / .15); }
+.sc-table summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.sc-table table { font-size: 12px; margin-top: 4px; }

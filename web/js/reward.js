@@ -1,7 +1,8 @@
 // The reward after a solved game: the page turns green and a dialog with the numbers fades in.
-import { getStats } from "./api.js";
+import { getGame, getStats } from "./api.js";
 import { fmtTime } from "./board.js";
 import { LEVEL_NAME, h } from "./ui.js";
+import { speedChart } from "./speedchart.js";
 
 let current = null;  // the open dialog's close()
 
@@ -21,6 +22,7 @@ export function showReward(r, puzzle, { onNew }) {
   closeReward();
   document.body.classList.add("won");
   const line = h("p", { class: "reward-compare" }, "…");
+  const chartBox = h("div", { class: "reward-chart" });
   const newBtn = h("button", { type: "button", class: "primary", id: "rewardNew" }, "Новая партия");
   const close = () => {
     window.removeEventListener("keydown", onKey, true);
@@ -35,6 +37,7 @@ export function showReward(r, puzzle, { onNew }) {
     h("div", { class: "reward-time", id: "rewardTime" }, fmtTime(r.time_ms)),
     h("p", { class: "hint", style: "margin:0" }, `${LEVEL_NAME[puzzle.level] || puzzle.level} · ${puzzle.grade_title} · ${r.mode}`),
     line,
+    chartBox,
     h("div", { class: "metrics" },
       item(fmtTime(r.first_move_ms), "До первого хода"),
       item(fmtTime(r.max_pause_ms), "Макс. пауза"),
@@ -55,6 +58,7 @@ export function showReward(r, puzzle, { onNew }) {
   requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add("in")));  // let the start state paint
   current = close;
   getStats().then(s => { line.textContent = compare(r, puzzle.level, s); }).catch(() => { line.textContent = ""; });
+  getGame(r.id).then(g => { if (g.moves.length) chartBox.append(speedChart(g.moves, r.time_ms)); }).catch(() => {});
 }
 
 /** Close the dialog (if open) and drop the green page tint. */
