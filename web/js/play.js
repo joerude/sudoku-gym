@@ -1,4 +1,5 @@
 // #/play — game page: setup controls, board, timer, results. The game survives navigation.
+import { tr } from "./i18n.js";
 import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
 import { createBoard, createPad, fmtTime, parseGrid } from "./board.js";
 import { startGame } from "./game.js";
@@ -33,18 +34,18 @@ function gradeCounts(level) {
 const levelTotal = level => Object.values(gradeCounts(level)).reduce((a, b) => a + b, 0);
 
 function setupSection() {
-  const lvl = h("select", { id: "level", "aria-label": "Уровень" },
+  const lvl = h("select", { id: "level", "aria-label": tr("Уровень") },
     [...LEVELS, "random"].map(l => h("option", { value: l }, l === "random" ? LEVEL_NAME.random : LEVEL_NAME[l])));
-  const grade = h("select", { id: "grade", "aria-label": "Техника" });
-  const mode = h("select", { id: "mode", "aria-label": "Режим" },
-    h("option", { value: "original" }, "original — ошибки видны"), h("option", { value: "hardcore" }, "hardcore — без подсветки"));
-  const limit = h("select", { id: "limit", "aria-label": "Лимит ошибок" },
-    h("option", { value: "3" }, "3"), h("option", { value: "5" }, "5"), h("option", { value: "none" }, "без лимита"));
-  const limitField = h("label", { class: "field" }, "Лимит ошибок", limit);
+  const grade = h("select", { id: "grade", "aria-label": tr("Техника") });
+  const mode = h("select", { id: "mode", "aria-label": tr("Режим") },
+    h("option", { value: "original" }, tr("original — ошибки видны")), h("option", { value: "hardcore" }, tr("hardcore — без подсветки")));
+  const limit = h("select", { id: "limit", "aria-label": tr("Лимит ошибок") },
+    h("option", { value: "3" }, "3"), h("option", { value: "5" }, "5"), h("option", { value: "none" }, tr("без лимита")));
+  const limitField = h("label", { class: "field" }, tr("Лимит ошибок"), limit);
   const sync = () => {
     const counts = gradeCounts(lvl.value);
     grade.textContent = "";
-    grade.append(h("option", { value: "" }, `Любая (${levelTotal(lvl.value)})`));
+    grade.append(h("option", { value: "" }, tr("Любая ({n})", { n: levelTotal(lvl.value) })));
     for (let g = 1; g <= 5; g++) {
       const n = counts[g] || 0;
       grade.append(h("option", { value: String(g), disabled: !n }, `${g} · ${options?.grade_titles[g] ?? ""} (${n})`));
@@ -59,61 +60,61 @@ function setupSection() {
   grade.onchange = () => { prefs.grade = grade.value; savePrefs(); };
   mode.onchange = () => { prefs.mode = mode.value; savePrefs(); sync(); markRecord(); };
   limit.onchange = () => { prefs.limit = limit.value; savePrefs(); };
-  const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) }, "Новая партия");
-  const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, "🎲 Случайная партия");
-  const favBtn = h("button", { type: "button", id: "favGame", title: "Задача из избранного: сначала та, что давно не игралась",
+  const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) }, tr("Новая партия"));
+  const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, tr("🎲 Случайная партия"));
+  const favBtn = h("button", { type: "button", id: "favGame", title: tr("Задача из избранного: сначала та, что давно не игралась"),
     onclick: () => begin(getFavoritePuzzle, false) });
   const syncFav = () => {
-    favBtn.textContent = `★ Из избранного${favCount === null ? "" : ` (${favCount})`}`;
+    favBtn.textContent = tr("★ Из избранного") + `${favCount === null ? "" : ` (${favCount})`}`;
     favBtn.disabled = !favCount;
   };
   syncFav();
   const box = h("section", { class: "first-mobile" },
-    h("h2", {}, "Новая партия"),
-    h("div", { class: "bar" }, h("label", { class: "field" }, "Уровень", lvl), h("label", { class: "field" }, "Техника", grade)),
-    h("div", { class: "bar" }, h("label", { class: "field" }, "Режим", mode), limitField),
+    h("h2", {}, tr("Новая партия")),
+    h("div", { class: "bar" }, h("label", { class: "field" }, tr("Уровень"), lvl), h("label", { class: "field" }, tr("Техника"), grade)),
+    h("div", { class: "bar" }, h("label", { class: "field" }, tr("Режим"), mode), limitField),
     h("div", { class: "bar", style: "margin:0" }, newBtn, rndBtn, favBtn));
   return { box, sync, syncFav, buttons: [newBtn, rndBtn, favBtn] };
 }
 
 export function mount(el, params, query) {
   const boardEl = h("div", { id: "board" }), padEl = h("div");
-  const notesBtn = h("button", { type: "button", class: "mini notes-toggle", id: "notesBtn", title: "Режим заметок (N, Т или пробел)",
-    onclick: () => G?.toggleNotes() }, "✎ заметки");
+  const notesBtn = h("button", { type: "button", class: "mini notes-toggle", id: "notesBtn", title: tr("Режим заметок (N, Т или пробел)"),
+    onclick: () => G?.toggleNotes() }, tr("✎ заметки"));
   const notesLabel = h("div", { class: "notes-label", id: "notesLabel" },
-    "✎ режим заметок · ", h("kbd", {}, "N"), " / ", h("kbd", {}, "пробел"), " — выключить");
+    tr("✎ режим заметок · "), h("kbd", {}, "N"), " / ", h("kbd", {}, tr("пробел")), tr(" — выключить"));
   const autoBox = h("input", { type: "checkbox", id: "autoNotes", checked: true, onchange: e => G?.setAutoNotes(e.target.checked) });
   const countsBox = h("input", { type: "checkbox", id: "padCounts", checked: prefs.counts,
     onchange: e => { prefs.counts = e.target.checked; savePrefs(); refresh(); } });
-  const clearBtn = h("button", { type: "button", id: "clearBtn", title: "Стереть все свои цифры и заметки (отменяется «↶ отменить»)",
-    onclick: () => G?.clear() }, "Очистить");
+  const clearBtn = h("button", { type: "button", id: "clearBtn", title: tr("Стереть все свои цифры и заметки (отменяется «↶ отменить»)"),
+    onclick: () => G?.clear() }, tr("Очистить"));
   // give up needs a second click within 3 s, so a stray click doesn't end the game
   let armed = null;
-  const giveUpBtn = h("button", { type: "button", id: "giveUpBtn", title: "Завершить партию как брошенную", onclick: () => {
+  const giveUpBtn = h("button", { type: "button", id: "giveUpBtn", title: tr("Завершить партию как брошенную"), onclick: () => {
     if (!G || G.S.status !== "active") return;
     if (!armed) {
-      giveUpBtn.textContent = "Точно сдаться?"; giveUpBtn.classList.add("danger");
+      giveUpBtn.textContent = tr("Точно сдаться?"); giveUpBtn.classList.add("danger");
       armed = setTimeout(disarm, 3000);
       return;
     }
     disarm();
-    G.S.msg = { text: "Партия сдана", cls: "bad" };
+    G.S.msg = { text: tr("Партия сдана"), cls: "bad" };
     endGame("abandoned");
-  } }, "Сдаться");
+  } }, tr("Сдаться"));
   // «＋ новая» above the board: one click when nothing is at stake, a confirming second click mid-game
   let armedNew = null;
-  const newTop = h("button", { type: "button", class: "mini", id: "newGameTop", title: "Новая партия с текущими настройками",
+  const newTop = h("button", { type: "button", class: "mini", id: "newGameTop", title: tr("Новая партия с текущими настройками"),
     onclick: () => {
       if (G?.S.status === "active" && G.S.seq > 0 && !armedNew) {
-        newTop.textContent = "Бросить партию?"; newTop.classList.add("danger");
+        newTop.textContent = tr("Бросить партию?"); newTop.classList.add("danger");
         armedNew = setTimeout(disarmNew, 3000);
         return;
       }
       disarmNew();
       newGame(false);
-    } }, "＋ новая");
-  const disarmNew = () => { clearTimeout(armedNew); armedNew = null; newTop.textContent = "＋ новая"; newTop.classList.remove("danger"); };
-  const disarm = () => { clearTimeout(armed); armed = null; giveUpBtn.textContent = "Сдаться"; giveUpBtn.classList.remove("danger"); };
+    } }, tr("＋ новая"));
+  const disarmNew = () => { clearTimeout(armedNew); armedNew = null; newTop.textContent = tr("＋ новая"); newTop.classList.remove("danger"); };
+  const disarm = () => { clearTimeout(armed); armed = null; giveUpBtn.textContent = tr("Сдаться"); giveUpBtn.classList.remove("danger"); };
   const setup = setupSection();
   const fav = createFav("puzzle", { onChange: r => {
     if (G) G.S.puzzle.fav = r.fav;
@@ -134,21 +135,21 @@ export function mount(el, params, query) {
       h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer,
         notesBtn, newTop, zenButton("mini")), boardEl, notesLabel, padEl,
       h("div", { class: "bar", style: "margin-top:10px" },
-        h("button", { type: "button", id: "undoBtn", title: "Отменить (Ctrl+Z)", onclick: () => G?.undoLast() }, "↶ отменить"),
-        h("button", { type: "button", id: "redoBtn", title: "Вернуть отменённое (Ctrl+Y или Ctrl+Shift+Z)", onclick: () => G?.redoLast() }, "↷ вернуть"),
-        h("button", { type: "button", id: "checkBtn", title: "Подсветить ошибки (учитывается в итогах)", onclick: () => G?.check() }, "Проверить"),
+        h("button", { type: "button", id: "undoBtn", title: tr("Отменить (Ctrl+Z)"), onclick: () => G?.undoLast() }, tr("↶ отменить")),
+        h("button", { type: "button", id: "redoBtn", title: tr("Вернуть отменённое (Ctrl+Y или Ctrl+Shift+Z)"), onclick: () => G?.redoLast() }, tr("↷ вернуть")),
+        h("button", { type: "button", id: "checkBtn", title: tr("Подсветить ошибки (учитывается в итогах)"), onclick: () => G?.check() }, tr("Проверить")),
         clearBtn, giveUpBtn,
-        h("label", { class: "check zen-hide" }, autoBox, "автоочистка заметок"),
-        h("label", { class: "check zen-hide", title: "Сколько каждой цифры осталось поставить" }, countsBox, "счётчик цифр")),
+        h("label", { class: "check zen-hide" }, autoBox, tr("автоочистка заметок")),
+        h("label", { class: "check zen-hide", title: tr("Сколько каждой цифры осталось поставить") }, countsBox, tr("счётчик цифр"))),
       ui.msg),
     setup.box,
     h("div", {}, ui.results, ui.records.el,
-      h("section", { class: "zen-hide" }, h("h2", {}, "Клавиши"), h("p", { class: "hint", style: "margin:0", html:
-        "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
+      h("section", { class: "zen-hide" }, h("h2", {}, tr("Клавиши")), h("p", { class: "hint", style: "margin:0", html:
+        tr("<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
         "<kbd>Ctrl+Y</kbd> — вернуть, " +
         "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением). " +
-        "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу." }))));
+        "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) загружает свою задачу.") }))));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
   el.append(ui.root);
   markRecord();
@@ -157,7 +158,7 @@ export function mount(el, params, query) {
 
   const onKey = e => handleKey(e);
   window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
-  keyTrace.page = "играть";
+  keyTrace.page = tr("играть");
   const tick = setInterval(() => { if (G && ui) ui.timer.textContent = fmtTime(G.elapsed()); }, 100);
 
   const ready = options ? Promise.resolve(options) : getOptions().then(o => { options = o; });
@@ -200,12 +201,12 @@ function refresh() {
   if (!G) {
     ui.board.render({ values: Array(81).fill(0), given: Array(81).fill(false) });
     ui.pad.update(null);
-    ui.badge.textContent = "партия не начата"; ui.errs.textContent = "";
+    ui.badge.textContent = tr("партия не начата"); ui.errs.textContent = "";
     ui.root?.classList.remove("notes-on");
     ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
     ui.root.querySelector("#undoBtn").disabled = ui.root.querySelector("#redoBtn").disabled = true;
     if (pendingMsg) { setMsg(pendingMsg.text, pendingMsg.cls); pendingMsg = null; }
-    else if (!ui.msg.textContent) setMsg("Выбери уровень и нажми «Новая партия».");
+    else if (!ui.msg.textContent) setMsg(tr("Выбери уровень и нажми «Новая партия»."));
     return;
   }
   const S = G.S, over = S.status !== "active";
@@ -216,15 +217,15 @@ function refresh() {
   });
   ui.pad.update(prefs.counts ? S.vals : null);
   const p = S.puzzle, showGrade = !meta.hideGrade || over;
-  ui.badge.textContent = `${LEVEL_NAME[p.level] || p.level} · ${showGrade ? `техника: ${p.grade_title}` : "техника скрыта"} · ${S.mode}`;
-  ui.errs.textContent = S.mode === "original" ? `Ошибки ${S.mistakes}/${S.limit ?? "∞"}` : "";
+  ui.badge.textContent = `${LEVEL_NAME[p.level] || p.level} · ${showGrade ? tr("техника: {title}", { title: p.grade_title }) : tr("техника скрыта")} · ${S.mode}`;
+  ui.errs.textContent = S.mode === "original" ? tr("Ошибки {n}/{limit}", { n: S.mistakes, limit: S.limit ?? "∞" }) : "";
   ui.errs.classList.toggle("bad", S.mode === "original" && S.mistakes > 0);
   ui.timer.textContent = fmtTime(G.elapsed());
   ui.timer.classList.toggle("done", S.status === "solved");
   // notes mode is visible at a glance: the toggle, a dashed board, pencil-style pad digits and a label above the pad
   ui.notesBtn.classList.toggle("on", !!S.notesMode);
   ui.notesBtn.setAttribute("aria-pressed", !!S.notesMode);
-  ui.notesBtn.textContent = S.notesMode ? "✎ заметки: вкл" : "✎ заметки";
+  ui.notesBtn.textContent = S.notesMode ? tr("✎ заметки: вкл") : tr("✎ заметки");
   ui.root.classList.toggle("notes-on", !!S.notesMode && !over);
   ui.clearBtn.disabled = ui.giveUpBtn.disabled = over;
   ui.root.querySelector("#undoBtn").disabled = over || !S.undo.length;
@@ -239,12 +240,12 @@ function showResults() {
   const r = G.S.result, p = G.S.puzzle;
   ui.results.textContent = "";
   ui.results.append(h("section", { id: "resultsCard" },
-    h("h2", {}, "Итоги партии: ", statusLine(r)),
-    h("p", { class: "hint" }, `${LEVEL_NAME[p.level] || p.level} · техника: ${p.grade_title} · ${r.mode}`),
+    h("h2", {}, tr("Итоги партии: "), statusLine(r)),
+    h("p", { class: "hint" }, `${LEVEL_NAME[p.level] || p.level} · ${tr("техника: {title}", { title: p.grade_title })} · ${r.mode}`),
     metricsGrid(r),
     h("div", { class: "bar", style: "margin:0" },
-      h("a", { class: "btn primary", href: `#/review/${r.id}`, id: "reviewLink" }, "Разбор пауз"),
-      h("button", { type: "button", onclick: () => newGame(false) }, "Новая партия"))));
+      h("a", { class: "btn primary", href: `#/review/${r.id}`, id: "reviewLink" }, tr("Разбор пауз")),
+      h("button", { type: "button", onclick: () => newGame(false) }, tr("Новая партия")))));
   if (matchMedia("(max-width: 820px)").matches) ui.results.scrollIntoView({ block: "nearest" });
 }
 
@@ -252,7 +253,7 @@ async function endGame(status) {
   try {
     await G.finish(status);
   } catch (e) {
-    setMsg(`Не удалось сохранить итог: ${e.message}`, "bad");
+    setMsg(tr("Не удалось сохранить итог: {error}", { error: e.message }), "bad");
   }
   refresh();
   showResults();
@@ -276,7 +277,7 @@ async function begin(getPuzzleFn, hideGrade) {
     G = startGame({
       puzzle, gameId: id, mode: prefs.mode, limit,
       onChange: refresh, onEnd: endGame,
-      onQueueError: e => setMsg(`Ходы пока не отправлены: ${e.message}. Повторю.`, "bad"),
+      onQueueError: e => setMsg(tr("Ходы пока не отправлены: {error}. Повторю.", { error: e.message }), "bad"),
     });
     G.setAutoNotes(ui ? ui.autoBox.checked : true);
     markRecord();
@@ -308,7 +309,7 @@ function newGame(random) {
 /** Ctrl+V of a grid: validate on the server and start it as a custom puzzle. */
 export function loadCustom(text) {
   const givens = parseGrid(text);
-  if (!givens) { setMsg("Нужно ровно 81 клетку (цифры, 0 или . — пусто)", "bad"); return Promise.resolve(); }
+  if (!givens) { setMsg(tr("Нужно ровно 81 клетку (цифры, 0 или . — пусто)"), "bad"); return Promise.resolve(); }
   return begin(() => addPuzzle(givens), false);
 }
 
@@ -324,8 +325,8 @@ function press(v, asNote) {
 export function escape() {
   if (!ui || asking || G?.S.status !== "active") return;
   asking = confirmDialog({
-    title: "Бросить партию?", text: "Партия запишется как брошенная.", ok: "Бросить",
-    onOk: () => { if (G?.S.status !== "active") return; G.S.msg = { text: "Партия брошена", cls: "bad" }; endGame("abandoned"); },
+    title: tr("Бросить партию?"), text: tr("Партия запишется как брошенная."), ok: tr("Бросить"),
+    onOk: () => { if (G?.S.status !== "active") return; G.S.msg = { text: tr("Партия брошена"), cls: "bad" }; endGame("abandoned"); },
     onClose: () => { asking = null; },
   });
 }
@@ -333,12 +334,12 @@ export function escape() {
 function handleKey(e) {
   if (asking) return;  // the dialog has the keyboard
   if (ignoreKey(e)) return;
-  if (e.altKey) { keyTrace.skip = "зажат Alt"; return; }
+  if (e.altKey) { keyTrace.skip = tr("зажат Alt"); return; }
   if (!G) {  // no game yet (e.g. after a page reload): say so instead of silently ignoring the key
-    keyTrace.skip = "партия не начата";
+    keyTrace.skip = tr("партия не начата");
     if (e.key === "Enter" && e.target === document.body) { newGame(false); e.preventDefault(); return; }
     if (/^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
-      setMsg("Партия не начата — нажми «Новая партия» или Enter.", "bad"); e.preventDefault();
+      setMsg(tr("Партия не начата — нажми «Новая партия» или Enter."), "bad"); e.preventDefault();
     }
     return;
   }

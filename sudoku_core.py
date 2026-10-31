@@ -5,6 +5,8 @@ Cells are 0..80 (row * 9 + col). Units are 0..26: rows 0-8, columns 9-17, boxes 
 from dataclasses import dataclass, field
 from itertools import combinations
 
+from i18n import tr
+
 Grid = list  # 81 ints, 0 = empty
 
 ROWS = [[r * 9 + c for c in range(9)] for r in range(9)]
@@ -51,7 +53,7 @@ class Step:
 def parse(s: str) -> Grid:
     chars = [ch for ch in s if ch.isdigit() or ch == "."]
     if len(chars) != 81:
-        raise ValueError(f"нужно 81 клетку, получено {len(chars)}")
+        raise ValueError(tr("нужно 81 клетку, получено {n}", n=len(chars)))
     return [0 if ch == "." else int(ch) for ch in chars]
 
 
@@ -60,8 +62,7 @@ def to_str(g: Grid) -> str:
 
 
 def unit_name(u: int) -> str:
-    kind = ("строка", "столбец", "блок")[u // 9]
-    return f"{kind} {u % 9 + 1}"
+    return tr(("строка {n}", "столбец {n}", "блок {n}")[u // 9], n=u % 9 + 1)
 
 
 def candidates(g: Grid) -> list:
@@ -229,7 +230,7 @@ def find_steps(g: Grid, cands=None, techniques=None) -> list:
         elif t == "y_wing":
             steps += _y_wings(g, cands)
         else:
-            raise ValueError(f"неизвестная техника: {t}")
+            raise ValueError(tr("неизвестная техника: {t}", t=t))
     return steps
 
 

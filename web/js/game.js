@@ -1,4 +1,5 @@
 // One game in progress: grid state, notes, undo, mistakes, move log (seq + t_ms) → buffered queue.
+import { tr } from "./i18n.js";
 import { createMoveQueue, finishGame } from "./api.js";
 import { PEERS, ROW, COL, toDigits } from "./board.js";
 
@@ -35,14 +36,14 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
 
   function afterPlace() {
     if (mode === "original" && limit !== null && S.mistakes >= limit) {
-      say(`Лимит ошибок исчерпан (${S.mistakes}/${limit})`, "bad");
+      say(tr("Лимит ошибок исчерпан ({n}/{limit})", { n: S.mistakes, limit }), "bad");
       stop("failed");
       return;
     }
     if (S.vals.includes(0)) return;
-    if (S.vals.every((v, i) => v === S.sol[i])) { say("Решено ✓", "ok"); stop("solved"); return; }
-    say(mode === "hardcore" ? "Сетка заполнена, но где-то ошибка. Ищи — таймер идёт."
-                            : "Сетка заполнена, но есть ошибки. Ищи — таймер идёт.", "bad");
+    if (S.vals.every((v, i) => v === S.sol[i])) { say(tr("Решено ✓"), "ok"); stop("solved"); return; }
+    say(mode === "hardcore" ? tr("Сетка заполнена, но где-то ошибка. Ищи — таймер идёт.")
+                            : tr("Сетка заполнена, но есть ошибки. Ищи — таймер идёт."), "bad");
   }
 
   // a new action invalidates what was undone, as in any editor
@@ -133,7 +134,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       S.showBad.clear();
       S.vals.forEach((v, i) => { if (v && !S.given[i] && v !== S.sol[i]) S.showBad.add(i); });
       const n = S.showBad.size;
-      say(n ? `Неверных клеток: ${n} (подсвечены)` : "Ошибок нет", n ? "bad" : "ok");
+      say(n ? tr("Неверных клеток: {n} (подсвечены)", { n }) : tr("Ошибок нет"), n ? "bad" : "ok");
       onChange();
     },
     isWrong(i) { return !!S.vals[i] && !S.given[i] && S.vals[i] !== S.sol[i]; },

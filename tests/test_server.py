@@ -60,13 +60,13 @@ class ServerTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     # --- helpers -------------------------------------------------------
-    def raw(self, method, path, body=None):
+    def raw(self, method, path, body=None, headers=None):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
         if isinstance(body, (dict, list)):
             body = json.dumps(body).encode()
         elif isinstance(body, str):
             body = body.encode()
-        conn.request(method, path, body=body, headers={"Content-Type": "application/json"} if body else {})
+        conn.request(method, path, body=body, headers={**({"Content-Type": "application/json"} if body else {}), **(headers or {})})
         r = conn.getresponse()
         data = r.read()
         conn.close()
@@ -285,6 +285,22 @@ class ServerTest(unittest.TestCase):
         self.api("PUT", "/api/favorites/puzzle/999999", status=404)
         self.api("PUT", "/api/favorites/drill/999999", status=404)
         self.api("PUT", "/api/favorites/game/1", status=404)
+
+    def test_english_by_header(self):
+        en = {"X-Lang": "en"}
+        code, _, data = self.raw("GET", "/api/theory/naked-single", headers=en)
+        page = json.loads(data)
+        self.assertEqual((code, page["title"]), (200, "Naked Single"))  # from theory/en/naked-single.md
+        self.assertTrue(page["body_md"].startswith("# Naked Single"))
+        code, _, data = self.raw("GET", "/api/theory", headers=en)
+        self.assertIn("Naked Single", [t["title"] for t in json.loads(data)])
+        code, _, data = self.raw("GET", "/api/drills/techniques", headers=en)
+        self.assertEqual(json.loads(data)[0]["title"], "Naked Single")
+        code, _, data = self.raw("GET", "/api/games/99999", headers=en)
+        self.assertEqual((code, json.loads(data)["error"]), (404, "game not found"))
+        code, _, data = self.raw("GET", "/api/puzzle/options", headers=en)
+        self.assertEqual(json.loads(data)["grade_titles"]["1"], "singles")
+        self.assertEqual(self.api("GET", "/api/theory/naked-single")["title"], "Голая одиночка")  # no header: Russian
 
     def test_theory(self):
         self.assertEqual(self.api("GET", "/api/theory"), [

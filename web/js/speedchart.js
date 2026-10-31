@@ -1,5 +1,6 @@
 // Speed over one game, as on Monkeytype's result screen: moves per minute in a rolling window,
 // correct placements vs all placements (one axis — both are moves/min), mistakes and long pauses on top.
+import { tr } from "./i18n.js";
 import { fmtTime } from "./board.js";
 import { h } from "./ui.js";
 
@@ -51,7 +52,7 @@ export function speedChart(moves, endMs) {
   const x = t => PAD.l + (t / d.end) * (W - PAD.l - PAD.r);
   const y = v => H - PAD.b - (v / yMax) * (H - PAD.t - PAD.b);
   const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "speed-svg", role: "img",
-    "aria-label": `Темп по ходу партии: в среднем ${fmt(d.avg)} верных ходов в минуту, ошибок ${d.errors.length}, длинных пауз ${d.pauses.length}` });
+    "aria-label": tr("Темп по ходу партии: в среднем {avg} верных ходов в минуту, ошибок {errors}, длинных пауз {pauses}", { avg: fmt(d.avg), errors: d.errors.length, pauses: d.pauses.length }) });
 
   for (const p of d.pauses) root.append(svg("rect", { class: "sc-pause", x: x(p.from), y: PAD.t, width: Math.max(2, x(p.to) - x(p.from)), height: H - PAD.t - PAD.b }));
   for (let k = 0; k <= 4; k++) {  // recessive grid + y labels
@@ -74,7 +75,7 @@ export function speedChart(moves, endMs) {
   const last = d.samples.at(-1);  // direct labels at the line ends, in text colour
   const labelY = [y(last.pace), y(last.raw)];
   if (Math.abs(labelY[0] - labelY[1]) < 12) labelY[1] = labelY[0] + (labelY[1] >= labelY[0] ? 12 : -12);
-  ["верные", "все"].forEach((txt, k) => root.append(Object.assign(
+  [tr("верные"), tr("все")].forEach((txt, k) => root.append(Object.assign(
     svg("text", { class: "sc-label", x: W - PAD.r - 2, y: Math.max(PAD.t + 9, labelY[k] - 5), "text-anchor": "end" }), { textContent: txt })));
 
   // hover: crosshair + tooltip with the nearest sample
@@ -94,7 +95,7 @@ export function speedChart(moves, endMs) {
     dotPace.setAttribute("cx", x(s.t)); dotPace.setAttribute("cy", y(s.pace));
     dotRaw.setAttribute("cx", x(s.t)); dotRaw.setAttribute("cy", y(s.raw));
     tip.hidden = false;
-    tip.innerHTML = `<b>${fmtTime(s.t, false)}</b><br>верные: ${fmt(s.pace)}/мин<br>все: ${fmt(s.raw)}/мин<br>ошибок к этому моменту: ${s.errors}`;
+    tip.innerHTML = `<b>${fmtTime(s.t, false)}</b><br>` + tr("верные: {pace}/мин<br>все: {raw}/мин<br>ошибок к этому моменту: {errors}", { pace: fmt(s.pace), raw: fmt(s.raw), errors: s.errors });
     const px = x(s.t) / W * box.width;
     tip.style.left = `${Math.min(px + 12, box.width - tip.offsetWidth - 4)}px`;
   };
@@ -102,17 +103,17 @@ export function speedChart(moves, endMs) {
   hit.addEventListener("pointerleave", () => { tip.hidden = true; for (const el of [cross, dotPace, dotRaw]) el.setAttribute("visibility", "hidden"); });
 
   const legend = h("div", { class: "sc-legend" },
-    h("span", {}, h("i", { class: "sw sw-pace" }), "верные ходы в минуту"),
-    h("span", {}, h("i", { class: "sw sw-raw" }), "все ходы (с ошибками)"),
-    h("span", {}, h("i", { class: "sw-err" }, "×"), "ошибка"),
-    h("span", {}, h("i", { class: "sw sw-pause" }), "пауза > 20 с"));
+    h("span", {}, h("i", { class: "sw sw-pace" }), tr("верные ходы в минуту")),
+    h("span", {}, h("i", { class: "sw sw-raw" }), tr("все ходы (с ошибками)")),
+    h("span", {}, h("i", { class: "sw-err" }, "×"), tr("ошибка")),
+    h("span", {}, h("i", { class: "sw sw-pause" }), tr("пауза > 20 с")));
   const every = Math.max(1, Math.ceil(d.samples.length / 12));
-  const table = h("details", { class: "sc-table" }, h("summary", {}, "таблица"),
-    h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "время"), h("th", {}, "верные/мин"), h("th", {}, "все/мин"), h("th", {}, "ошибок"))),
+  const table = h("details", { class: "sc-table" }, h("summary", {}, tr("таблица")),
+    h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, tr("время")), h("th", {}, tr("верные/мин")), h("th", {}, tr("все/мин")), h("th", {}, tr("ошибок")))),
       h("tbody", {}, d.samples.filter((_, k) => k % every === every - 1 || k === d.samples.length - 1).map(s =>
         h("tr", {}, h("td", {}, fmtTime(s.t, false)), h("td", { class: "num" }, fmt(s.pace)), h("td", { class: "num" }, fmt(s.raw)), h("td", { class: "num" }, s.errors))))));
   return h("div", { class: "speed-chart", id: "speedChart" },
-    h("div", { class: "sc-head" }, h("b", {}, "Темп"), h("span", { class: "hint", style: "margin:0" },
-      `в среднем ${fmt(d.avg)} верных ходов в минуту`)),
+    h("div", { class: "sc-head" }, h("b", {}, tr("Темп")), h("span", { class: "hint", style: "margin:0" },
+      tr("в среднем {avg} верных ходов в минуту", { avg: fmt(d.avg) }))),
     legend, wrap, table);
 }

@@ -2,6 +2,7 @@
 import statistics
 
 from drills import NEUTRAL
+from i18n import tr
 from sudoku_core import TECH_TIER, TECH_TITLE, easiest_steps, parse, to_str, unit_name
 
 LONG_PAUSE_MS = 20000
@@ -99,7 +100,7 @@ def load_moves(conn, game_id: int) -> list:
 
 
 def _step_dict(st) -> dict:
-    return {"technique": st.technique, "title": TECH_TITLE[st.technique], "cell": st.cell, "value": st.value,
+    return {"technique": st.technique, "title": tr(TECH_TITLE[st.technique]), "cell": st.cell, "value": st.value,
             "unit": st.unit, "unit_name": None if st.unit is None else unit_name(st.unit),
             "eliminations": [list(e) for e in st.eliminations]}
 
@@ -194,7 +195,7 @@ def stats(conn) -> dict:
     for t in TECH_TIER:
         rows = attempts.get(t, [])
         techniques.append({
-            "technique": t, "title": TECH_TITLE[t], "kind": "place" if TECH_TIER[t] == 1 else "eliminate",
+            "technique": t, "title": tr(TECH_TITLE[t]), "kind": "place" if TECH_TIER[t] == 1 else "eliminate",
             "tier": TECH_TIER[t], "n": len(rows), "median_ms": _median([ms for ok, ms in rows if ok]),
             "accuracy": sum(1 for ok, _ in rows if ok) / len(rows) if rows else None,
         })

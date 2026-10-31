@@ -1,4 +1,5 @@
 // Reusable 9x9 board renderer (play, drills, review mini boards) + number pad + grid helpers.
+import { tr } from "./i18n.js";
 import { hintPrefs } from "./appearance.js";
 
 export const ROW = i => Math.floor(i / 9);
@@ -131,14 +132,14 @@ export function createPad(el, { onDigit, onErase }) {
     const b = document.createElement("button");
     b.type = "button";
     b.dataset.digit = v;
-    b.setAttribute("aria-label", `цифра ${v}`);
+    b.setAttribute("aria-label", tr("цифра {v}", { v }));
     b.addEventListener("click", () => onDigit(v));
     buttons.push(b);
     el.appendChild(b);
   }
   if (onErase) {
     const er = document.createElement("button");
-    er.type = "button"; er.textContent = "⌫"; er.setAttribute("aria-label", "стереть");
+    er.type = "button"; er.textContent = "⌫"; er.setAttribute("aria-label", tr("стереть"));
     er.addEventListener("click", onErase);
     el.appendChild(er);
   }

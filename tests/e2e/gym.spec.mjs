@@ -67,7 +67,7 @@ const browser = BROWSER === "firefox" ? await firefox.launch() : await chromium.
 const problems = [];
 async function newPage(viewport, extra = {}) {
   if (BROWSER === "firefox") delete extra.isMobile;  // not supported by Playwright's Firefox
-  const ctx = await browser.newContext({ viewport, ...extra });
+  const ctx = await browser.newContext({ viewport, locale: "ru-RU", ...extra });  // the UI follows the browser language
   const page = await ctx.newPage();
   page.on("console", m => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
   page.on("pageerror", e => problems.push(`pageerror: ${e.message}`));
@@ -624,6 +624,30 @@ try {
   await waitGame(dark, () => dark.click("#newGame"));
   await dark.click(cellSel(40));
   await shot(dark, "play-dark");
+
+  // --- English: an English browser gets the English UI, RU/EN in the header switches it -------------------------
+  const en = await newPage({ width: 1440, height: 900 }, { locale: "en-US" });
+  const russianLeft = () => en.evaluate(() => {
+    const txt = document.body.innerText + " " + [...document.querySelectorAll("[title],[aria-label]")]
+      .filter(e => e.id !== "langBtn").map(e => `${e.title} ${e.getAttribute("aria-label") || ""}`).join(" ");
+    return [...new Set(txt.match(/\S*[А-Яа-яЁё]\S*/g) || [])].slice(0, 8);
+  });
+  for (const r of ["today", "play", "drills", "stats", "theory", "theory/x-wing", `review/${gp}`, "settings"]) {
+    await en.goto(`${BASE}/#/${r}`);
+    await en.waitForTimeout(800);
+    const left = await russianLeft();
+    ok(left.length === 0 || left.every(w => w === "Русский"), `en: no Russian on #/${r}`, left.join(" | "));
+  }
+  await en.goto(`${BASE}/#/drills`);
+  await en.click("#startDrill");
+  await en.click("#hintBtn");
+  await en.waitForSelector("#drillWhy:not([hidden])");
+  ok(/^Hint: /.test(await en.textContent("#drillWhy")), "en: drill hint in English", await en.textContent("#drillWhy"));
+  ok(await en.textContent("#nav a") === "Today" && await en.evaluate(() => document.documentElement.lang) === "en", "en: nav and <html lang>");
+  await shot(en, "drills-en");
+  await en.click("#langBtn");
+  await en.waitForFunction(() => document.documentElement.lang === "ru");
+  ok(await en.textContent("#nav a") === "Сегодня", "en: «RU» in the header switches to Russian");
 } catch (e) {
   ok(false, "unexpected exception", e.stack);
 } finally {

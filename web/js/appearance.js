@@ -1,6 +1,7 @@
 // Look settings (theme, font, digit sizes, side of the panel on board pages, board highlights): kept in localStorage,
 // applied as CSS variables and data-theme / data-side on <html>; highlights are read by board.js on each render.
 // index.html re-applies the last result from BOOT_KEY before first paint, so a page load never flashes the default look.
+import { tr } from "./i18n.js";
 const KEY = "gym-appearance";
 const BOOT_KEY = "gym-appearance-boot";
 
@@ -17,21 +18,21 @@ export const FONTS = [
   { id: "nunito", name: "Nunito" },
   { id: "montserrat", name: "Montserrat" },
   { id: "comfortaa", name: "Comfortaa" },
-  { id: "system", name: "Системный", stack: SANS },
+  { id: "system", name: tr("Системный"), stack: SANS },
 ];
 export const fontStack = f => f.stack || `"${f.name}", ${f.mono ? MONO : SANS}`;
 
 // A palette is 9 base colours; the other tokens (lines, highlights, tinted backgrounds) are mixed from them.
 export const BASE = ["bg", "surface", "ink", "muted", "accent", "user", "bad", "ok", "other"];
-export const BASE_NAME = { bg: "фон", surface: "поверхность", ink: "текст и данные", muted: "приглушённый", accent: "акцент",
-                           user: "мои цифры", bad: "ошибка", ok: "верно", other: "другая техника" };
+export const BASE_NAME = { bg: tr("фон"), surface: tr("поверхность"), ink: tr("текст и данные"), muted: tr("приглушённый"), accent: tr("акцент"),
+                           user: tr("мои цифры"), bad: tr("ошибка"), ok: tr("верно"), other: tr("другая техника") };
 // light/dark are the stylesheet's own tokens (applied by data-theme only); their base colours are listed for previews
 // and as the starting point of a custom theme.
 export const THEMES = [
-  { id: "auto", name: "Как в системе" },
-  { id: "light", name: "Светлая", builtin: true,
+  { id: "auto", name: tr("Как в системе") },
+  { id: "light", name: tr("Светлая"), builtin: true,
     bg: "#f6f5f1", surface: "#ffffff", ink: "#1d1d1b", muted: "#6b6a66", accent: "#2456a6", user: "#2456a6", bad: "#c0392b", ok: "#1f7a4a", other: "#8a5a00" },
-  { id: "dark", name: "Тёмная", builtin: true, dark: true,
+  { id: "dark", name: tr("Тёмная"), builtin: true, dark: true,
     bg: "#161614", surface: "#1f1f1d", ink: "#ecebe6", muted: "#9a9890", accent: "#8db6f0", user: "#8db6f0", bad: "#ff7a6b", ok: "#5fd08f", other: "#f0c060" },
   { id: "serika", name: "serika dark", dark: true,
     bg: "#323437", surface: "#2c2e31", ink: "#d1d0c5", muted: "#7e8083", accent: "#e2b714", user: "#e2b714", bad: "#ca4754", ok: "#8fbf6b", other: "#e0954c" },
@@ -49,19 +50,19 @@ export const THEMES = [
     bg: "#fdf6e3", surface: "#fffbef", ink: "#073642", muted: "#657b83", accent: "#268bd2", user: "#268bd2", bad: "#dc322f", ok: "#859900", other: "#b58900" },
   { id: "paper", name: "paper",
     bg: "#eeeeee", surface: "#f8f8f8", ink: "#333333", muted: "#7a7a7a", accent: "#444444", user: "#3b6fb6", bad: "#c94040", ok: "#3d8b4f", other: "#a06a00" },
-  { id: "custom", name: "Своя" },
+  { id: "custom", name: tr("Своя") },
 ];
 export const SCALE = { min: 0.8, max: 1.4, step: 0.05 };
 // highlights on the board around the selected cell / digit; each can be switched off
 export const HINTS = [
-  { id: "peers", name: "ряд, столбец и блок выбранной клетки" },
-  { id: "same", name: "та же цифра в клетках" },
-  { id: "notes", name: "та же цифра в кандидатах" },
-  { id: "labels", name: "номер ряда и столбца у края" },
+  { id: "peers", name: tr("ряд, столбец и блок выбранной клетки") },
+  { id: "same", name: tr("та же цифра в клетках") },
+  { id: "notes", name: tr("та же цифра в кандидатах") },
+  { id: "labels", name: tr("номер ряда и столбца у края") },
 ];
 const ALL_HINTS = Object.fromEntries(HINTS.map(x => [x.id, true]));
 export const DEFAULTS = { theme: "auto", font: "jetbrains", digit: 1, notes: 1, side: "right", hints: ALL_HINTS, custom: null };
-export const SIDES = [{ id: "left", name: "← слева" }, { id: "right", name: "справа →" }];
+export const SIDES = [{ id: "left", name: tr("← слева") }, { id: "right", name: tr("справа →") }];
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const clampScale = v => Number.isFinite(+v) ? Math.min(SCALE.max, Math.max(SCALE.min, +v)) : 1;

@@ -1,13 +1,14 @@
 // Small shared UI helpers: element builder, labels, metrics card, favourite star, zen mode, theme.
+import { lang, tr } from "./i18n.js";
 import { setFavorite } from "./api.js";
 import { THEMES, loadPrefs, palette, savePrefs } from "./appearance.js";
 import { fmtTime } from "./board.js";
 
-export const LEVEL_NAME = { easy: "лёгкий", medium: "средний", hard: "сложный", expert: "эксперт", custom: "своя сетка",
-                            random: "🎲 случайный" };
+export const LEVEL_NAME = { easy: tr("лёгкий"), medium: tr("средний"), hard: tr("сложный"), expert: tr("эксперт"), custom: tr("своя сетка"),
+                            random: tr("🎲 случайный") };
 export const MODE_NAME = { original: "original", hardcore: "hardcore" };
-export const STATUS_NAME = { active: "идёт", solved: "решено", failed: "провал", abandoned: "брошена" };
-export const TIER_NAME = { 1: "Одиночки", 2: "Блок и линия", 3: "Пары", 4: "Крылья" };
+export const STATUS_NAME = { active: tr("идёт"), solved: tr("решено"), failed: tr("провал"), abandoned: tr("брошена") };
+export const TIER_NAME = { 1: tr("Одиночки"), 2: tr("Блок и линия"), 3: tr("Пары"), 4: tr("Крылья") };
 
 export function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -40,18 +41,18 @@ export function typingInto(e) {
 export function ignoreKey(e) {
   keyTrace.skip = null;
   if (typingInto(e)) {
-    keyTrace.skip = e.target.isContentEditable ? "страница редактируемая (contentEditable)" : "фокус в поле ввода";
+    keyTrace.skip = e.target.isContentEditable ? tr("страница редактируемая (contentEditable)") : tr("фокус в поле ввода");
     return true;
   }
   if (e.target.tagName !== "SELECT") return false;
-  if (!/^(?:Digit|Numpad)\d$/.test(e.code)) { keyTrace.skip = "фокус на выпадающем списке"; return true; }
+  if (!/^(?:Digit|Numpad)\d$/.test(e.code)) { keyTrace.skip = tr("фокус на выпадающем списке"); return true; }
   e.target.blur();
   return false;
 }
 
 /** A yes/no question over the page. Enter confirms, Esc or a click outside cancels, and no key reaches the page
  *  underneath while it is open. Returns close(), so a page can drop the dialog when it unmounts. */
-export function confirmDialog({ title, text, ok, cancel = "Продолжить", onOk, onClose = () => {} }) {
+export function confirmDialog({ title, text, ok, cancel = tr("Продолжить"), onOk, onClose = () => {} }) {
   const okBtn = h("button", { type: "button", class: "danger", id: "confirmOk" }, ok);
   const card = h("div", { class: "confirm-card", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "confirmTitle", tabindex: "-1" },
     h("h2", { id: "confirmTitle" }, title),
@@ -82,28 +83,28 @@ export function confirmDialog({ title, text, ok, cancel = "Продолжить"
 /** What the page keyboard handler did with the last key — shown by the ?debug key log. */
 export const keyTrace = { page: null, skip: null };
 
-export const sec = ms => ms === null || ms === undefined ? "—" : `${(ms / 1000).toFixed(1)} с`;
+export const sec = ms => ms === null || ms === undefined ? "—" : tr("{n} с", { n: (ms / 1000).toFixed(1) });
 export const pct = x => x === null || x === undefined ? "—" : `${Math.round(x * 100)}%`;
-export const dateRu = iso => iso ? new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit",
+export const dateRu = iso => iso ? new Date(iso).toLocaleString(lang === "en" ? "en-GB" : "ru-RU", { day: "2-digit", month: "2-digit",
   hour: "2-digit", minute: "2-digit" }) : "—";
 
 /** Metrics tiles for a finished game (finish response or game row). */
 export function metricsGrid(g) {
   const items = [
-    ["Время", fmtTime(g.time_ms)],
-    ["До первого хода", fmtTime(g.first_move_ms)],
-    ["Макс. пауза", fmtTime(g.max_pause_ms)],
-    ["Пауз > 20 с", g.long_pauses ?? "—"],
-    ["Ошибки", g.mistakes ?? "—"],
-    ["Исправления", g.corrections ?? "—"],
-    ["Проверки", g.checks ?? "—"],
+    [tr("Время"), fmtTime(g.time_ms)],
+    [tr("До первого хода"), fmtTime(g.first_move_ms)],
+    [tr("Макс. пауза"), fmtTime(g.max_pause_ms)],
+    [tr("Пауз > 20 с"), g.long_pauses ?? "—"],
+    [tr("Ошибки"), g.mistakes ?? "—"],
+    [tr("Исправления"), g.corrections ?? "—"],
+    [tr("Проверки"), g.checks ?? "—"],
   ];
   return h("div", { class: "metrics" }, items.map(([k, v]) => h("div", { class: "metric" }, h("b", {}, v), h("span", {}, k))));
 }
 
 export function statusLine(g) {
   const txt = g.status === "failed" && g.mode === "original" && g.mistake_limit !== null && g.mistakes >= g.mistake_limit
-    ? `провал: лимит ошибок ${g.mistakes}/${g.mistake_limit}` : STATUS_NAME[g.status] || g.status;
+    ? tr("провал: лимит ошибок {n}/{limit}", { n: g.mistakes, limit: g.mistake_limit }) : STATUS_NAME[g.status] || g.status;
   return h("span", { class: `status-${g.status}` }, txt);
 }
 
@@ -118,10 +119,10 @@ export function createFav(kind, { onChange, label = false } = {}) {
   const el = h("button", { type: "button", class: "fav", id: `fav-${kind}`, onclick: () => toggle() });
   const paint = () => {
     el.hidden = id === null;
-    el.textContent = (fav ? "★" : "☆") + (label ? (fav ? " в избранном" : " в избранное") : "");
+    el.textContent = (fav ? "★" : "☆") + (label ? (fav ? tr(" в избранном") : tr(" в избранное")) : "");
     el.classList.toggle("on", fav);
     el.setAttribute("aria-pressed", fav);
-    el.title = fav ? "Убрать из избранного (F)" : "Добавить в избранное (F)";
+    el.title = fav ? tr("Убрать из избранного (F)") : tr("Добавить в избранное (F)");
   };
   async function toggle() {
     if (id === null || busy) return;
@@ -146,7 +147,7 @@ export const isZen = () => document.body.classList.contains("zen");
 function paintZen(b) {
   const on = isZen();
   b.textContent = on ? "✕ zen" : "☯ zen";
-  b.title = on ? "Выйти из zen-режима (Z или Esc)" : "Zen-режим: только доска (Z)";
+  b.title = on ? tr("Выйти из zen-режима (Z или Esc)") : tr("Zen-режим: только доска (Z)");
   b.setAttribute("aria-pressed", on);
 }
 export function setZen(on) {
@@ -173,8 +174,8 @@ export function themeButton() {
   const sync = () => {
     const prefs = loadPrefs(), t = THEMES.find(x => x.id === prefs.theme);
     const icon = prefs.theme === "auto" ? "◐" : palette(prefs).dark ? "☾" : "☀";
-    b.textContent = `${icon} ${prefs.theme === "auto" ? "авто" : t.name.toLowerCase()}`;
-    b.title = `Тема: ${t.name}. Нажми, чтобы сменить (авто → светлая → тёмная)`;
+    b.textContent = `${icon} ${prefs.theme === "auto" ? tr("авто") : t.name.toLowerCase()}`;
+    b.title = tr("Тема: {name}. Нажми, чтобы сменить (авто → светлая → тёмная)", { name: t.name });
   };
   b.onclick = () => {
     const prefs = loadPrefs(), k = QUICK.indexOf(prefs.theme);

@@ -1,4 +1,5 @@
 // JSON API client and the buffered move queue.
+import { lang, tr } from "./i18n.js";
 
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
@@ -9,15 +10,15 @@ async function call(method, path, body) {
   try {
     res = await fetch(path, {
       method,
-      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      headers: { "X-Lang": lang, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError("нет связи с сервером", 0);
+    throw new ApiError(tr("нет связи с сервером"), 0);
   }
   let data = null;
   try { data = await res.json(); } catch { /* empty or non-JSON body */ }
-  if (!res.ok) throw new ApiError(data?.error || `ошибка сервера (${res.status})`, res.status);
+  if (!res.ok) throw new ApiError(data?.error || tr("ошибка сервера ({status})", { status: res.status }), res.status);
   return data;
 }
 

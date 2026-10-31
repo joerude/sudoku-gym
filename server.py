@@ -16,10 +16,12 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 import analysis
 import drills
+from i18n import get_lang, set_lang, tr
 from db import DEFAULT_DB, FAVORITE_KINDS, connect, favorite_counts, is_favorite
 from sudoku_core import GRADE_TITLE, count_solutions, grade, parse, solve, to_str
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+THEORY_EN = os.path.join(HERE, "theory", "en")  # English theory pages; the Russian ones are in the DB
 LEVELS = ["easy", "medium", "hard", "expert"]
 MODES = ("original", "hardcore")
 MOVE_KINDS = ("place", "erase", "note", "check", "undo")
@@ -46,13 +48,13 @@ def now_iso() -> str:
 def _int(data: dict, key: str, lo=None, hi=None, required=True, default=None):
     if key not in data or data[key] is None:
         if required:
-            raise ApiError(400, f"поле {key} обязательно")
+            raise ApiError(400, tr("поле {key} обязательно", key=key))
         return default
     v = data[key]
     if isinstance(v, bool) or not isinstance(v, int):
-        raise ApiError(400, f"поле {key} должно быть целым числом")
+        raise ApiError(400, tr("поле {key} должно быть целым числом", key=key))
     if (lo is not None and v < lo) or (hi is not None and v > hi):
-        raise ApiError(400, f"поле {key} вне диапазона")
+        raise ApiError(400, tr("поле {key} вне диапазона", key=key))
     return v
 
 
@@ -63,7 +65,7 @@ def api_health(conn, m, q, body):
 
 
 def _puzzle_out(conn, row) -> dict:
-    return {**dict(row), "grade_title": GRADE_TITLE.get(row["tech_grade"], ""), "fav": is_favorite(conn, "puzzle", row["id"])}
+    return {**dict(row), "grade_title": tr(GRADE_TITLE.get(row["tech_grade"], "")), "fav": is_favorite(conn, "puzzle", row["id"])}
 
 
 def api_puzzle(conn, m, q, body):
@@ -73,15 +75,15 @@ def api_puzzle(conn, m, q, body):
             " WHERE f.kind = 'puzzle' ORDER BY (SELECT COALESCE(MAX(g.id), 0) FROM games g WHERE g.puzzle_id = p.id),"
             " RANDOM() LIMIT 1").fetchone()
         if row is None:
-            raise ApiError(404, "в избранном нет задач")
+            raise ApiError(404, tr("в избранном нет задач"))
         return _puzzle_out(conn, row)
     level = q.get("level", "medium")
     if level != "random" and level not in LEVELS:
-        raise ApiError(400, f"неизвестный уровень: {level}")
+        raise ApiError(400, tr("неизвестный уровень: {level}", level=level))
     grade = None
     if "grade" in q:
         if not q["grade"].isdigit() or not 1 <= int(q["grade"]) <= 5:
-            raise ApiError(400, "grade должен быть 1..5")
+            raise ApiError(400, tr("grade должен быть 1..5"))
         grade = int(q["grade"])
     cond, args = "", []
     if grade is not None:
@@ -90,7 +92,7 @@ def api_puzzle(conn, m, q, body):
         have = [r[0] for r in conn.execute(f"SELECT DISTINCT level FROM puzzles WHERE 1=1{cond}", args)
                 if r[0] in LEVELS]  # 'custom' (pasted) puzzles are never served at random
         if not have:
-            raise ApiError(404, "нет задач с такими параметрами")
+            raise ApiError(404, tr("нет задач с такими параметрами"))
         level = random.choice(have)
     cols = "id, level, givens, solution, tech_grade"
     row = conn.execute(
@@ -100,7 +102,7 @@ def api_puzzle(conn, m, q, body):
         row = conn.execute(f"SELECT {cols} FROM puzzles WHERE level = ?{cond} ORDER BY RANDOM() LIMIT 1",
                            [level] + args).fetchone()
     if row is None:
-        raise ApiError(404, "нет задач с такими параметрами")
+        raise ApiError(404, tr("нет задач с такими параметрами"))
     return _puzzle_out(conn, row)
 
 
@@ -108,16 +110,16 @@ def api_add_puzzle(conn, m, q, body):
     """A pasted grid: validated, graded and stored as level 'custom' (idempotent by givens)."""
     givens = body.get("givens")
     if not isinstance(givens, str):
-        raise ApiError(400, "поле givens обязательно")
+        raise ApiError(400, tr("поле givens обязательно"))
     try:
         g = parse(givens)
     except ValueError as e:
         raise ApiError(400, str(e))
     n = count_solutions(g)
     if n == 0:
-        raise ApiError(400, "нет решения")
+        raise ApiError(400, tr("нет решения"))
     if n > 1:
-        raise ApiError(400, "решение не единственное")
+        raise ApiError(400, tr("решение не единственное"))
     givens = to_str(g)
     conn.execute("INSERT OR IGNORE INTO puzzles (bank_id, level, givens, solution, se_rating, tech_grade)"
                  " VALUES (?, 'custom', ?, ?, NULL, ?)", ("custom-" + givens, givens, to_str(solve(g)), grade(g)))
@@ -134,7 +136,7 @@ def api_puzzle_options(conn, m, q, body):
         if level in counts:  # skip 'custom'
             counts[level][str(g)] = n
     return {"levels": [{"level": lv, "grades": grades} for lv, grades in counts.items()],
-            "grade_titles": {str(k): v for k, v in GRADE_TITLE.items()}}
+            "grade_titles": {str(k): tr(v) for k, v in GRADE_TITLE.items()}}
 
 
 def api_games_list(conn, m, q, body):
@@ -150,12 +152,12 @@ def api_create_game(conn, m, q, body):
     puzzle_id = _int(body, "puzzle_id")
     mode = body.get("mode")
     if mode not in MODES:
-        raise ApiError(400, "mode должен быть original или hardcore")
+        raise ApiError(400, tr("mode должен быть original или hardcore"))
     limit = None
     if mode == "original":
         limit = _int(body, "mistake_limit", lo=1, required=False) if "mistake_limit" in body else DEFAULT_MISTAKE_LIMIT
     if not conn.execute("SELECT 1 FROM puzzles WHERE id = ?", (puzzle_id,)).fetchone():
-        raise ApiError(404, "задача не найдена")
+        raise ApiError(404, tr("задача не найдена"))
     # a game left by a reload or navigation would stay "active" forever: close it at its last move
     for (stale,) in conn.execute("SELECT id FROM games WHERE status = 'active'").fetchall():
         moves = analysis.load_moves(conn, stale)
@@ -169,7 +171,7 @@ def api_create_game(conn, m, q, body):
 def _game(conn, game_id):
     game = analysis.game_info(conn, game_id)
     if game is None:
-        raise ApiError(404, "партия не найдена")
+        raise ApiError(404, tr("партия не найдена"))
     return game
 
 
@@ -180,11 +182,11 @@ def api_get_game(conn, m, q, body):
 
 def _validate_move(mv) -> tuple:
     if not isinstance(mv, dict):
-        raise ApiError(400, "ход должен быть объектом")
+        raise ApiError(400, tr("ход должен быть объектом"))
     seq, t_ms = _int(mv, "seq", lo=0), _int(mv, "t_ms", lo=0)
     kind = mv.get("kind")
     if kind not in MOVE_KINDS:
-        raise ApiError(400, f"неизвестный тип хода: {kind}")
+        raise ApiError(400, tr("неизвестный тип хода: {kind}", kind=kind))
     cell = _int(mv, "cell", 0, 80, required=kind != "check")
     if kind == "place":
         value = _int(mv, "value", 1, 9)
@@ -200,7 +202,7 @@ def api_moves(conn, m, q, body):
     game = _game(conn, gid)
     moves = body.get("moves")
     if not isinstance(moves, list):
-        raise ApiError(400, "поле moves должно быть списком")
+        raise ApiError(400, tr("поле moves должно быть списком"))
     rows = [_validate_move(mv) for mv in moves]
     solution = game["solution"]
     with conn:
@@ -218,7 +220,7 @@ def api_finish(conn, m, q, body):
     game = _game(conn, gid)
     status = body.get("status")
     if status not in FINISH_STATUSES:
-        raise ApiError(400, "status должен быть solved, failed или abandoned")
+        raise ApiError(400, tr("status должен быть solved, failed или abandoned"))
     return _close_game(conn, game, status, _int(body, "t_ms", lo=0))
 
 
@@ -242,7 +244,7 @@ def _close_game(conn, game, status, t_ms, moves=None):
 def api_review(conn, m, q, body):
     r = analysis.review(conn, int(m.group(1)))
     if r is None:
-        raise ApiError(404, "партия не найдена")
+        raise ApiError(404, tr("партия не найдена"))
     r["game"]["fav"] = is_favorite(conn, "puzzle", r["game"]["puzzle_id"])
     return r
 
@@ -266,7 +268,7 @@ def api_drill_next(conn, m, q, body):
     except ValueError as e:
         raise ApiError(400, str(e))
     if d is None:
-        raise ApiError(404, "в избранном нет упражнений" if technique == "favorites" else "упражнений нет")
+        raise ApiError(404, tr("в избранном нет упражнений") if technique == "favorites" else tr("упражнений нет"))
     return d
 
 
@@ -275,21 +277,21 @@ def api_drill_attempt(conn, m, q, body):
     hint = _int(body, "hint", 0, 1, required=False, default=0)
     res = drills.attempt(conn, int(m.group(1)), time_ms, cell, value, hint)
     if res is None:
-        raise ApiError(404, "упражнение не найдено")
+        raise ApiError(404, tr("упражнение не найдено"))
     return res
 
 
 def api_drill_reveal(conn, m, q, body):
     res = drills.reveal(conn, int(m.group(1)), _int(body, "time_ms", lo=0))
     if res is None:
-        raise ApiError(404, "упражнение не найдено")
+        raise ApiError(404, tr("упражнение не найдено"))
     return res
 
 
 def api_drill_hint(conn, m, q, body):
     res = drills.hint(conn, int(m.group(1)))
     if res is None:
-        raise ApiError(404, "упражнение не найдено")
+        raise ApiError(404, tr("упражнение не найдено"))
     return res
 
 
@@ -301,9 +303,9 @@ def _favorite_target(conn, m):
     kind, ref_id = m.group(1), int(m.group(2))
     table = {"puzzle": "puzzles", "drill": "drills"}.get(kind)
     if table is None:
-        raise ApiError(404, f"в избранное можно добавить только: {', '.join(FAVORITE_KINDS)}")
+        raise ApiError(404, tr("в избранное можно добавить только: {kinds}", kinds=", ".join(FAVORITE_KINDS)))
     if not conn.execute(f"SELECT 1 FROM {table} WHERE id = ?", (ref_id,)).fetchone():
-        raise ApiError(404, "задача не найдена" if kind == "puzzle" else "упражнение не найдено")
+        raise ApiError(404, tr("задача не найдена") if kind == "puzzle" else tr("упражнение не найдено"))
     return kind, ref_id
 
 
@@ -321,16 +323,28 @@ def api_favorite_remove(conn, m, q, body):
     return {"fav": False, "counts": favorite_counts(conn)}
 
 
+def _theory_en(slug: str) -> dict:
+    """{title, body_md} from theory/en/<slug>.md for an English request; {} keeps the Russian page from the DB."""
+    path = os.path.join(THEORY_EN, slug + ".md")
+    if get_lang() != "en" or not re.fullmatch(r"[a-z0-9-]+", slug) or not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        _, head, body = f.read().split("---", 2)
+    meta = dict(line.split(":", 1) for line in head.strip().splitlines())
+    return {"title": meta.get("title", slug).strip(), "body_md": body.strip()}
+
+
 def api_theory_list(conn, m, q, body):
-    return [dict(r) for r in conn.execute("SELECT slug, title, level, ord, drill FROM techniques ORDER BY ord, slug")]
+    rows = conn.execute("SELECT slug, title, level, ord, drill FROM techniques ORDER BY ord, slug")
+    return [{**dict(r), **{k: v for k, v in _theory_en(r["slug"]).items() if k == "title"}} for r in rows]
 
 
 def api_theory_page(conn, m, q, body):
     row = conn.execute("SELECT slug, title, level, ord, drill, body_md FROM techniques WHERE slug = ?",
                        (unquote(m.group(1)),)).fetchone()
     if row is None:
-        raise ApiError(404, "страница теории не найдена")
-    return dict(row)
+        raise ApiError(404, tr("страница теории не найдена"))
+    return {**dict(row), **_theory_en(row["slug"])}
 
 
 ROUTES = [
@@ -382,9 +396,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(raw.decode("utf-8")) if raw else {}
         except (UnicodeDecodeError, json.JSONDecodeError):
-            raise ApiError(400, "некорректный JSON")
+            raise ApiError(400, tr("некорректный JSON"))
         if not isinstance(data, dict):
-            raise ApiError(400, "тело запроса должно быть JSON-объектом")
+            raise ApiError(400, tr("тело запроса должно быть JSON-объектом"))
         return data
 
     def handle_api(self, method: str, path: str, query: str):
@@ -398,19 +412,19 @@ class Handler(BaseHTTPRequestHandler):
                         result = fn(self.server.conn, match, q, body)
                     self.send_json(200, result)
                     return
-            raise ApiError(404, f"нет такого маршрута: {method} {path}")
+            raise ApiError(404, tr("нет такого маршрута: {method} {path}", method=method, path=path))
         except ApiError as e:
             self.send_json(e.status, {"error": str(e)})
         except Exception as e:  # pragma: no cover - unexpected bug
             traceback.print_exc()
-            self.send_json(500, {"error": f"внутренняя ошибка: {e}"})
+            self.send_json(500, {"error": tr("внутренняя ошибка: {e}", e=e)})
 
     def serve_static(self, path: str):
         root = self.server.web_root
         rel = unquote(path).lstrip("/") or "index.html"
         full = os.path.realpath(os.path.join(root, rel))
         if not full.startswith(root + os.sep) or not os.path.isfile(full):
-            self.send_json(404, {"error": "файл не найден"})
+            self.send_json(404, {"error": tr("файл не найден")})
             return
         with open(full, "rb") as f:
             data = f.read()
@@ -423,13 +437,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def dispatch(self, method: str):
+        set_lang(self.headers.get("X-Lang"))  # api.js sends the page language
         parts = urlsplit(self.path)
         if parts.path == "/api" or parts.path.startswith("/api/"):
             self.handle_api(method, parts.path, parts.query)
         elif method == "GET":
             self.serve_static(parts.path)
         else:
-            self.send_json(404, {"error": "не найдено"})
+            self.send_json(404, {"error": tr("не найдено")})
 
     def do_GET(self):
         self.dispatch("GET")

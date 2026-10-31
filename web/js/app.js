@@ -1,4 +1,5 @@
 // Hash router + nav + global Ctrl+V of a grid.
+import { LANGS, lang, setLang, tr } from "./i18n.js";
 import { initAppearance } from "./appearance.js";
 import { parseGrid } from "./board.js";
 import * as play from "./play.js";
@@ -20,7 +21,7 @@ const ROUTES = [
   [/^theory\/([^/]+)$/, theory.mountPage, "theory"],
   [/^settings$/, settings.mount, "settings"],
 ];
-const TITLES = { today: "Сегодня", play: "Играть", drills: "Упражнения", stats: "Статистика", theory: "Теория", settings: "Вид" };
+const TITLES = { today: tr("Сегодня"), play: tr("Играть"), drills: tr("Упражнения"), stats: tr("Статистика"), theory: tr("Теория"), settings: tr("Вид") };
 const ZEN_PAGES = new Set(["play", "drills"]);
 
 initAppearance();
@@ -59,7 +60,15 @@ function route() {
 
 window.addEventListener("hashchange", route);
 const themeBtn = themeButton();  // re-synced on every route: #/settings may have changed the theme
-document.querySelector(".top-in").append(themeBtn);
+// header language switch RU ⇄ EN (a reload: texts are taken once at startup) and the static texts of index.html
+const other = LANGS.find(l => l.id !== lang);
+const langBtn = Object.assign(document.createElement("button"), { type: "button", className: "lang-toggle", id: "langBtn",
+  textContent: other.short, title: `${other.name} — ${tr("сменить язык")}`, onclick: () => setLang(other.id) });
+document.querySelector(".top-in").append(themeBtn, langBtn);
+for (const a of document.querySelectorAll("#nav a")) a.textContent = TITLES[a.dataset.route];
+document.getElementById("nav").setAttribute("aria-label", tr("Разделы"));
+const zenHome = document.querySelector(".zen-home");
+if (zenHome) Object.assign(zenHome, { textContent: `← ${TITLES.today}`, title: tr("На главную (zen остаётся для доски)") });
 initZen();
 
 // Z toggles zen mode on the board pages. Esc leaves zen first; otherwise it goes to «Играть» (the main page),
@@ -79,23 +88,22 @@ document.addEventListener("keydown", e => {
 if (new URLSearchParams(location.search).has("debug")) {
   const box = document.createElement("pre");
   box.className = "keylog";
-  box.textContent = "нажми клавишу…";
+  box.textContent = tr("нажми клавишу…");
   document.body.append(box);
   const log = [];
   const show = () => {
-    const env = `обработчик клавиш: ${keyTrace.page || "НЕТ"} · страница редактируемая: `
-      + `${document.body.isContentEditable || document.designMode === "on" ? "ДА" : "нет"}`;
+    const env = tr("обработчик клавиш: {page} · страница редактируемая: {editable}", { page: keyTrace.page || tr("НЕТ"), editable: document.body.isContentEditable || document.designMode === "on" ? tr("ДА") : tr("нет") });
     box.textContent = [env, ...log.slice(0, 8)].join("\n");
   };
   window.addEventListener("keydown", e => {
     const t = e.target, a = document.activeElement;
     setTimeout(() => {  // after the page handlers ran
-      log.unshift(`${e.key} (${e.code}) → ${t.tagName}${t.id ? "#" + t.id : ""}, фокус ${a?.tagName}${a?.id ? "#" + a.id : ""}, `
-        + (e.defaultPrevented ? "обработано" : "НЕ обработано") + (keyTrace.skip ? ` — ${keyTrace.skip}` : ""));
+      log.unshift(`${e.key} (${e.code}) → ${t.tagName}${t.id ? "#" + t.id : ""}, ${tr("фокус")} ${a?.tagName}${a?.id ? "#" + a.id : ""}, `
+        + (e.defaultPrevented ? tr("обработано") : tr("НЕ обработано")) + (keyTrace.skip ? ` — ${keyTrace.skip}` : ""));
       show();
     });
   }, true);
-  const err = text => { log.unshift(`ОШИБКА: ${text}`); show(); };
+  const err = text => { log.unshift(tr("ОШИБКА: {text}", { text })); show(); };
   window.addEventListener("error", e => err(`${e.message} (${(e.filename || "").split("/").pop()}:${e.lineno})`));
   window.addEventListener("unhandledrejection", e => err(String(e.reason?.message || e.reason)));
   window.addEventListener("hashchange", () => setTimeout(show));

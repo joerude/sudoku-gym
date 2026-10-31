@@ -1,5 +1,6 @@
 // #/settings — look: colour theme (presets + own colours), font, digit and candidate size, side of the panel on the
 // board pages, board highlights, with a live sample board.
+import { LANGS, lang, setLang, tr } from "./i18n.js";
 import { BASE, BASE_NAME, DEFAULTS, FONTS, HINTS, SCALE, SIDES, THEMES, fontStack, loadPrefs, palette, savePrefs } from "./appearance.js";
 import { computeCandidates, createBoard, toDigits } from "./board.js";
 import { h } from "./ui.js";
@@ -61,31 +62,34 @@ export function mount(el) {
       oninput: e => set({ [key]: +e.target.value }) });
     return { input, out, row: h("label", { class: "field range" }, h("span", {}, label, " ", out), input) };
   };
-  const digitS = slider("digit", "Цифры в клетках"), notesS = slider("notes", "Кандидаты");
+  const digitS = slider("digit", tr("Цифры в клетках")), notesS = slider("notes", tr("Кандидаты"));
   const hintBoxes = HINTS.map(x => h("input", { type: "checkbox", "data-hint": x.id,
     onchange: e => set({ hints: { ...prefs.hints, [x.id]: e.target.checked } }) }));
   const sideBtns = SIDES.map(s => h("button", { type: "button", "data-side": s.id, onclick: () => set({ side: s.id }) }, s.name));
 
   const preview = h("div", { id: "lookBoard" });
-  el.append(h("h1", {}, "Вид"),
+  el.append(h("h1", {}, tr("Вид")),
     h("div", { class: "look" },
       h("div", { class: "look-preview" }, preview,
-        h("p", { class: "hint", style: "margin:8px 0 0" }, "Пример: выбрана r1c3, ошибка в r2c3, кандидаты в верхних рядах.")),
+        h("p", { class: "hint", style: "margin:8px 0 0" }, tr("Пример: выбрана r1c3, ошибка в r2c3, кандидаты в верхних рядах."))),
       h("div", {},
-        h("section", {}, h("h2", {}, "Тема"), h("div", { class: "theme-grid", id: "themes" }, themeBtns)),
-        h("section", {}, h("h2", {}, "Свои цвета"),
-          h("p", { class: "hint" }, "Любое изменение цвета создаёт тему «Своя» на основе текущей."),
+        h("section", {}, h("h2", {}, tr("Тема")), h("div", { class: "theme-grid", id: "themes" }, themeBtns)),
+        h("section", {}, h("h2", {}, tr("Свои цвета")),
+          h("p", { class: "hint" }, tr("Любое изменение цвета создаёт тему «Своя» на основе текущей.")),
           h("div", { class: "color-grid", id: "customColors" }, colorRows),
-          h("label", { class: "check", style: "margin-top:8px" }, darkBox, "тёмная (графики и полосы прокрутки)")),
-        h("section", {}, h("h2", {}, "Шрифт"), h("div", { class: "font-grid", id: "fonts" }, fontBtns)),
-        h("section", {}, h("h2", {}, "Размер"), digitS.row, notesS.row),
-        h("section", {}, h("h2", {}, "Подсветка на доске"),
-          h("p", { class: "hint" }, "Действует на «Играть», «Упражнения» и на примере. Выключенное ищешь глазами сам."),
+          h("label", { class: "check", style: "margin-top:8px" }, darkBox, tr("тёмная (графики и полосы прокрутки)"))),
+        h("section", {}, h("h2", {}, tr("Шрифт")), h("div", { class: "font-grid", id: "fonts" }, fontBtns)),
+        h("section", {}, h("h2", {}, tr("Размер")), digitS.row, notesS.row),
+        h("section", {}, h("h2", {}, tr("Подсветка на доске")),
+          h("p", { class: "hint" }, tr("Действует на «Играть», «Упражнения» и на примере. Выключенное ищешь глазами сам.")),
           h("div", { class: "check-list", id: "hints" }, HINTS.map((x, k) => h("label", { class: "check" }, hintBoxes[k], x.name)))),
-        h("section", {}, h("h2", {}, "Панель у доски"),
-          h("p", { class: "hint" }, "Настройки партии и список техник на «Играть» и «Упражнения». На широком экране доска — по центру."),
+        h("section", {}, h("h2", {}, tr("Панель у доски")),
+          h("p", { class: "hint" }, tr("Настройки партии и список техник на «Играть» и «Упражнения». На широком экране доска — по центру.")),
           h("div", { class: "chips", id: "sides" }, sideBtns)),
-        h("button", { type: "button", id: "lookReset", onclick: () => set({ ...DEFAULTS, custom: prefs.custom }) }, "Сбросить вид"))));
+        h("section", {}, h("h2", {}, tr("Язык")),
+          h("div", { class: "chips", id: "langs" }, LANGS.map(l => h("button", { type: "button", "data-lang": l.id,
+            class: l.id === lang ? "on" : "", "aria-pressed": l.id === lang, onclick: () => l.id !== lang && setLang(l.id) }, l.name)))),
+        h("button", { type: "button", id: "lookReset", onclick: () => set({ ...DEFAULTS, custom: prefs.custom }) }, tr("Сбросить вид")))));
 
   const board = createBoard(preview, { interactive: false });
 
