@@ -16,7 +16,9 @@ const NM = [process.env.PLAYWRIGHT_CORE, `${SCRATCH}/node_modules`, path.join(RO
   "/home/joerude/.npm-global/lib/node_modules/rea-agents/node_modules"].filter(Boolean)
   .find(d => existsSync(path.join(d, "playwright-core")));
 if (!NM) { console.log("FAIL playwright-core not found (set PLAYWRIGHT_CORE)"); process.exit(2); }
-const { chromium } = createRequire(path.join(NM, "noop.js"))("playwright-core");
+const { chromium, firefox } = createRequire(path.join(NM, "noop.js"))("playwright-core");
+// BROWSER=firefox runs the same checks in Playwright's Firefox build (`playwright-core install firefox`)
+const BROWSER = process.env.BROWSER || "chromium";
 const CHROME = process.env.CHROME || "/home/joerude/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome";
 const SHOTS = process.argv[2] || process.env.SHOTS || SCRATCH;
 mkdirSync(SHOTS, { recursive: true });
@@ -61,9 +63,10 @@ const post = (p, body) => api(p, { method: "POST", headers: { "Content-Type": "a
 const dbJson = (sql, ...args) => JSON.parse(py(`import sqlite3, sys, json
 c = sqlite3.connect(sys.argv[1]); print(json.dumps(c.execute(sys.argv[2], sys.argv[3:]).fetchall()))`, DB, sql, ...args.map(String)));
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = BROWSER === "firefox" ? await firefox.launch() : await chromium.launch({ executablePath: CHROME });
 const problems = [];
 async function newPage(viewport, extra = {}) {
+  if (BROWSER === "firefox") delete extra.isMobile;  // not supported by Playwright's Firefox
   const ctx = await browser.newContext({ viewport, ...extra });
   const page = await ctx.newPage();
   page.on("console", m => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
@@ -209,15 +212,45 @@ try {
 . . . | . . . | 3 7 .
 . 1 3 | 5 9 . | . . 8
 . . . | 4 . . | . . 5`;
-  const g4full = await waitGame(page, () => page.evaluate(text => {
-    const dt = new DataTransfer(); dt.setData("text/plain", text);
-    document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
-  }, ascii));
-  ok((await page.textContent("#badge")).includes("своя сетка"), "custom badge");
-  ok(g4full.level === "custom" && g4full.givens === "100006000600035120032000000000140030860000092050029000000000370013590008000400005",
-     "Ctrl+V ASCII grid loads a custom puzzle");
-  ok((await api(`/api/games/${g3.id}`)).status === "abandoned", "previous active game finished as abandoned");
-  ok((await page.textContent(cellSel(0))).trim() === "1" && (await page.textContent(cellSel(5))).trim() === "6", "custom grid on board");
+  // Firefox drops clipboardData from a synthetic ClipboardEvent, so the paste path is checked in Chromium only.
+  if (BROWSER === "chromium") {
+    const g4full = await waitGame(page, () => page.evaluate(text => {
+      const dt = new DataTransfer(); dt.setData("text/plain", text);
+      document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
+    }, ascii));
+    ok((await page.textContent("#badge")).includes("своя сетка"), "custom badge");
+    ok(g4full.level === "custom" && g4full.givens === "100006000600035120032000000000140030860000092050029000000000370013590008000400005",
+       "Ctrl+V ASCII grid loads a custom puzzle");
+    ok((await api(`/api/games/${g3.id}`)).status === "abandoned", "previous active game finished as abandoned");
+    ok((await page.textContent(cellSel(0))).trim() === "1" && (await page.textContent(cellSel(5))).trim() === "6", "custom grid on board");
+  }
+
+  // --- 4b. «Очистить» wipes own digits and notes (one undo brings them back); «Сдаться» asks twice ---
+  const g4b = await startGame(page, { level: "easy", mode: "hardcore", grade: "" });
+  const e4 = [...g4b.givens].map((c, i) => (c === "0" ? i : -1)).filter(i => i >= 0);
+  await typeAt(page, e4[0], g4b.solution[e4[0]]);
+  await typeAt(page, e4[1], +g4b.solution[e4[1]] % 9 + 1);
+  await page.click(cellSel(e4[2])); await page.keyboard.press("Shift+Digit5");
+  await page.click("#clearBtn");
+  ok(await page.$$eval(e4.slice(0, 3).map(cellSel).join(","), els => els.every(e => !e.textContent.trim())),
+     "«Очистить» empties own digits and notes");
+  ok(await page.$$eval("#board .cell", (els, g) => els.every((e, i) => g[i] === "0" || e.textContent.trim() === g[i]), g4b.givens),
+     "«Очистить» keeps the givens");
+  await page.keyboard.press("Control+z");
+  ok((await page.textContent(cellSel(e4[0]))).trim() === g4b.solution[e4[0]] &&
+     (await page.textContent(`${cellSel(e4[2])} .notes`)).includes("5"), "one Ctrl+Z restores the whole cleared board");
+  await page.click("#clearBtn");
+  await page.click("#giveUpBtn");
+  ok((await page.textContent("#giveUpBtn")).includes("Точно") && !(await page.$("#resultsCard")),
+     "«Сдаться»: first click only asks");
+  await page.click("#giveUpBtn");
+  await page.waitForSelector("#resultsCard");
+  ok(/брошена/.test(await page.textContent("#resultsCard")), "«Сдаться»: second click ends the game");
+  ok(await page.$eval("#giveUpBtn", e => e.disabled) && await page.$eval("#clearBtn", e => e.disabled),
+     "clear / give up disabled after the game ends");
+  const s4b = await api(`/api/games/${g4b.id}`);
+  ok(s4b.status === "abandoned" && s4b.moves.filter(m => m.kind === "erase").length === 6,
+     "server: abandoned, each clear logged as erases", JSON.stringify([s4b.status, s4b.moves.map(m => m.kind)]));
 
   // --- 5. drills: place + eliminate ---------------------------------------------------------
   const drillResp = () => page.waitForResponse(r => r.url().includes("/api/drills/next"));
@@ -363,6 +396,9 @@ try {
   await page.waitForFunction(() => location.hash === "#/drills?technique=pointing");
   await page.waitForSelector('#picker button[data-tech="pointing"].on');
   ok(true, "«Тренировать» opens the pointing drill");
+  await page.waitForSelector("#drillGate:not([hidden])");
+  await page.mouse.click(...await page.$eval("#drillBoard", e => { const r = e.getBoundingClientRect(); return [r.x + 30, r.y + 30]; }));
+  ok(await page.$eval("#drillGate", e => e.hidden), "drill gate: a click on the blurred board starts");
 
   // --- 8. today -------------------------------------------------------------------------------
   await page.goto(`${BASE}/#/today`);

@@ -50,8 +50,9 @@ export function mount(el, params, query) {
   const pad = createPad(padEl, { onDigit: v => onDigit(v) });
   // The first drill after opening the page waits for «Начать»: reading the page is not solving time.
   let gated = true, pausedMs = 0, hiddenAt = null;
-  const gate = h("div", { class: "gate", id: "drillGate" },
-    h("button", { type: "button", class: "primary", id: "startDrill", onclick: () => begin() }, "Начать"),
+  // a click anywhere on the blurred board starts, not only on the button
+  const gate = h("div", { class: "gate", id: "drillGate", onclick: () => begin() },
+    h("button", { type: "button", class: "primary", id: "startDrill" }, "Начать"),
     h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "Пробел"), " / ", h("kbd", {}, "Enter")));
   const boardWrap = h("div", { class: "board-wrap" }, boardEl, gate);
   const elapsed = () => performance.now() - start - pausedMs;

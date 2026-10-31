@@ -138,6 +138,7 @@ section, .card { background: var(--surface); border: 1px solid var(--line); bord
   gap: 10px; background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(7px); z-index: 2; }
 .gate[hidden] { display: none; }
 .gate button { font-size: 18px; padding: 10px 28px; }
+.gate { cursor: pointer; }
 .cell.other { color: var(--other); background: var(--other-bg); }
 .cell.ghost { color: var(--ok); font-weight: 600; }
 .cell.ans { box-shadow: inset 0 0 0 2px var(--ok); }
