@@ -41,6 +41,7 @@ export const finishGame = (id, status, tMs) => call("POST", `/api/games/${id}/fi
 export const getReview = id => call("GET", `/api/games/${id}/review`);
 export const getStats = () => call("GET", "/api/stats");
 export const getRecords = () => call("GET", "/api/records");
+export const getActivity = () => call("GET", "/api/activity");
 export const drillTechniques = () => call("GET", "/api/drills/techniques");
 export const nextDrill = technique => call("GET", `/api/drills/next${qs({ technique })}`);
 export const sendAttempt = (id, timeMs, cell, value, hint = 0) =>

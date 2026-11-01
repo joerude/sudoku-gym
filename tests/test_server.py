@@ -184,6 +184,11 @@ class ServerTest(unittest.TestCase):
         rec = self.api("GET", "/api/records")
         self.assertEqual(len(rec), 8)
         self.assertEqual(set(rec[0]), {"level", "mode", "best_ms", "game_id", "at", "solved"})
+        act = self.api("GET", "/api/activity")
+        self.assertEqual(set(act), {"today", "days", "streak", "totals"})
+        self.assertEqual(set(act["streak"]), {"current", "best", "today"})
+        self.assertTrue(act["streak"]["today"])  # games were just solved in this test
+        self.assertGreaterEqual(act["totals"]["games"], 1)
         st = self.api("GET", "/api/stats")
         easy = [x for x in st["by_level_mode"] if x["level"] == "easy"]
         self.assertEqual(easy, [

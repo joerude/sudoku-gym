@@ -263,6 +263,10 @@ def api_stats(conn, m, q, body):
     return analysis.stats(conn)
 
 
+def api_activity(conn, m, q, body):
+    return analysis.activity(conn)
+
+
 def api_records(conn, m, q, body):
     return analysis.records(conn)
 
@@ -414,6 +418,7 @@ ROUTES = [
     ("POST", r"/api/games/(\d+)/finish", api_finish),
     ("GET", r"/api/games/(\d+)/review", api_review),
     ("GET", r"/api/stats", api_stats),
+    ("GET", r"/api/activity", api_activity),
     ("GET", r"/api/records", api_records),
     ("GET", r"/api/drills/techniques", api_drill_techniques),
     ("GET", r"/api/drills/next", api_drill_next),
