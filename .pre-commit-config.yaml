@@ -1,0 +1,36 @@
+# ./gym setup installs these hooks; ./gym check runs them on every file.
+default_install_hook_types: [pre-commit, commit-msg]
+exclude: ^web/fonts/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: unit-tests
+        name: unit tests
+        entry: python3 -m unittest discover -s tests
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: no-ai-trailers
+        name: no AI trailers in the commit message
+        entry: (?i)(co-authored-by:.*(claude|anthropic)|generated with claude)
+        language: pygrep
+        stages: [commit-msg]
