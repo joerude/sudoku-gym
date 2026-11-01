@@ -246,7 +246,7 @@ def _validate_move(mv) -> tuple:
 def _board(body, givens: str) -> list:
     """The position a hint or analysis is asked for: 81 digits (0 = empty) that keep the puzzle's givens."""
     b = body.get("board")
-    if not isinstance(b, str) or len(b) != 81 or not b.isdigit():
+    if not isinstance(b, str) or len(b) != 81 or not (b.isascii() and b.isdigit()):
         raise ApiError(400, tr("поле board — 81 цифра (0 — пусто)"))
     if any(g != "0" and g != c for g, c in zip(givens, b, strict=True)):
         raise ApiError(400, tr("board не совпадает с условием"))

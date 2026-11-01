@@ -296,6 +296,9 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(same["next"], r["next"])
         self.api("POST", f"/api/games/{gid}/analysis", {"board": "1" * 81}, status=400)  # not this puzzle's givens
         self.api("POST", f"/api/games/{gid}/analysis", {"board": P[:80]}, status=400)
+        non_ascii = P[: e[0]] + "²" + P[e[0] + 1 :]  # isdigit() is True, int() is not
+        self.api("POST", f"/api/games/{gid}/analysis", {"board": non_ascii}, status=400)
+        self.api("POST", f"/api/games/{gid}/analysis", {"board": "x" * 81}, status=400)
         self.api("POST", f"/api/games/{gid}/analysis", {"board": P, "cands": [0] * 80}, status=400)
         self.api("POST", f"/api/games/{gid}/analysis", {"board": P, "cands": [2048] * 81}, status=400)
         self.api("POST", "/api/games/99999/analysis", {"board": P}, status=404)
