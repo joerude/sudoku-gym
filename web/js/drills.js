@@ -40,21 +40,21 @@ export function mount(el, params, query) {
     title: tr("Рейтинг упражнений: растёт, когда находишь ходы быстрее своей нормы") });
   let rating = null;  // GET /api/rating; after an answer only .rating/.provisional are updated from its result
   let rated = 1;      // 0 while the drill came from «Избранное»: repeats stay out of the rating
-  /** res — the last answer's result: its delta and «калибровка n/10» are shown until the next drill. */
+  /** res — the last answer's result: its delta is shown until the next drill («калибровка n/10» goes to the answer line). */
   function renderRating(res) {
     ratingEl.textContent = "";
     if (!rating) return;
     ratingEl.append(`${rating.rating}${rating.provisional ? "?" : ""}`);
     const d = res?.rating?.delta;
     if (d !== undefined)
-      ratingEl.append(" ", h("small", { class: d >= 0 ? "up" : "down", id: "ratingDelta" }, d >= 0 ? `+${d}` : `${d}`));
-    if (res?.calibrating) ratingEl.append(" ", h("small", { id: "ratingCal" }, tr("калибровка {n}/{need}", res.calibrating)));
+      ratingEl.append(" ", h("small", { class: d >= 0 ? "up" : "down", id: "ratingDelta" }, d >= 0 ? `+${d}` : `−${-d}`));
   }
   function applyRating(res) {
     if (res.rating && rating) rating = { ...rating, rating: res.rating.after, provisional: res.rating.provisional };
     renderRating(res);
+    if (res.calibrating) msg.append(" ", h("small", { id: "ratingCal", class: "hint" }, tr("калибровка {n}/{need}", res.calibrating)));
   }
-  getRating().then(r => { rating = r; renderRating(null); }).catch(() => {});
+  getRating().then(r => { rating = r; renderRating(result); }).catch(() => {});
   const msg = h("div", { class: "msg", id: "drillMsg", role: "status" });
   const strip = h("div", { class: "strip", id: "session" });
   const candBox = h("input", { type: "checkbox", id: "showCands", onchange: e => { showCands = e.target.checked; render(); } });
@@ -171,10 +171,11 @@ export function mount(el, params, query) {
     clearTimeout(autoTimer); autoTimer = null;
     if (loading) return;
     loading = true;
+    const ch = choice;  // a chip clicked while the drill is loading must not change this drill's «rated»
     msg.textContent = ""; msg.className = "msg";
     try {
-      drill = await nextDrill(choice === "adaptive" ? undefined : choice);
-      rated = choice === "favorites" ? 0 : 1;
+      drill = await nextDrill(ch === "adaptive" ? undefined : ch);
+      rated = ch === "favorites" ? 0 : 1;
       renderRating(null);
       values = toDigits(drill.board); sel = -1; result = null; picked = null; digit = 0; hinted = null;
       title.textContent = drill.title; title.title = drill.title;
