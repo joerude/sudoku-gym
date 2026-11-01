@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS games (
     note_actions INTEGER,
     first_move_ms INTEGER,
     max_pause_ms INTEGER,
-    long_pauses INTEGER
+    long_pauses INTEGER,
+    daily TEXT  -- local date of the daily puzzle this game was started as; NULL for other games
 );
 CREATE INDEX IF NOT EXISTS games_puzzle ON games(puzzle_id);
 
@@ -114,6 +115,7 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     # databases created before these columns existed
     for table, column, ddl in (
+        ("games", "daily", "TEXT"),
         ("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
         ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),
         ("drill_attempts", "hint", "INTEGER NOT NULL DEFAULT 0"),

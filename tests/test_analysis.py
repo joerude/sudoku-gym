@@ -4,7 +4,21 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from analysis import LONG_PAUSE_MS, activity, compute_metrics, game_info, pauses, records, replay, review, stats
+from analysis import (
+    LONG_PAUSE_MS,
+    activity,
+    compute_metrics,
+    daily_history,
+    daily_puzzle_id,
+    daily_today,
+    game_info,
+    local_today,
+    pauses,
+    records,
+    replay,
+    review,
+    stats,
+)
 from db import connect
 from fixtures import L1, insert_puzzle
 from sudoku_core import TECH_TIER, TECH_TITLE, parse, to_str, unit_name
@@ -279,6 +293,9 @@ class StatsTest(unittest.TestCase):
         ns = techs[0]
         self.assertEqual(ns["title"], TECH_TITLE["naked_single"])
         self.assertEqual((ns["n"], ns["median_ms"], ns["kind"], ns["tier"]), (3, 4000, "place", 1))
+        self.assertEqual(
+            [t["theory"] for t in techs[:5]], ["naked-single", *["hidden-single"] * 3, "pointing-claiming"]
+        )
         self.assertAlmostEqual(ns["accuracy"], 2 / 3)
         self.assertEqual(
             (techs[4]["technique"], techs[4]["n"], techs[4]["median_ms"], techs[4]["accuracy"]),
@@ -355,6 +372,84 @@ class ActivityTest(unittest.TestCase):
             },
         )
         self.assertRegex(activity(self.conn)["today"], r"^\d{4}-\d{2}-\d{2}$")
+
+
+class DailyTest(unittest.TestCase):
+    def setUp(self):
+        self.conn = connect(":memory:")
+        self.ids = [insert_puzzle(self.conn, f"m{k}", "medium", P, S, 2) for k in range(20)]
+        insert_puzzle(self.conn, "custom-medium-x", "medium", P, S, 2)  # never a daily
+        insert_puzzle(self.conn, "e1", "easy", P, S)
+        self.conn.commit()
+
+    def play(self, pid, day, status="solved", ms=200000, daily=None):
+        make_game(self.conn, pid, [], "hardcore", status, f"{day}T12:00:00+00:00", ms)
+        gid = self.conn.execute("SELECT MAX(id) FROM games").fetchone()[0]
+        if daily:
+            self.conn.execute("UPDATE games SET daily = ? WHERE id = ?", (daily, gid))
+            self.conn.commit()
+        return gid
+
+    def test_same_day_same_puzzle_from_the_medium_bank(self):
+        a = daily_puzzle_id(self.conn, "2026-11-01")
+        self.assertIn(a, self.ids)
+        self.assertEqual(daily_puzzle_id(self.conn, "2026-11-01"), a)
+        picks = {daily_puzzle_id(self.conn, f"2026-11-{d:02d}") for d in range(1, 29)}
+        self.assertGreater(len(picks), 5)  # the date spreads the pick
+        self.assertTrue(picks <= set(self.ids))
+
+    def test_played_before_the_day_is_skipped_played_on_the_day_is_not(self):
+        a = daily_puzzle_id(self.conn, "2026-11-01")
+        self.play(a, "2026-11-01")
+        self.assertEqual(daily_puzzle_id(self.conn, "2026-11-01"), a)  # stable all day
+        self.play(a, "2026-10-31")
+        b = daily_puzzle_id(self.conn, "2026-11-01")
+        self.assertNotEqual(b, a)
+        self.assertIn(b, self.ids)
+
+    def test_all_played_falls_back_to_the_whole_bank(self):
+        for pid in self.ids:
+            self.play(pid, "2026-10-30")
+        self.assertIn(daily_puzzle_id(self.conn, "2026-11-01"), self.ids)
+
+    def test_no_bank_medium(self):
+        conn = connect(":memory:")
+        insert_puzzle(conn, "custom-medium-y", "medium", P, S, 2)
+        conn.commit()
+        self.assertIsNone(daily_puzzle_id(conn, "2026-11-01"))
+
+    def test_today_first_solve_counts(self):
+        day = "2026-11-01"
+        self.assertEqual(daily_today(self.conn, day), {"result": None, "attempts": 0})
+        pid = daily_puzzle_id(self.conn, day)
+        self.play(pid, day, "abandoned", daily=day)
+        self.assertEqual(daily_today(self.conn, day), {"result": None, "attempts": 1})
+        first = self.play(pid, day, "solved", 250000, daily=day)
+        self.play(pid, day, "solved", 120000, daily=day)  # a known grid again: does not replace the first
+        self.play(pid, day, "solved", 90000)  # same grid, not started as the daily
+        self.assertEqual(daily_today(self.conn, day), {"result": {"game_id": first, "time_ms": 250000}, "attempts": 3})
+
+    def test_history(self):
+        self.assertEqual(daily_history(self.conn), {"days": [], "solved": 0, "best_ms": None, "median_ms": None})
+        self.play(self.ids[0], "2026-10-30", "failed", daily="2026-10-30")
+        g1 = self.play(self.ids[0], "2026-10-30", "solved", 300000, daily="2026-10-30")
+        self.play(self.ids[0], "2026-10-30", "solved", 100000, daily="2026-10-30")
+        g2 = self.play(self.ids[1], "2026-10-31", "solved", 200000, daily="2026-10-31")
+        self.play(self.ids[2], "2026-11-01", "abandoned", daily="2026-11-01")  # unsolved day: not listed
+        h = daily_history(self.conn)
+        self.assertEqual(
+            h["days"],
+            [
+                {"day": "2026-10-31", "game_id": g2, "time_ms": 200000, "attempts": 1, "tech_grade": 2},
+                {"day": "2026-10-30", "game_id": g1, "time_ms": 300000, "attempts": 2, "tech_grade": 2},
+            ],
+        )
+        self.assertEqual((h["solved"], h["best_ms"], h["median_ms"]), (2, 200000, 250000))
+        self.assertEqual(len(daily_history(self.conn, limit=1)["days"]), 1)
+        self.assertEqual(daily_history(self.conn, limit=1)["solved"], 2)
+
+    def test_local_today(self):
+        self.assertRegex(local_today(self.conn), r"^\d{4}-\d{2}-\d{2}$")
 
 
 if __name__ == "__main__":

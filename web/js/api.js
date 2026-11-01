@@ -32,9 +32,9 @@ const qs = params => {
 export const getOptions = () => call("GET", "/api/puzzle/options");
 export const getPuzzle = (level, grade) => call("GET", `/api/puzzle${qs({ level, grade })}`);
 export const addPuzzle = (givens, level) => call("POST", "/api/puzzles", { givens, level });
-export const createGame = (puzzleId, mode, limit) =>
-  call("POST", "/api/games", mode === "original" ? { puzzle_id: puzzleId, mode, mistake_limit: limit }
-                                                 : { puzzle_id: puzzleId, mode });
+export const createGame = (puzzleId, mode, limit, daily = false) =>
+  call("POST", "/api/games", { puzzle_id: puzzleId, mode, ...(mode === "original" ? { mistake_limit: limit } : {}),
+    ...(daily ? { daily: true } : {}) });
 export const listGames = (limit = 20) => call("GET", `/api/games${qs({ limit })}`);
 export const getGame = id => call("GET", `/api/games/${id}`);
 export const finishGame = (id, status, tMs) => call("POST", `/api/games/${id}/finish`, { status, t_ms: Math.round(tMs) });
@@ -42,6 +42,8 @@ export const getReview = id => call("GET", `/api/games/${id}/review`);
 export const getStats = () => call("GET", "/api/stats");
 export const getRecords = () => call("GET", "/api/records");
 export const getActivity = () => call("GET", "/api/activity");
+export const getDaily = () => call("GET", "/api/daily");
+export const getDailyHistory = () => call("GET", "/api/daily/history");
 export const drillTechniques = () => call("GET", "/api/drills/techniques");
 export const nextDrill = technique => call("GET", `/api/drills/next${qs({ technique })}`);
 export const sendAttempt = (id, timeMs, cell, value, hint = 0, rated = 1) =>
