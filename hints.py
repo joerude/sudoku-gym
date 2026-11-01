@@ -4,7 +4,7 @@ right digit and let eliminations the player already made count as done."""
 
 from drills import THEORY_SLUG, cells_text, explain_step, hint_step, in_unit, rc
 from i18n import tr
-from sudoku_core import PEERS, TECH_TITLE, Step, candidates, easiest_steps
+from sudoku_core import BOX_OF, PEERS, TECH_TITLE, UNITS, Step, candidates, easiest_steps
 
 TIER1_ORDER = {"hidden_single_box": 0, "hidden_single_row": 1, "hidden_single_col": 2, "naked_single": 3}
 SOLUTION = "solution"  # a line step the core can't find by logic: the digit is taken from the solution
@@ -19,14 +19,21 @@ def _digits(mask: int) -> set:
     return {v for v in range(1, 10) if mask >> v & 1}
 
 
+def _marked(board: list, notes: list, cell: int, v: int) -> bool:
+    """The notes track v in the cell's box: v is noted in some empty cell there. Full candidates and Snyder marks
+    alike then say «v is only where it is noted» for that box; a box without a v note says nothing."""
+    return any(not board[c] and notes[c] >> v & 1 for c in UNITS[BOX_OF[cell]])
+
+
 def position_issues(givens: str, solution: str, board: list, notes=None) -> dict:
     """wrong_cells: the player's digits that differ from the solution; bad_notes: [cell, digit] where the cell has
-    notes but not its solution digit."""
+    notes but not its solution digit, while that digit is noted elsewhere in its box. A cell without notes or a
+    box without the digit says nothing: Snyder marks and half-filled candidates are no errors."""
     wrong = [i for i in range(81) if board[i] and givens[i] == "0" and board[i] != int(solution[i])]
     bad = [
-        [i, int(solution[i])]
-        for i in range(81)
-        if notes and not board[i] and notes[i] and not notes[i] >> int(solution[i]) & 1
+        [i, v]
+        for i, v in ((i, int(solution[i])) for i in range(81))
+        if notes and not board[i] and notes[i] and not notes[i] >> v & 1 and _marked(board, notes, i, v)
     ]
     return {"wrong_cells": wrong, "bad_notes": bad}
 
@@ -66,7 +73,7 @@ def _next_step(g, cands, notes=None):
             s.cell is None
             and s.eliminations
             and notes
-            and all(notes[c] and not notes[c] >> v & 1 for c, v in s.eliminations)
+            and all(notes[c] and not notes[c] >> v & 1 and _marked(g, notes, c, v) for c, v in s.eliminations)
         ):
             for c, v in s.eliminations:
                 cands[c].discard(v)

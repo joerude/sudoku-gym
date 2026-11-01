@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fixtures import L1, L2, L3
 from hints import SOLUTION, _step_levels, masks, next_ladder, position_issues, solve_line
-from sudoku_core import TECH_TIER, candidates, easiest_steps, find_steps, parse, solve, to_str
+from sudoku_core import BOX_OF, TECH_TIER, UNITS, candidates, easiest_steps, find_steps, parse, solve, to_str
 
 INKALA = "800000000003600000070090200050007000000045700000100030001000068008500010090000400"  # grade 5: beyond Y-Wing
 INKALA_SOL = to_str(solve(parse(INKALA)))
@@ -35,6 +35,22 @@ def empties(givens):
     return [i for i, c in enumerate(givens) if c == "0"]
 
 
+def box_mate(board, cell):
+    """Another empty cell in the cell's box."""
+    return next(c for c in UNITS[BOX_OF[cell]] if c != cell and not board[c])
+
+
+def snyder(g):
+    """Snyder marks: a digit noted in a box only where it has exactly two places."""
+    cs, notes = candidates(g), [0] * 81
+    for box in UNITS[18:]:
+        for v in range(1, 10):
+            if len(where := [c for c in box if v in cs[c]]) == 2:
+                for c in where:
+                    notes[c] |= 1 << v
+    return notes
+
+
 def line_state(technique):
     """The first (board, candidates, Step) along L2-1's solve line where `technique` is available."""
     _, gv, sol = L2[0]
@@ -56,10 +72,24 @@ class IssuesTest(unittest.TestCase):
         notes = [0] * 81
         notes[e[1]] = 0b1111111110 & ~(1 << int(sol[e[1]]))  # every digit but the right one
         notes[e[2]] = 1 << int(sol[e[2]])
+        # the box says nothing about the right digit yet, and empty cells say nothing at all: no error
+        self.assertEqual(position_issues(gv, sol, g, notes)["bad_notes"], [])
+        m = box_mate(g, e[1])
+        notes[m] = 1 << int(sol[e[1]]) | 1 << int(sol[m])  # noted elsewhere in the box, struck out where it goes
         self.assertEqual(
             position_issues(gv, sol, g, notes), {"wrong_cells": [e[0]], "bad_notes": [[e[1], int(sol[e[1]])]]}
         )
         self.assertEqual(position_issues(gv, sol, parse(gv)), {"wrong_cells": [], "bad_notes": []})
+
+    def test_snyder_marks_are_not_errors(self):
+        _, gv, sol = L2[0]
+        g = parse(gv)
+        notes = snyder(g)
+        self.assertTrue(any(notes))
+        self.assertEqual(position_issues(gv, sol, g, notes)["bad_notes"], [])
+        lad = next_ladder(gv, sol, g, notes)
+        self.assertEqual(lad["kind"], "step")
+        self.assertEqual(lad["technique"], next_ladder(gv, sol, g)["technique"])
 
 
 class LadderTest(unittest.TestCase):
@@ -78,6 +108,8 @@ class LadderTest(unittest.TestCase):
         e = empties(gv)
         notes = [0] * 81
         notes[e[1]] = 1 << (int(sol[e[1]]) % 9 + 1)
+        m = box_mate(parse(gv), e[1])
+        notes[m] = 1 << int(sol[e[1]]) | 1 << int(sol[m])
         lad = next_ladder(gv, sol, parse(gv), notes)
         self.assertEqual((lad["kind"], lad["max_level"]), ("notes", 2))
         self.assertEqual(lad["levels"][1]["cells"], [e[1]])
