@@ -4,7 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from analysis import LONG_PAUSE_MS, compute_metrics, game_info, pauses, records, replay, review, stats  # noqa: E402
+from analysis import LONG_PAUSE_MS, activity, compute_metrics, game_info, pauses, records, replay, review, stats  # noqa: E402
 from db import connect  # noqa: E402
 from fixtures import L1, insert_puzzle  # noqa: E402
 from sudoku_core import TECH_TIER, TECH_TITLE, parse, to_str, unit_name  # noqa: E402
@@ -216,6 +216,61 @@ class StatsTest(unittest.TestCase):
     def test_empty(self):
         s = stats(connect(":memory:"))
         self.assertEqual((s["by_level_mode"], s["daily"]), ([], []))
+
+
+class ActivityTest(unittest.TestCase):
+    def setUp(self):
+        self.conn = connect(":memory:")
+        self.pid = insert_puzzle(self.conn, "e1", "easy", P, S)
+        self.did = self.conn.execute("INSERT INTO drills (technique, kind, puzzle_id, board, answers) VALUES"
+                                     " ('naked_single', 'place', ?, ?, '[]')", (self.pid, P)).lastrowid
+        self.conn.commit()
+
+    def game(self, day, status="solved"):
+        make_game(self.conn, self.pid, [], "hardcore", status, f"{day}T12:00:00+00:00", 100000)
+
+    def attempt(self, day, correct=1, hint=0, valid_other=0):
+        self.conn.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct, hint, valid_other)"
+                          " VALUES (?, ?, 1000, ?, ?, ?)", (self.did, f"{day}T12:00:00+00:00", correct, hint, valid_other))
+        self.conn.commit()
+
+    def test_points(self):
+        self.game("2026-10-31")
+        self.game("2026-10-31", "failed")
+        self.game("2026-10-31", "abandoned")
+        self.attempt("2026-10-31")
+        self.attempt("2026-10-31", correct=0)
+        self.attempt("2026-10-31", hint=1)
+        self.attempt("2026-10-31", correct=0, valid_other=1)
+        a = activity(self.conn, today="2026-11-01")
+        self.assertEqual(a["today"], "2026-11-01")
+        self.assertEqual(a["days"], [{"day": "2026-10-31", "games": 1, "drills": 1}])
+        self.assertEqual(a["totals"], {"games": 1, "drills": 1, "active_days": 1})
+
+    def test_streak_alive_until_day_ends(self):
+        for d in ("2026-10-25", "2026-10-26", "2026-10-29", "2026-10-30", "2026-10-31"):
+            self.game(d)
+        self.assertEqual(activity(self.conn, today="2026-11-01")["streak"], {"current": 3, "best": 3, "today": False})
+        self.attempt("2026-11-01")
+        self.assertEqual(activity(self.conn, today="2026-11-01")["streak"], {"current": 4, "best": 4, "today": True})
+        self.assertEqual(activity(self.conn, today="2026-11-02")["streak"]["current"], 4)
+        self.assertEqual(activity(self.conn, today="2026-11-03")["streak"], {"current": 0, "best": 4, "today": False})
+
+    def test_best_from_old_history_and_window(self):
+        for d in ("2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"):
+            self.game(d)
+        for d in ("2025-10-26", "2025-10-27", "2025-11-01", "2025-11-02"):
+            self.game(d)
+        a = activity(self.conn, today="2026-11-01")  # Sunday; the window starts Monday 2025-10-27
+        self.assertEqual(a["streak"], {"current": 0, "best": 5, "today": False})
+        self.assertEqual([d["day"] for d in a["days"]], ["2025-10-27", "2025-11-01", "2025-11-02"])
+        self.assertEqual(a["totals"]["active_days"], 1)  # the last 365 days are 2025-11-02 … 2026-11-01
+
+    def test_empty(self):
+        self.assertEqual(activity(self.conn, today="2026-11-01"), {
+            "today": "2026-11-01", "days": [], "streak": {"current": 0, "best": 0, "today": False},
+            "totals": {"games": 0, "drills": 0, "active_days": 0}})
+        self.assertRegex(activity(self.conn)["today"], r"^\d{4}-\d{2}-\d{2}$")
 
 
 if __name__ == "__main__":

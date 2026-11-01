@@ -1,5 +1,6 @@
 """Game analytics: replay, metrics from moves, pause review and overall statistics."""
 import statistics
+from datetime import date, timedelta
 
 from drills import NEUTRAL
 from i18n import tr
@@ -200,3 +201,37 @@ def stats(conn) -> dict:
             "accuracy": sum(1 for ok, _ in rows if ok) / len(rows) if rows else None,
         })
     return {"by_level_mode": by_lm, "daily": daily, "techniques": techniques}
+
+
+def activity(conn, today: str | None = None) -> dict:
+    """GitHub-style calendar: points per local day (solved games + correct drill attempts), streaks, yearly totals.
+
+    The window is 53 weeks, Monday-first, ending with today's week. The current streak ends today or, while today is
+    still empty, yesterday — it is not broken until the day is over."""
+    today = today or conn.execute("SELECT date('now', 'localtime')").fetchone()[0]
+    per_day = {}
+    for day, n in conn.execute("SELECT date(started_at, 'localtime'), COUNT(*) FROM games"
+                               " WHERE status = 'solved' GROUP BY 1"):
+        per_day.setdefault(day, {"day": day, "games": 0, "drills": 0})["games"] = n
+    for day, n in conn.execute("SELECT date(a.at, 'localtime'), COUNT(*) FROM drill_attempts a"
+                               f" WHERE a.correct = 1 AND NOT {NEUTRAL} GROUP BY 1"):
+        per_day.setdefault(day, {"day": day, "games": 0, "drills": 0})["drills"] = n
+    t = date.fromisoformat(today)
+    start = (t - timedelta(days=t.weekday() + 52 * 7)).isoformat()
+    year_ago = (t - timedelta(days=365)).isoformat()
+    days = [per_day[d] for d in sorted(per_day) if start <= d <= today]
+    year = [d for d in days if d["day"] > year_ago]
+
+    best = run = 0
+    prev = None
+    for d in sorted(per_day):
+        cur = date.fromisoformat(d)
+        run = run + 1 if prev is not None and cur - prev == timedelta(days=1) else 1
+        best, prev = max(best, run), cur
+    current, k = 0, t if today in per_day else t - timedelta(days=1)
+    while k.isoformat() in per_day:
+        current, k = current + 1, k - timedelta(days=1)
+    return {"today": today, "days": days,
+            "streak": {"current": current, "best": best, "today": today in per_day},
+            "totals": {"games": sum(d["games"] for d in year), "drills": sum(d["drills"] for d in year),
+                       "active_days": len(year)}}
