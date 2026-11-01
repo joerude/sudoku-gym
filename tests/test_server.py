@@ -560,6 +560,78 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(json.loads(data)["grade_titles"]["1"], "singles")
         self.assertEqual(self.api("GET", "/api/theory/naked-single")["title"], "Голая одиночка")  # no header: Russian
 
+    def test_rating(self):
+        r = self.api("GET", "/api/rating")
+        self.assertEqual(set(r), {"rating", "n", "provisional", "by_technique", "history"})
+        start = r["rating"]
+        d = self.api("GET", "/api/drills/next?technique=naked_single")
+        conn = connect(self.db_path)
+        answers = json.loads(conn.execute("SELECT answers FROM drills WHERE id=?", (d["id"],)).fetchone()[0])
+        frozen = conn.execute("SELECT 1 FROM rating_norms WHERE technique='naked_single'").fetchone()
+        if not frozen:  # ten correct answers at 2 s: the next answer freezes the norm
+            for _ in range(10):
+                conn.execute(
+                    "INSERT INTO drill_attempts (drill_id, at, time_ms, correct) VALUES (?, ?, 2000, 1)",
+                    (d["id"], "2026-10-30T12:00:00+00:00"),
+                )
+            conn.commit()
+        conn.close()
+        cell, value = answers[0]
+        res = self.api("POST", f"/api/drills/{d['id']}/attempt", {"time_ms": 2000, "cell": cell, "value": value})
+        self.assertNotIn("attempt_id", res)
+        self.assertNotIn("technique", res)
+        self.assertIsNone(res["calibrating"])
+        if not frozen:  # the answer that froze the norm is not rated: it is the baseline
+            self.assertIsNone(res["rating"])
+        res = self.api("POST", f"/api/drills/{d['id']}/attempt", {"time_ms": 500, "cell": cell, "value": value})
+        self.assertGreater(res["rating"]["delta"], 0)
+        self.assertEqual(res["rating"]["after"] - res["rating"]["before"], res["rating"]["delta"])
+        res = self.api(
+            "POST", f"/api/drills/{d['id']}/attempt", {"time_ms": 500, "cell": cell, "value": value, "rated": 0}
+        )
+        self.assertIsNone(res["rating"])
+        res = self.api("POST", f"/api/drills/{d['id']}/reveal", {"time_ms": 500, "rated": 0})
+        self.assertIsNone(res["rating"])
+        res = self.api("POST", f"/api/drills/{d['id']}/reveal", {"time_ms": 500})
+        self.assertLess(res["rating"]["delta"], 0)
+        self.api(
+            "POST",
+            f"/api/drills/{d['id']}/attempt",
+            {"time_ms": 1, "cell": cell, "value": value, "rated": 2},
+            status=400,
+        )
+        r = self.api("GET", "/api/rating")
+        self.assertNotEqual((r["n"], r["rating"]), (0, start))
+        self.assertGreater(r["by_technique"]["naked_single"]["norm_ms"], 0)
+        self.assertEqual(r["history"][-1]["rating"], r["rating"])
+
+    def test_server_start_freezes_norms_with_enough_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "gym.db")
+            conn = connect(path)
+            name, g, s = L1[0]
+            pid = insert_puzzle(conn, name, "easy", g, s)
+            drill = conn.execute(
+                "INSERT INTO drills (technique, puzzle_id, board, answers) VALUES ('naked_single', ?, ?, '[]')",
+                (pid, g),
+            ).lastrowid
+            for _ in range(10):
+                conn.execute(
+                    "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, hint) VALUES (?, ?, 2000, 1, 0)",
+                    (drill, "2026-10-30T12:00:00+00:00"),
+                )
+            conn.commit()
+            last = conn.execute("SELECT MAX(id) FROM drill_attempts").fetchone()[0]
+            conn.close()
+            server = make_server(path, 0)
+            try:
+                row = server.conn.execute(
+                    "SELECT norm_ms, from_attempt_id FROM rating_norms WHERE technique='naked_single'"
+                ).fetchone()
+            finally:
+                server.server_close()
+            self.assertEqual(tuple(row), (2000, last))
+
     def test_theory(self):
         self.assertEqual(
             self.api("GET", "/api/theory"),

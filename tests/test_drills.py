@@ -208,6 +208,28 @@ class AttemptTest(unittest.TestCase):
         ).fetchone()
         return d, json.loads(d["answers"])
 
+    def test_attempt_and_reveal_store_rated_and_return_attempt_id(self):
+        conn, _ = seeded_conn()
+        make_drills(conn, per_technique=2, seed=1)
+        drill_id, answers = conn.execute(
+            "SELECT id, answers FROM drills WHERE technique='naked_single' LIMIT 1"
+        ).fetchone()
+        cell, value = json.loads(answers)[0]
+        res = attempt(conn, drill_id, 1500, cell, value)
+        self.assertEqual(res["technique"], "naked_single")
+        row = conn.execute("SELECT id, rated FROM drill_attempts ORDER BY id DESC LIMIT 1").fetchone()
+        self.assertEqual((res["attempt_id"], row[1]), (row[0], 1))
+        res = attempt(conn, drill_id, 1500, cell, value, rated=0)
+        self.assertEqual(
+            conn.execute("SELECT rated FROM drill_attempts WHERE id=?", (res["attempt_id"],)).fetchone()[0], 0
+        )
+        res = reveal(conn, drill_id, 4000, rated=0)
+        self.assertEqual(res["technique"], "naked_single")
+        self.assertEqual(
+            tuple(conn.execute("SELECT rated, hint FROM drill_attempts WHERE id=?", (res["attempt_id"],)).fetchone()),
+            (0, 2),
+        )
+
     def test_correct(self):
         d, answers = self.drill("hidden_single_box")
         cell, value = answers[0]

@@ -1,6 +1,6 @@
 // #/drills — "find the move" drills: place (cell + digit) and eliminate (click the removed candidate).
 import { tr } from "./i18n.js";
-import { drillHint, drillTechniques, getFavorites, nextDrill, revealDrill, sendAttempt } from "./api.js";
+import { drillHint, drillTechniques, getFavorites, getRating, nextDrill, revealDrill, sendAttempt } from "./api.js";
 import { ROW, COL, cellName, createBoard, createPad, toDigits, unitCells } from "./board.js";
 import { TIER_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, pct, sec, zenButton } from "./ui.js";
 
@@ -36,6 +36,25 @@ export function mount(el, params, query) {
     favCount = r.counts.drill; renderChips();
   } });
   const timer = h("span", { class: "timer", id: "drillTimer" }, tr("0.0 с"));
+  const ratingEl = h("span", { class: "rating", id: "drillRating",
+    title: tr("Рейтинг упражнений: растёт, когда находишь ходы быстрее своей нормы") });
+  let rating = null;  // GET /api/rating; after an answer only .rating/.provisional are updated from its result
+  let rated = 1;      // 0 while the drill came from «Избранное»: repeats stay out of the rating
+  /** res — the last answer's result: its delta is shown until the next drill («калибровка n/10» goes to the answer line). */
+  function renderRating(res) {
+    ratingEl.textContent = "";
+    if (!rating) return;
+    ratingEl.append(`${rating.rating}${rating.provisional ? "?" : ""}`);
+    const d = res?.rating?.delta;
+    if (d !== undefined)
+      ratingEl.append(" ", h("small", { class: d >= 0 ? "up" : "down", id: "ratingDelta" }, d >= 0 ? `+${d}` : `−${-d}`));
+  }
+  function applyRating(res) {
+    if (res.rating && rating) rating = { ...rating, rating: res.rating.after, provisional: res.rating.provisional };
+    renderRating(res);
+    if (res.calibrating) msg.append(" ", h("small", { id: "ratingCal", class: "hint" }, tr("калибровка {n}/{need}", res.calibrating)));
+  }
+  getRating().then(r => { rating = r; renderRating(result); }).catch(() => {});
   const msg = h("div", { class: "msg", id: "drillMsg", role: "status" });
   const strip = h("div", { class: "strip", id: "session" });
   const candBox = h("input", { type: "checkbox", id: "showCands", onchange: e => { showCands = e.target.checked; render(); } });
@@ -66,7 +85,7 @@ export function mount(el, params, query) {
 
   el.append(h("div", { class: "layout" },
     h("div", { class: "main-col" },
-      h("div", { class: "bar head", style: "margin-bottom:4px" }, title, fav.el, theoryLink, timer, zenButton("mini")), prompt,
+      h("div", { class: "bar head", style: "margin-bottom:4px" }, title, fav.el, theoryLink, timer, ratingEl, zenButton("mini")), prompt,
       h("p", { class: "hint zen-hide", id: "drillHow" }), boardWrap, padEl,
       h("div", { class: "bar", style: "margin-top:10px" }, nextBtn,
         h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, tr("Пробел")), " / ", h("kbd", {}, "Enter")),
@@ -152,9 +171,12 @@ export function mount(el, params, query) {
     clearTimeout(autoTimer); autoTimer = null;
     if (loading) return;
     loading = true;
+    const ch = choice;  // a chip clicked while the drill is loading must not change this drill's «rated»
     msg.textContent = ""; msg.className = "msg";
     try {
-      drill = await nextDrill(choice === "adaptive" ? undefined : choice);
+      drill = await nextDrill(ch === "adaptive" ? undefined : ch);
+      rated = ch === "favorites" ? 0 : 1;
+      renderRating(null);
       values = toDigits(drill.board); sel = -1; result = null; picked = null; digit = 0; hinted = null;
       title.textContent = drill.title; title.title = drill.title;
       fav.set(drill.id, drill.fav);
@@ -220,7 +242,7 @@ export function mount(el, params, query) {
         return;
       }
       const ms = elapsed();
-      const res = await revealDrill(id, ms);
+      const res = await revealDrill(id, ms, rated);
       if (!drill || drill.id !== id) return;
       result = res; picked = null;
       timer.textContent = sec(ms);
@@ -228,6 +250,7 @@ export function mount(el, params, query) {
       const list = res.answers.map(([c, v]) => drill.kind === "eliminate" ? tr("{v} из {cell}", { v, cell: cellName(c) }) : `${cellName(c)} = ${v}`);
       msg.textContent = tr("Ответ показан — засчитано как ошибка. {list}", { list: list.join(", ") }); msg.className = "msg bad";
       showWhy(res);
+      applyRating(res);
       renderStrip(); render(); refreshTechs();
     } catch (e) {
       msg.textContent = e.message; msg.className = "msg bad";
@@ -247,7 +270,7 @@ export function mount(el, params, query) {
     sending = true;
     const ms = elapsed();
     try {
-      const res = await sendAttempt(drill.id, ms, cell, value, hinted ? 1 : 0);
+      const res = await sendAttempt(drill.id, ms, cell, value, hinted ? 1 : 0, rated);
       result = res; picked = [cell, value];
       timer.textContent = sec(ms);
       session.n++;
@@ -263,6 +286,7 @@ export function mount(el, params, query) {
       const advance = res.correct && autoNext;
       if (advance) autoTimer = setTimeout(load, AUTO_DELAY);
       if (!advance) showWhy(res);
+      applyRating(res);
       renderStrip(); render(); refreshTechs();
     } catch (e) {
       msg.textContent = e.message; msg.className = "msg bad";

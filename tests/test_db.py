@@ -21,7 +21,18 @@ class DbTest(unittest.TestCase):
         conn = connect(":memory:")
         names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertEqual(
-            names, {"puzzles", "games", "moves", "game_hints", "techniques", "drills", "drill_attempts", "favorites"}
+            names,
+            {
+                "puzzles",
+                "games",
+                "moves",
+                "game_hints",
+                "techniques",
+                "drills",
+                "drill_attempts",
+                "favorites",
+                "rating_norms",
+            },
         )
 
     def test_reconnect_file(self):
@@ -56,6 +67,8 @@ class DbTest(unittest.TestCase):
             cols = {r[1] for r in conn.execute("PRAGMA table_info(drill_attempts)")}
             self.assertIn("valid_other", cols)
             self.assertEqual(conn.execute("SELECT valid_other FROM drill_attempts").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT rated FROM drill_attempts").fetchone()[0], 1)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM rating_norms").fetchone()[0], 0)
             conn.close()
             connect(path).close()
 

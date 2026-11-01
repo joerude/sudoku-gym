@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 import analysis
 import drills
 import hints
+import rating
 from db import DEFAULT_DB, FAVORITE_KINDS, connect, favorite_counts, is_favorite, now_iso
 from i18n import get_lang, set_lang, tr
 from sudoku_core import GRADE_TITLE, count_solutions, grade, parse, solve, to_str
@@ -415,20 +416,30 @@ def api_drill_next(conn, m, q, body):
     return d
 
 
+def _rated(conn, res):
+    """The drill's answer plus what it did to the rating; freezes a technique's norm once it is due."""
+    attempt_id, technique = res.pop("attempt_id"), res.pop("technique")
+    rating.freeze_norms(conn)
+    res.update(rating.outcome(conn, attempt_id, technique))
+    return res
+
+
 def api_drill_attempt(conn, m, q, body):
     time_ms, cell, value = _int(body, "time_ms", lo=0), _int(body, "cell", 0, 80), _int(body, "value", 1, 9)
     hint = _int(body, "hint", 0, 1, required=False, default=0)
-    res = drills.attempt(conn, int(m.group(1)), time_ms, cell, value, hint)
+    rated = _int(body, "rated", 0, 1, required=False, default=1)
+    res = drills.attempt(conn, int(m.group(1)), time_ms, cell, value, hint, rated)
     if res is None:
         raise ApiError(404, tr("упражнение не найдено"))
-    return res
+    return _rated(conn, res)
 
 
 def api_drill_reveal(conn, m, q, body):
-    res = drills.reveal(conn, int(m.group(1)), _int(body, "time_ms", lo=0))
+    rated = _int(body, "rated", 0, 1, required=False, default=1)
+    res = drills.reveal(conn, int(m.group(1)), _int(body, "time_ms", lo=0), rated)
     if res is None:
         raise ApiError(404, tr("упражнение не найдено"))
-    return res
+    return _rated(conn, res)
 
 
 def api_drill_hint(conn, m, q, body):
@@ -436,6 +447,10 @@ def api_drill_hint(conn, m, q, body):
     if res is None:
         raise ApiError(404, tr("упражнение не найдено"))
     return res
+
+
+def api_rating(conn, m, q, body):
+    return {**rating.current(conn), "history": rating.history(conn)}
 
 
 def api_favorites(conn, m, q, body):
@@ -575,6 +590,7 @@ ROUTES = [
     ("POST", r"/api/drills/(\d+)/attempt", api_drill_attempt),
     ("GET", r"/api/drills/(\d+)/hint", api_drill_hint),
     ("POST", r"/api/drills/(\d+)/reveal", api_drill_reveal),
+    ("GET", r"/api/rating", api_rating),
     ("GET", r"/api/favorites", api_favorites),
     ("GET", r"/api/favorites/export", api_favorites_export),
     ("POST", r"/api/favorites/import", api_favorites_import),
@@ -684,6 +700,7 @@ def make_server(db_path: str, port: int, web_dir: str = "web", host: str = "127.
     """One shared sqlite connection guarded by a lock: every API call is serialized."""
     server = GymServer((host, port), Handler)
     server.conn = connect(db_path)
+    rating.freeze_norms(server.conn)  # techniques that already have enough history start rated today
     server.lock = threading.Lock()
     server.web_root = os.path.realpath(web_dir if os.path.isabs(web_dir) else os.path.join(HERE, web_dir))
     server.verbose = False

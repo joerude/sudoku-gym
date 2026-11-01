@@ -333,9 +333,9 @@ def _drill(conn, drill_id: int):
     ).fetchone()
 
 
-def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int, hint: int = 0) -> dict | None:
-    """Record an answer (hint=1: given after «где искать»). Returns {correct, valid_other_move, answers, …}
-    or None for an unknown drill.
+def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int, hint: int = 0, rated: int = 1) -> dict | None:
+    """Record an answer (hint=1: given after «где искать»; rated=0: answered in «Избранное», kept out of the
+    rating). Returns {correct, valid_other_move, answers, …, attempt_id, technique} or None for an unknown drill.
 
     valid_other_move — a true move not made by the drill's technique: for place drills a correct digit in an
     empty cell; for eliminate drills a fresh candidate that is not the cell's solution."""
@@ -350,10 +350,10 @@ def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int, hint: int 
             valid_other = str(value) != solution[cell] and value in candidates(parse(board))[cell]
         else:
             valid_other = solution[cell] == str(value)
-    conn.execute(
-        "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, cell, value, valid_other, hint)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (drill_id, now_iso(), time_ms, int(correct), cell, value, int(valid_other), hint),
+    cur = conn.execute(
+        "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, cell, value, valid_other, hint, rated)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (drill_id, now_iso(), time_ms, int(correct), cell, value, int(valid_other), hint, rated),
     )
     conn.commit()
     return {
@@ -362,18 +362,20 @@ def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int, hint: int 
         "answers": answers,
         **explain(board, row[4], answers, (cell, value) if correct else None),
         "theory": THEORY_SLUG.get(row[4]),
+        "attempt_id": cur.lastrowid,
+        "technique": row[4],
     }
 
 
-def reveal(conn, drill_id: int, time_ms: int) -> dict | None:
+def reveal(conn, drill_id: int, time_ms: int, rated: int = 1) -> dict | None:
     """«Не знаю — покажи ответ»: recorded as a wrong attempt (hint=2, no cell); returns what attempt() returns."""
     row = _drill(conn, drill_id)
     if row is None:
         return None
     answers = json.loads(row[1])
-    conn.execute(
-        "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, hint) VALUES (?, ?, ?, 0, 2)",
-        (drill_id, now_iso(), time_ms),
+    cur = conn.execute(
+        "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, hint, rated) VALUES (?, ?, ?, 0, 2, ?)",
+        (drill_id, now_iso(), time_ms, rated),
     )
     conn.commit()
     return {
@@ -382,6 +384,8 @@ def reveal(conn, drill_id: int, time_ms: int) -> dict | None:
         "answers": answers,
         **explain(row[0], row[4], answers),
         "theory": THEORY_SLUG.get(row[4]),
+        "attempt_id": cur.lastrowid,
+        "technique": row[4],
     }
 
 
