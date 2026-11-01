@@ -22,14 +22,21 @@ The first start downloads the puzzle bank ([grantm/sudoku-exchange-puzzle-bank](
 | `./gym open` | open the trainer in the browser |
 | `./gym dev` | run without Docker from the working tree (`PORT=8766 ./gym dev` for another port) |
 | `./gym test` | unit tests, then e2e if node and playwright-core are found (`BROWSER=firefox` for Firefox) |
+| `./gym backup` | consistent copy of `data/sudoku.db` into `data/backups/`, newest 20 kept; also runs before `start`, `restart`, `dev` |
+| `./gym setup` | install the git hooks (pre-commit) |
+| `./gym check` | run the hooks on every file: ruff lint and format, file hygiene, unit tests |
 
-`NO_OPEN=1` skips opening the browser. The plain equivalents: `docker compose up -d --build`, or without Docker `python3 tools/import_bank.py --if-empty && python3 server.py`.
+`NO_OPEN=1` skips opening the browser; `BACKUP_DIR` and `KEEP` move or resize the backup set (point `BACKUP_DIR` at a synced folder to survive a lost disk). The plain equivalents: `docker compose up -d --build`, or without Docker `python3 tools/import_bank.py --if-empty && python3 server.py`.
 
 Keyboard not reacting in Firefox? Keyboard extensions such as Vimium take the digit keys before the page sees them: exclude `http://127.0.0.1:8765/*` in their settings. `http://127.0.0.1:8765/?debug` shows where each key press goes.
 
 ## Develop
 
+Python 3.12+, stdlib only. Style and lint rules live in `pyproject.toml` (ruff, line length 120); `./gym setup` once installs the pre-commit hooks, which run ruff, the unit tests and reject AI trailers in commit messages.
+
 ```bash
+./gym setup                              # once: git hooks
+./gym check                              # all hooks on all files
 ./gym test                               # both suites below
 python3 -m unittest discover -s tests   # unit tests
 node tests/e2e/gym.spec.mjs [shots-dir]  # e2e, needs playwright-core (PLAYWRIGHT_CORE=<its node_modules>)
@@ -39,7 +46,7 @@ python3 tools/regrade.py                 # recompute tech_grade after technique 
 | Module | Role |
 |---|---|
 | `sudoku_core.py` | candidates, technique-labelled steps, solver, grade 1–5 |
-| `db.py` | SQLite schema |
+| `db.py` | SQLite schema and connection, timestamps |
 | `analysis.py` | game metrics, pause review, stats, activity calendar and streaks |
 | `drills.py` | drill generation, adaptive pick, technique unlocks, explanations |
 | `server.py` | HTTP API and static files from `web/` |

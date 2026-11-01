@@ -6,6 +6,9 @@ cd "$(dirname "$(readlink -f "$0")")"
 PORT="${PORT:-8765}"          # docker-compose.yml publishes 8765; PORT only changes `dev`
 URL="http://127.0.0.1:${PORT}/"
 HEALTH="${URL}api/health"
+DB=data/sudoku.db
+BACKUP_DIR="${BACKUP_DIR:-data/backups}"
+KEEP="${KEEP:-20}"          # backups kept; older ones are deleted
 
 say() { printf '\033[1m%s\033[0m\n' "$*"; }
 die() { printf 'ошибка: %s\n' "$*" >&2; exit 1; }
@@ -36,6 +39,24 @@ open_browser() {
 
 need_docker() { command -v docker >/dev/null || die "нужен Docker (или запусти без него: ./gym dev)"; }
 
+# Consistent copy of the progress DB (safe while the server runs), then keep the newest $KEEP.
+backup() {
+  [[ -f "$DB" ]] || { say "бэкап пропущен: нет $DB"; return 0; }
+  mkdir -p "$BACKUP_DIR"
+  local out="$BACKUP_DIR/sudoku-$(date +%Y-%m-%d_%H%M%S).db"
+  [[ -e "$out" ]] && return 0  # one per second is plenty
+  python3 -c 'import sqlite3, sys; sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True).execute("VACUUM INTO ?", (sys.argv[2],))' "$DB" "$out"
+  ls -1t "$BACKUP_DIR"/sudoku-*.db | tail -n +"$((KEEP + 1))" | xargs -r rm --
+  say "бэкап: $out"
+}
+
+pre_commit() {
+  if command -v pre-commit >/dev/null; then pre-commit "$@"
+  elif command -v uvx >/dev/null; then uvx pre-commit "$@"
+  else die "нужен pre-commit (pipx install pre-commit) или uv"
+  fi
+}
+
 # node for the e2e suite: PATH first, then the newest nvm install
 find_node() {
   command -v node 2>/dev/null && return 0
@@ -47,6 +68,7 @@ shift || true
 case "$cmd" in
   start)
     need_docker
+    backup
     say "сборка и запуск контейнера…"
     docker compose up -d --build
     wait_ready
@@ -59,6 +81,7 @@ case "$cmd" in
     ;;
   restart)
     need_docker
+    backup
     docker compose up -d --build --force-recreate
     wait_ready
     ;;
@@ -79,6 +102,7 @@ case "$cmd" in
     # without Docker, straight from the working tree (code changes apply on a page reload)
     command -v python3 >/dev/null || die "нужен python3"
     if healthy; then die "порт $PORT уже занят (контейнер?) — ./gym stop или PORT=8766 ./gym dev"; fi
+    backup
     python3 tools/import_bank.py --if-empty
     ( sleep 1; wait_ready 30 >/dev/null && open_browser ) &
     say "Sudoku Gym (без Docker): $URL — Ctrl+C, чтобы остановить"
@@ -97,6 +121,15 @@ case "$cmd" in
     if (( code == 2 )); then say "e2e пропущены: нет playwright-core (задай PLAYWRIGHT_CORE)"; exit 0; fi
     exit "$code"
     ;;
+  backup)
+    backup
+    ;;
+  setup)
+    pre_commit install
+    ;;
+  check)
+    pre_commit run --all-files
+    ;;
   help|-h|--help)
     cat <<'EOF'
 ./gym start     собрать и поднять контейнер, дождаться сервера, открыть браузер
@@ -107,8 +140,11 @@ case "$cmd" in
 ./gym open      открыть тренажёр в браузере
 ./gym dev       запустить без Docker из рабочей папки (PORT=8766 — другой порт)
 ./gym test      юнит-тесты и e2e (BROWSER=firefox — в Firefox)
+./gym backup    копия базы прогресса в data/backups/ (делается и перед start/restart/dev)
+./gym setup     поставить git-хуки (pre-commit: ruff, тесты, проверка сообщения коммита)
+./gym check     прогнать хуки по всем файлам: ruff lint + format, гигиена файлов, тесты
 
-NO_OPEN=1 — не открывать браузер.
+NO_OPEN=1 — не открывать браузер. BACKUP_DIR=… KEEP=20 — куда и сколько бэкапов хранить.
 EOF
     ;;
   *)
