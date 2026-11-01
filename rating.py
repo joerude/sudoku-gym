@@ -2,7 +2,8 @@
 
 A correct answer scores 1 / (1 + (t / norm)²) — 0.5 at the technique's norm, 0.8 twice as fast — and a wrong
 or revealed one 0. The norm is the median of the technique's correct hint-free answers, frozen once it has
-NORM_MIN_CORRECT of them, so 1500 means "as fast as on the day the norm froze".
+NORM_MIN_CORRECT of them, so 1500 means answering at your frozen norm without mistakes (a wrong answer
+scores 0: the same speed with mistakes sits below 1500).
 
 Only the norms are stored: the rating is replayed from drill_attempts, so a change of formula or K
 recomputes the whole history."""
@@ -21,7 +22,7 @@ K_PROVISIONAL, K_STABLE = 40, 20
 
 
 def score(time_ms: int, norm_ms: int, correct) -> float:
-    return 1 / (1 + (time_ms / norm_ms) ** 2) if correct else 0.0
+    return 1 / (1 + (time_ms / max(norm_ms, 1)) ** 2) if correct else 0.0
 
 
 def expected(r: float) -> float:
@@ -53,7 +54,7 @@ def freeze_norms(conn) -> list:
         ).fetchone()[0]
         conn.execute(
             "INSERT INTO rating_norms (technique, norm_ms, from_attempt_id, frozen_at) VALUES (?, ?, ?, ?)",
-            (t, round(statistics.median(times[:NORM_WINDOW])), last, now_iso()),
+            (t, max(1, round(statistics.median(times[:NORM_WINDOW]))), last, now_iso()),
         )
         frozen.append(t)
     if frozen:

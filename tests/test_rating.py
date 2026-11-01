@@ -86,6 +86,17 @@ class FreezeTest(unittest.TestCase):
         rating.freeze_norms(conn)
         self.assertEqual(conn.execute("SELECT norm_ms FROM rating_norms").fetchone()[0], 1000)
 
+    def test_zero_times_freeze_a_norm_of_one(self):
+        conn, ids = conn_with_drills()
+        for _ in range(rating.NORM_MIN_CORRECT):
+            add(conn, ids["naked_single"], 0)
+        self.assertEqual(rating.freeze_norms(conn), ["naked_single"])
+        self.assertEqual(conn.execute("SELECT norm_ms FROM rating_norms").fetchone()[0], 1)
+        add(conn, ids["naked_single"], 500)
+        self.assertEqual(len(rating.replay(conn)), 1)
+        self.assertEqual(rating.current(conn)["by_technique"]["naked_single"]["norm_ms"], 1)
+        self.assertLess(rating.current(conn)["rating"], rating.BASE)  # 500 ms against a 1 ms norm scores ~0
+
 
 class ReplayTest(unittest.TestCase):
     def test_nothing_rated_right_after_calibration(self):

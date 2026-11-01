@@ -533,6 +533,20 @@ try {
   const nd = await (await auto).json();
   ok(nd.id !== d.id && Date.now() - t0 < 2000, "auto-advance: next drill after a correct answer");
 
+  // rating delta: freeze naked_single's norm through the API (slow answers), then answer one faster in the page
+  const [[nsId]] = dbJson("SELECT id FROM drills WHERE technique = 'naked_single' LIMIT 1");
+  const [[nsCell, nsVal]] = info(nsId).answers;
+  for (let i = 0; i < 10; i++) await post(`/api/drills/${nsId}/attempt`, { time_ms: 60000, cell: nsCell, value: nsVal });
+  await page.click("#autoNext");  // back to manual «Дальше»: the delta stays on screen
+  rp = drillResp();
+  await page.click('#picker button[data-tech="naked_single"]');
+  d = await (await rp).json();
+  inf = info(d.id);
+  await page.click(`#drillBoard .cell[data-cell="${inf.answers[0][0]}"]`);
+  await page.keyboard.press(String(inf.answers[0][1]));
+  await page.waitForSelector("#ratingDelta");
+  ok(/^[+−]\d+$/.test(await page.textContent("#ratingDelta")), "drill rating: +N / −N after an answer once the norm is frozen");
+
   // --- 6. stats -------------------------------------------------------------------------------
   await page.goto(`${BASE}/#/stats`);
   await page.waitForSelector("#gamesTable");
@@ -544,7 +558,7 @@ try {
   ok(await page.$(`#gamesTable a[href="#/review/${g1.id}"]`) !== null, "stats: review link for the solved game");
   ok(await page.$("#chart svg polyline") !== null, "stats: daily chart drawn");
   ok(/Голая одиночка/.test(await page.textContent("#techTable")), "stats: techniques table");
-  ok(/\d{3,4}/.test(await page.textContent("#ratingNow")), "stats: drill rating shown");
+  ok(/^\d{3,4}\??$/.test(await page.textContent("#ratingNow b")), "stats: drill rating shown");
   ok(await page.$("#ratingNote") !== null, "stats: rating chart waits for two days of rated answers");
   await shot(page, "stats");
 
