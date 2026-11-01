@@ -88,10 +88,20 @@ label.check { font-size: 13px; color: var(--muted); display: inline-flex; gap: 4
   /* fixed width up to 100.0 с / 10:00.0, so the bar never re-wraps and the board below stays put */
   min-width: 7ch; text-align: right; white-space: nowrap; flex: none; }
 .timer.done { color: var(--ok); }
+.rating { font: 600 15px/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.rating .up { color: var(--ok); }
+.rating .down { color: var(--bad); }
+/* phone: the number on top, «+N · калибровка» under it, a tighter gap in the header, and the theory link gives way, so the bar still fits */
+@media (max-width: 600px) {
+  .bar.head { gap: 4px; }
+  .rating { display: flex; flex-wrap: wrap; justify-content: flex-end; column-gap: 4px; max-width: 130px; font-size: 13px; }
+  .rating small { font-size: 10px; }
+}
 .badge { display: inline-block; font-size: 12px; color: var(--muted); }
 .bar.head { flex-wrap: nowrap; }
 .bar.head .badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar.head .hint { flex: none; white-space: nowrap; }
+@media (max-width: 600px) { .bar.head .hint { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; } }
 .counter { font-weight: 600; font-variant-numeric: tabular-nums; }
 .counter.bad { color: var(--bad); }
 .hint { color: var(--muted); font-size: 13px; margin: 0 0 8px; }

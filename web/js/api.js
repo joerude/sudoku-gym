@@ -44,10 +44,12 @@ export const getRecords = () => call("GET", "/api/records");
 export const getActivity = () => call("GET", "/api/activity");
 export const drillTechniques = () => call("GET", "/api/drills/techniques");
 export const nextDrill = technique => call("GET", `/api/drills/next${qs({ technique })}`);
-export const sendAttempt = (id, timeMs, cell, value, hint = 0) =>
-  call("POST", `/api/drills/${id}/attempt`, { time_ms: Math.round(timeMs), cell, value, hint });
+export const sendAttempt = (id, timeMs, cell, value, hint = 0, rated = 1) =>
+  call("POST", `/api/drills/${id}/attempt`, { time_ms: Math.round(timeMs), cell, value, hint, rated });
 export const drillHint = id => call("GET", `/api/drills/${id}/hint`);
-export const revealDrill = (id, timeMs) => call("POST", `/api/drills/${id}/reveal`, { time_ms: Math.round(timeMs) });
+export const revealDrill = (id, timeMs, rated = 1) =>
+  call("POST", `/api/drills/${id}/reveal`, { time_ms: Math.round(timeMs), rated });
+export const getRating = () => call("GET", "/api/rating");
 export const getFavorites = () => call("GET", "/api/favorites");
 export const setFavorite = (kind, id, on) => call(on ? "PUT" : "DELETE", `/api/favorites/${kind}/${id}`);
 export const getFavoritePuzzle = () => call("GET", "/api/puzzle?favorite=1");

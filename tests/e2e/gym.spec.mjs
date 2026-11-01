@@ -437,6 +437,8 @@ try {
   await page.keyboard.press(String(inf.answers[0][1]));
   await page.waitForSelector("#drillMsg.ok");
   ok(await page.$eval(`#drillBoard .cell[data-cell="${inf.answers[0][0]}"]`, e => e.classList.contains("ok")), "place drill: correct → green");
+  ok(/1500\?/.test(await page.textContent("#drillRating")), "drill rating: provisional 1500 next to the timer");
+  ok(/калибровка \d+\/10/.test(await page.textContent("#ratingCal")), "drill rating: technique without a norm is calibrating");
   rp = drillResp();
   await page.keyboard.press("Enter");
   d = await (await rp).json();

@@ -164,6 +164,8 @@ export default {
   "Теория →": "Theory →",
   "Верно с подсказкой · {time} — не в зачёт": "Correct with a hint · {time} — does not count",
   "Верно · {time}": "Correct · {time}",
+  "Рейтинг упражнений: растёт, когда находишь ходы быстрее своей нормы": "Drill rating: goes up when you find moves faster than your norm",
+  "калибровка {n}/{need}": "calibrating {n}/{need}",
   "Ход верный, но найден другой техникой — засчитано нейтрально. {answers}": "A true move, but by another technique — counted as neutral. {answers}",
   "Неверно. {answers}": "Wrong. {answers}",
   "Ответы этой техникой: {list}": "Answers by this technique: {list}",
