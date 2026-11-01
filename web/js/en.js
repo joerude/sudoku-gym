@@ -309,6 +309,9 @@ export default {
   "График появится, когда будут решённые партии хотя бы за два разных дня. Играй каждый день — и тут будет видно, как падает медиана.":
     "The chart appears once there are solved games on at least two different days. Play every day and you will see the median fall.",
   "Медиана времени по дням": "Median time by day",
+  "Рейтинг упражнений": "Drill rating",
+  "учтённых ответов: {n}": "rated answers: {n}",
+  "График появится, когда будут учтённые ответы хотя бы за два дня. Ответы по технике идут в рейтинг после калибровки: 10 верных без подсказки задают её норму.": "The chart appears once there are rated answers on at least two days. A technique's answers count after calibration: 10 correct answers without a hint set its norm.",
   "Активность": "Activity",
   "Календарь активности": "Activity calendar",
   "Пн": "Mon",

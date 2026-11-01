@@ -1,6 +1,6 @@
 // #/stats — activity calendar, by level/mode, daily median chart, techniques, recent games.
 import { tr } from "./i18n.js";
-import { getActivity, getStats, listGames } from "./api.js";
+import { getActivity, getRating, getStats, listGames } from "./api.js";
 import { heatmapCard } from "./heatmap.js";
 import { recordsCard } from "./records.js";
 import { fmtTime } from "./board.js";
@@ -71,11 +71,43 @@ function chart(daily) {
   return h("div", { class: "chart", id: "chart" }, root, legend, tip);
 }
 
+function ratingCard(r) {
+  const now = h("p", { id: "ratingNow", style: "margin:0 0 8px" }, h("b", {}, `${r.rating}${r.provisional ? "?" : ""}`), " ",
+    h("span", { class: "hint" }, tr("учтённых ответов: {n}", { n: r.n })));
+  const card = body => h("section", { id: "ratingCard" }, h("h2", {}, tr("Рейтинг упражнений")), now, body);
+  if (r.history.length < 2)
+    return card(h("p", { class: "hint", id: "ratingNote", style: "margin:0" },
+      tr("График появится, когда будут учтённые ответы хотя бы за два дня. Ответы по технике идут в рейтинг после калибровки: 10 верных без подсказки задают её норму.")));
+  const W = 640, H = 200, L = 46, R = 16, T = 12, B = 28;
+  const vals = r.history.map(p => p.rating);
+  const lo = Math.floor((Math.min(...vals, 1500) - 20) / 50) * 50, hi = Math.ceil((Math.max(...vals, 1500) + 20) / 50) * 50;
+  const tick = Math.max(50, Math.ceil((hi - lo) / 4 / 50) * 50);
+  const days = r.history.map(p => p.day), t0 = Date.parse(days[0]), t1 = Date.parse(days.at(-1));
+  const x = d => L + ((Date.parse(d) - t0) / (t1 - t0)) * (W - L - R);
+  const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": tr("Рейтинг упражнений") });
+  for (let v = lo; v <= hi; v += tick)
+    root.append(svg("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: "axis", "stroke-width": 1 }),
+      svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end", class: "lbl" }, String(v)));
+  const step = Math.ceil(days.length / 7);
+  days.forEach((d, k) => {
+    if (k % step === 0 || k === days.length - 1)
+      root.append(svg("text", { x: x(d), y: H - 8, "text-anchor": k === 0 ? "start" : k === days.length - 1 ? "end" : "middle",
+        class: "lbl" }, `${d.slice(8, 10)}.${d.slice(5, 7)}`));
+  });
+  root.append(svg("polyline", { points: r.history.map(p => `${x(p.day)},${y(p.rating)}`).join(" "), fill: "none",
+    stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  for (const p of r.history)
+    root.append(svg("circle", { cx: x(p.day), cy: y(p.rating), r: 4, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 },
+      svg("title", {}, `${p.day}: ${p.rating}`)));
+  return card(h("div", { class: "chart", id: "ratingChart" }, root));
+}
+
 export function mount(el) {
   el.append(h("h1", {}, tr("Статистика")));
   const box = h("div", {}, h("p", { class: "hint" }, tr("Загрузка…")));
   el.append(box);
-  Promise.all([getStats(), listGames(20), getActivity()]).then(([st, games, act]) => {
+  Promise.all([getStats(), listGames(20), getActivity(), getRating()]).then(([st, games, act, rt]) => {
     box.textContent = "";
     box.append(heatmapCard(act));
     const rec = recordsCard({ title: tr("Рекорды по уровню и режиму"), id: "recordsStats" });
@@ -88,6 +120,7 @@ export function mount(el) {
             fmtTime(r.best_ms, false), r.mistakes_per_game.toFixed(1), pct(r.fail_rate)]), "byLevel")
         : h("p", { class: "hint", style: "margin:0" }, tr("Законченных партий пока нет."))));
     box.append(h("section", {}, h("h2", {}, tr("Медиана времени по дням")), chart(st.daily)));
+    box.append(ratingCard(rt));
     const techs = [...st.techniques].sort((a, b) => (b.median_ms ?? -1) - (a.median_ms ?? -1));
     box.append(h("section", {}, h("h2", {}, tr("Упражнения по техникам (медленные сверху)")),
       table([[tr("Техника")], [tr("Попыток"), 1], [tr("Медиана"), 1], [tr("Точность"), 1], [""]],

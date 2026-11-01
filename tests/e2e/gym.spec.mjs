@@ -544,6 +544,8 @@ try {
   ok(await page.$(`#gamesTable a[href="#/review/${g1.id}"]`) !== null, "stats: review link for the solved game");
   ok(await page.$("#chart svg polyline") !== null, "stats: daily chart drawn");
   ok(/Голая одиночка/.test(await page.textContent("#techTable")), "stats: techniques table");
+  ok(/\d{3,4}/.test(await page.textContent("#ratingNow")), "stats: drill rating shown");
+  ok(await page.$("#ratingNote") !== null, "stats: rating chart waits for two days of rated answers");
   await shot(page, "stats");
 
   // --- 7. theory ------------------------------------------------------------------------------
