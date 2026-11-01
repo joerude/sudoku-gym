@@ -2,6 +2,7 @@
 
 tr("Russian template {x}", x=…) looks the template up in EN when the request is English; Russian is the key,
 so code reads as before and a missing translation falls back to Russian."""
+
 from contextvars import ContextVar
 
 LANGS = ("ru", "en")
@@ -54,43 +55,28 @@ EN = {
     "столбце {n}": "column {n}",
     "блоке {n}": "box {n}",
     "{v} из {cells}": "{v} from {cells}",
-    "В {cell} остался один кандидат — {v}: остальные цифры уже стоят в её строке, столбце или блоке.":
-        "{cell} has one candidate left — {v}: every other digit is already in its row, column or box.",
+    "В {cell} остался один кандидат — {v}: остальные цифры уже стоят в её строке, столбце или блоке.": "{cell} has one candidate left — {v}: every other digit is already in its row, column or box.",
     "В {unit} цифра {v} может стоять только в {cell}.": "In {unit}, {v} can only go in {cell}.",
     "этой строке": "this row",
     "этом столбце": "this column",
-    "В {unit} цифра {v} может стоять только в {line} ({cells}). Значит, в {this} вне блока {v} быть не может → убираем {elims}.":
-        "In {unit}, {v} can only go in {line} ({cells}). So {v} cannot be in {this} outside the box → remove {elims}.",
-    "В {unit} цифра {v} может стоять только внутри блока {box} ({cells}). Значит, в остальных клетках блока {box} её быть не может → убираем {elims}.":
-        "In {unit}, {v} can only go inside box {box} ({cells}). So it cannot be in the other cells of box {box} → remove {elims}.",
-    "В {unit} клетки {a} и {b} содержат только {x} и {y} — эти две цифры займут именно их → убираем {elims}.":
-        "In {unit}, cells {a} and {b} hold only {x} and {y} — these two digits will take exactly them → remove {elims}.",
-    "В {unit} цифры {x} и {y} могут стоять только в {a} и {b} → эти клетки заняты ими, остальные кандидаты оттуда убираем: {elims}.":
-        "In {unit}, {x} and {y} can only go in {a} and {b} → those cells are theirs, remove the other candidates there: {elims}.",
+    "В {unit} цифра {v} может стоять только в {line} ({cells}). Значит, в {this} вне блока {v} быть не может → убираем {elims}.": "In {unit}, {v} can only go in {line} ({cells}). So {v} cannot be in {this} outside the box → remove {elims}.",
+    "В {unit} цифра {v} может стоять только внутри блока {box} ({cells}). Значит, в остальных клетках блока {box} её быть не может → убираем {elims}.": "In {unit}, {v} can only go inside box {box} ({cells}). So it cannot be in the other cells of box {box} → remove {elims}.",
+    "В {unit} клетки {a} и {b} содержат только {x} и {y} — эти две цифры займут именно их → убираем {elims}.": "In {unit}, cells {a} and {b} hold only {x} and {y} — these two digits will take exactly them → remove {elims}.",
+    "В {unit} цифры {x} и {y} могут стоять только в {a} и {b} → эти клетки заняты ими, остальные кандидаты оттуда убираем: {elims}.": "In {unit}, {x} and {y} can only go in {a} and {b} → those cells are theirs, remove the other candidates there: {elims}.",
     "строках {a} и {b}": "rows {a} and {b}",
     "столбцах {a} и {b}": "columns {a} and {b}",
-    "В {base} цифра {v} может стоять только в {cover} (углы: {cells}). В каждой из этих линий {v} займёт один из углов → убираем {elims}.":
-        "In {base}, {v} can only go in {cover} (corners: {cells}). In each of these lines {v} takes one of the corners → remove {elims}.",
-    "Опора {p} видит крылья {a} и {b}. Что бы ни встало в опору, в одном из крыльев окажется {v} → {v} нельзя там, где клетка видит оба крыла: убираем {elims}.":
-        "Pivot {p} sees wings {a} and {b}. Whatever goes into the pivot, one of the wings gets {v} → {v} is impossible where a cell sees both wings: remove {elims}.",
+    "В {base} цифра {v} может стоять только в {cover} (углы: {cells}). В каждой из этих линий {v} займёт один из углов → убираем {elims}.": "In {base}, {v} can only go in {cover} (corners: {cells}). In each of these lines {v} takes one of the corners → remove {elims}.",
+    "Опора {p} видит крылья {a} и {b}. Что бы ни встало в опору, в одном из крыльев окажется {v} → {v} нельзя там, где клетка видит оба крыла: убираем {elims}.": "Pivot {p} sees wings {a} and {b}. Whatever goes into the pivot, one of the wings gets {v} → {v} is impossible where a cell sees both wings: remove {elims}.",
     "{title}: убираем {elims}.": "{title}: remove {elims}.",
     " (Здесь таких ходов {n}, засчитывается любой.)": " (There are {n} such moves here; any of them counts.)",
-    "Смотри в {unit}: там есть пустая клетка, где строка, столбец и блок уже закрыли все цифры, кроме одной.":
-        "Look in {unit}: there is an empty cell where the row, column and box already rule out every digit but one.",
-    "Смотри в {unit}: одной из недостающих цифр там осталось только одно место. Для каждой недостающей цифры вычеркни клетки, которые она «видит».":
-        "Look in {unit}: one of the missing digits has only one place left there. For each missing digit, cross out the cells it “sees”.",
-    "Смотри цифру {d} в {unit}: внутри блока она возможна только на одной линии.":
-        "Look at {d} in {unit}: inside the box it is only possible on one line.",
-    "Смотри цифру {d} в {unit}: в этой линии она возможна только внутри одного блока.":
-        "Look at {d} in {unit}: on this line it is only possible inside one box.",
-    "Смотри в {unit}: у двух клеток там одна и та же пара кандидатов.":
-        "Look in {unit}: two cells there have the same pair of candidates.",
-    "Смотри в {unit}: две цифры там возможны только в двух одних и тех же клетках.":
-        "Look in {unit}: two digits there are possible only in the same two cells.",
-    "Смотри цифру {d}: найди две строки (или два столбца), где она возможна ровно в двух одинаковых позициях — получится прямоугольник.":
-        "Look at {d}: find two rows (or two columns) where it is possible in exactly the same two positions — they form a rectangle.",
-    "Опора — {cell} ({x}/{y}). Найди две клетки-крыла, которые она видит: у каждой два кандидата, один общий с опорой, а второй — одинаковый у обоих крыльев.":
-        "The pivot is {cell} ({x}/{y}). Find two wing cells it sees: each has two candidates, one shared with the pivot, the other the same in both wings.",
+    "Смотри в {unit}: там есть пустая клетка, где строка, столбец и блок уже закрыли все цифры, кроме одной.": "Look in {unit}: there is an empty cell where the row, column and box already rule out every digit but one.",
+    "Смотри в {unit}: одной из недостающих цифр там осталось только одно место. Для каждой недостающей цифры вычеркни клетки, которые она «видит».": "Look in {unit}: one of the missing digits has only one place left there. For each missing digit, cross out the cells it “sees”.",
+    "Смотри цифру {d} в {unit}: внутри блока она возможна только на одной линии.": "Look at {d} in {unit}: inside the box it is only possible on one line.",
+    "Смотри цифру {d} в {unit}: в этой линии она возможна только внутри одного блока.": "Look at {d} in {unit}: on this line it is only possible inside one box.",
+    "Смотри в {unit}: у двух клеток там одна и та же пара кандидатов.": "Look in {unit}: two cells there have the same pair of candidates.",
+    "Смотри в {unit}: две цифры там возможны только в двух одних и тех же клетках.": "Look in {unit}: two digits there are possible only in the same two cells.",
+    "Смотри цифру {d}: найди две строки (или два столбца), где она возможна ровно в двух одинаковых позициях — получится прямоугольник.": "Look at {d}: find two rows (or two columns) where it is possible in exactly the same two positions — they form a rectangle.",
+    "Опора — {cell} ({x}/{y}). Найди две клетки-крыла, которые она видит: у каждой два кандидата, один общий с опорой, а второй — одинаковый у обоих крыльев.": "The pivot is {cell} ({x}/{y}). Find two wing cells it sees: each has two candidates, one shared with the pivot, the other the same in both wings.",
     "Ищи: {title}.": "Look for: {title}.",
     # API errors (server)
     "поле {key} обязательно": "field {key} is required",

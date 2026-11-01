@@ -7,8 +7,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from db import connect  # noqa: E402
 from drills import (  # noqa: E402
-    DRILL_PROMPT, DRILL_TECHNIQUES, KIND, UNLOCK_MIN_CORRECT, attempt, explain, hint, make_drills, next_drill,
-    reveal, technique_list, unlocked_tier,
+    DRILL_PROMPT,
+    DRILL_TECHNIQUES,
+    KIND,
+    UNLOCK_MIN_CORRECT,
+    attempt,
+    explain,
+    hint,
+    make_drills,
+    next_drill,
+    reveal,
+    technique_list,
+    unlocked_tier,
 )
 from fixtures import L2, L3, seed_variants  # noqa: E402
 from sudoku_core import TECH_TIER, TECH_TITLE, candidates, find_steps, parse  # noqa: E402
@@ -34,11 +44,15 @@ def seeded_conn():
 def add_attempts(conn, technique, times_correct, n_wrong=0):
     drill_id = conn.execute("SELECT id FROM drills WHERE technique=? LIMIT 1", (technique,)).fetchone()[0]
     for t in times_correct:
-        conn.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct) VALUES (?, '2026-10-30T10:00:00+00:00', ?, 1)",
-                     (drill_id, t))
+        conn.execute(
+            "INSERT INTO drill_attempts (drill_id, at, time_ms, correct) VALUES (?, '2026-10-30T10:00:00+00:00', ?, 1)",
+            (drill_id, t),
+        )
     for _ in range(n_wrong):
-        conn.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct) VALUES (?, '2026-10-30T10:00:00+00:00', 999, 0)",
-                     (drill_id,))
+        conn.execute(
+            "INSERT INTO drill_attempts (drill_id, at, time_ms, correct) VALUES (?, '2026-10-30T10:00:00+00:00', 999, 0)",
+            (drill_id,),
+        )
     conn.commit()
 
 
@@ -70,7 +84,8 @@ class MakeDrillsTest(unittest.TestCase):
         cls.conn, cls.levels = seeded_conn()
         cls.made = make_drills(cls.conn, per_technique=5, seed=1)
         cls.rows = cls.conn.execute(
-            "SELECT d.*, p.givens, p.solution FROM drills d JOIN puzzles p ON p.id = d.puzzle_id").fetchall()
+            "SELECT d.*, p.givens, p.solution FROM drills d JOIN puzzles p ON p.id = d.puzzle_id"
+        ).fetchall()
 
     def test_count_and_caps(self):
         self.assertEqual(self.made, len(self.rows))
@@ -157,9 +172,21 @@ class MakeDrillsTest(unittest.TestCase):
         lst = technique_list(self.conn)
         self.assertEqual([x["technique"] for x in lst], DRILL_TECHNIQUES)
         ns = next(x for x in lst if x["technique"] == "naked_single")
-        self.assertEqual(ns, {"technique": "naked_single", "title": TECH_TITLE["naked_single"],
-                              "kind": "place", "tier": 1, "n": 5, "unlocked": True, "theory": "naked-single",
-                              "correct": 0, "accuracy": None, "mastered": False})
+        self.assertEqual(
+            ns,
+            {
+                "technique": "naked_single",
+                "title": TECH_TITLE["naked_single"],
+                "kind": "place",
+                "tier": 1,
+                "n": 5,
+                "unlocked": True,
+                "theory": "naked-single",
+                "correct": 0,
+                "accuracy": None,
+                "mastered": False,
+            },
+        )
         self.assertEqual(next(x for x in lst if x["technique"] == "pointing")["kind"], "eliminate")
         self.assertEqual(technique_list(connect(":memory:"))[0]["n"], 0)
 
@@ -176,17 +203,23 @@ class AttemptTest(unittest.TestCase):
     def drill(self, technique):
         d = self.conn.execute(
             "SELECT d.*, p.solution FROM drills d JOIN puzzles p ON p.id=d.puzzle_id WHERE technique=? LIMIT 1",
-            (technique,)).fetchone()
+            (technique,),
+        ).fetchone()
         return d, json.loads(d["answers"])
 
     def test_correct(self):
         d, answers = self.drill("hidden_single_box")
         cell, value = answers[0]
         res = attempt(self.conn, d["id"], 4200, cell, value)
-        self.assertEqual(sub(res, ("correct", "valid_other_move", "answers")), {"correct": True, "valid_other_move": False, "answers": answers})
+        self.assertEqual(
+            sub(res, ("correct", "valid_other_move", "answers")),
+            {"correct": True, "valid_other_move": False, "answers": answers},
+        )
         row = self.conn.execute("SELECT * FROM drill_attempts").fetchone()
-        self.assertEqual((row["drill_id"], row["time_ms"], row["correct"], row["cell"], row["value"]),
-                         (d["id"], 4200, 1, cell, value))
+        self.assertEqual(
+            (row["drill_id"], row["time_ms"], row["correct"], row["cell"], row["value"]),
+            (d["id"], 4200, 1, cell, value),
+        )
 
     def test_wrong_value(self):
         d, answers = self.drill("hidden_single_box")
@@ -211,13 +244,14 @@ class AttemptTest(unittest.TestCase):
         board, sol = d["board"], d["solution"]
         fresh = candidates(parse(board))
         cell, value = answers[0]
-        self.assertEqual(sub(attempt(self.conn, d["id"], 5000, cell, value), ("correct", "valid_other_move", "answers")),
-                         {"correct": True, "valid_other_move": False, "answers": answers})
+        self.assertEqual(
+            sub(attempt(self.conn, d["id"], 5000, cell, value), ("correct", "valid_other_move", "answers")),
+            {"correct": True, "valid_other_move": False, "answers": answers},
+        )
         # the cell's solution digit is never a valid elimination
         self.assertEqual(attempt(self.conn, d["id"], 5000, cell, int(sol[cell]))["valid_other_move"], False)
         # another removable (wrong) candidate elsewhere is a valid other move
-        other = next((i, v) for i in range(81) for v in sorted(fresh[i])
-                     if v != int(sol[i]) and [i, v] not in answers)
+        other = next((i, v) for i in range(81) for v in sorted(fresh[i]) if v != int(sol[i]) and [i, v] not in answers)
         res = attempt(self.conn, d["id"], 5000, *other)
         self.assertEqual((res["correct"], res["valid_other_move"]), (False, True))
         # a digit that is not a candidate is not
@@ -286,10 +320,13 @@ class NextDrillTest(unittest.TestCase):
     def test_valid_other_move_is_neutral(self):
         d = next_drill(self.conn, "hidden_single_col")
         board = parse(d["board"])
-        sol = self.conn.execute("SELECT p.solution FROM drills d JOIN puzzles p ON p.id = d.puzzle_id WHERE d.id = ?",
-                                (d["id"],)).fetchone()[0]
-        answers = {tuple(a) for a in json.loads(self.conn.execute("SELECT answers FROM drills WHERE id = ?",
-                                                                  (d["id"],)).fetchone()[0])}
+        sol = self.conn.execute(
+            "SELECT p.solution FROM drills d JOIN puzzles p ON p.id = d.puzzle_id WHERE d.id = ?", (d["id"],)
+        ).fetchone()[0]
+        answers = {
+            tuple(a)
+            for a in json.loads(self.conn.execute("SELECT answers FROM drills WHERE id = ?", (d["id"],)).fetchone()[0])
+        }
         other = next(i for i in range(81) if not board[i] and (i, int(sol[i])) not in answers)
         r = attempt(self.conn, d["id"], 4000, other, int(sol[other]))
         self.assertEqual((r["correct"], r["valid_other_move"]), (False, True))
@@ -339,8 +376,11 @@ class ExplainTest(unittest.TestCase):
 
     def test_pointing_from_real_drill(self):
         e = explain(self.BOARD, "pointing", [[28, 5], [46, 5]])
-        self.assertEqual(e["explanation"], "В блоке 7 цифра 5 может стоять только в столбце 2 (r7c2, r8c2). "
-                                           "Значит, в этом столбце вне блока 5 быть не может → убираем 5 из r4c2, r6c2.")
+        self.assertEqual(
+            e["explanation"],
+            "В блоке 7 цифра 5 может стоять только в столбце 2 (r7c2, r8c2). "
+            "Значит, в этом столбце вне блока 5 быть не может → убираем 5 из r4c2, r6c2.",
+        )
         self.assertEqual(e["pattern"], [55, 64])
 
     def test_every_technique_explains(self):
@@ -372,7 +412,9 @@ class HintTest(unittest.TestCase):
         self.conn.execute("DELETE FROM drill_attempts")
 
     def drill(self, technique):
-        did, answers = self.conn.execute("SELECT id, answers FROM drills WHERE technique=? LIMIT 1", (technique,)).fetchone()
+        did, answers = self.conn.execute(
+            "SELECT id, answers FROM drills WHERE technique=? LIMIT 1", (technique,)
+        ).fetchone()
         return did, json.loads(answers)
 
     def mastery(self, technique):

@@ -2,6 +2,7 @@
 
 Usage: python3 tools/import_bank.py [--n 5000] [--db data/sudoku.db] [--theory-only]
 """
+
 import argparse
 import os
 import sys

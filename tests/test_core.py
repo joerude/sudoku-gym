@@ -1,8 +1,19 @@
 import unittest
 
 from sudoku_core import (
-    GRADE_TITLE, PEERS, TECH_TIER, TECH_TITLE, UNITS, count_solutions, easiest_steps, find_steps,
-    grade, parse, solve, to_str, unit_name,
+    GRADE_TITLE,
+    PEERS,
+    TECH_TIER,
+    TECH_TITLE,
+    UNITS,
+    count_solutions,
+    easiest_steps,
+    find_steps,
+    grade,
+    parse,
+    solve,
+    to_str,
+    unit_name,
 )
 
 P = "100006000600035120032000000000140030860000092050029000000000370013590008000400005"
@@ -21,7 +32,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(to_str(parse(P.replace("0", "."))), P)
 
     def test_ascii_art(self):
-        rows = [P[r * 9:r * 9 + 9].replace("0", ".") for r in range(9)]
+        rows = [P[r * 9 : r * 9 + 9].replace("0", ".") for r in range(9)]
         art = []
         for r, row in enumerate(rows):
             if r in (3, 6):
@@ -106,19 +117,29 @@ def cands_from(rows):
 class WingTest(unittest.TestCase):
     def test_x_wing_rows(self):
         # 4 only in c2/c7 of rows 2 and 8 → remove 4 from c2/c7 elsewhere
-        cands = cands_from({(2, 2): {4, 5}, (2, 7): {4, 6}, (8, 2): {4, 7}, (8, 7): {4, 9},
-                            (5, 2): {4, 1}, (5, 5): {4, 3}, (6, 7): {4, 8}})
+        cands = cands_from(
+            {
+                (2, 2): {4, 5},
+                (2, 7): {4, 6},
+                (8, 2): {4, 7},
+                (8, 7): {4, 9},
+                (5, 2): {4, 1},
+                (5, 5): {4, 3},
+                (6, 7): {4, 8},
+            }
+        )
         steps = find_steps([1] * 81, cands, ["x_wing"])
         elims = {e for s in steps for e in s.eliminations}
         self.assertEqual(elims, {(4 * 9 + 1, 4), (5 * 9 + 6, 4)})
 
     def test_y_wing(self):
         # pivot r1c1 {1,2}, pincers r1c5 {1,9} (row) and r3c2 {2,9} (box) → 9 out of r3c5... cells seeing both
-        cands = cands_from({(1, 1): {1, 2}, (1, 5): {1, 9}, (3, 2): {2, 9},
-                            (3, 5): {9, 7}, (1, 3): {9, 4}, (7, 7): {9, 3}})
+        cands = cands_from(
+            {(1, 1): {1, 2}, (1, 5): {1, 9}, (3, 2): {2, 9}, (3, 5): {9, 7}, (1, 3): {9, 4}, (7, 7): {9, 3}}
+        )
         steps = find_steps([1] * 81, cands, ["y_wing"])
         elims = {e for s in steps for e in s.eliminations}
-        self.assertIn((2 * 9 + 4, 9), elims)   # r3c5 sees r1c5 (col) and r3c2 (row)
+        self.assertIn((2 * 9 + 4, 9), elims)  # r3c5 sees r1c5 (col) and r3c2 (row)
         self.assertNotIn((6 * 9 + 6, 9), elims)  # r7c7 sees neither
 
 

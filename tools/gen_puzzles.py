@@ -1,18 +1,19 @@
 """Generate sudoku puzzles with a unique solution, graded by the techniques needed."""
+
 import random
 import sys
 from itertools import combinations
 
 ROWS = [[r * 9 + c for c in range(9)] for r in range(9)]
 COLS = [[r * 9 + c for r in range(9)] for c in range(9)]
-BOXES = [[(br * 3 + r) * 9 + bc * 3 + c for r in range(3) for c in range(3)]
-         for br in range(3) for bc in range(3)]
+BOXES = [[(br * 3 + r) * 9 + bc * 3 + c for r in range(3) for c in range(3)] for br in range(3) for bc in range(3)]
 UNITS = ROWS + COLS + BOXES
 PEERS = [set().union(*(u for u in UNITS if i in u)) - {i} for i in range(81)]
 
 
 def count_solutions(g, limit=2):
     g = g[:]
+
     def rec():
         best, opts = None, None
         for i in range(81):
@@ -32,11 +33,13 @@ def count_solutions(g, limit=2):
                 break
         g[best] = 0
         return n
+
     return rec()
 
 
 def full_grid(rng):
     g = [0] * 81
+
     def rec(i=0):
         if i == 81:
             return True
@@ -48,6 +51,7 @@ def full_grid(rng):
                 return True
         g[i] = 0
         return False
+
     rec()
     return g
 

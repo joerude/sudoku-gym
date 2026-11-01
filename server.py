@@ -2,6 +2,7 @@
 
 Usage: python3 server.py [--host 127.0.0.1] [--port 8765] [--db data/sudoku.db] [--web web]
 """
+
 import argparse
 import json
 import os
@@ -28,10 +29,17 @@ MOVE_KINDS = ("place", "erase", "note", "check", "undo")
 FINISH_STATUSES = ("solved", "failed", "abandoned")
 DEFAULT_MISTAKE_LIMIT = 3
 CONTENT_TYPES = {
-    ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8",
-    ".mjs": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-    ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8", ".md": "text/markdown; charset=utf-8",
-    ".txt": "text/plain; charset=utf-8", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2",
+    ".html": "text/html; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".mjs": "application/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".json": "application/json; charset=utf-8",
+    ".md": "text/markdown; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
 }
 
 
@@ -60,12 +68,17 @@ def _int(data: dict, key: str, lo=None, hi=None, required=True, default=None):
 
 # --- API handlers: (conn, match, query, body) -> JSON-able ---------------------------
 
+
 def api_health(conn, m, q, body):
     return {"ok": True, "puzzles": conn.execute("SELECT COUNT(*) FROM puzzles").fetchone()[0]}
 
 
 def _puzzle_out(conn, row) -> dict:
-    return {**dict(row), "grade_title": tr(GRADE_TITLE.get(row["tech_grade"], "")), "fav": is_favorite(conn, "puzzle", row["id"])}
+    return {
+        **dict(row),
+        "grade_title": tr(GRADE_TITLE.get(row["tech_grade"], "")),
+        "fav": is_favorite(conn, "puzzle", row["id"]),
+    }
 
 
 # entered or pasted grids (api_add_puzzle) are played on purpose: never served by level selection, nor counted in options
@@ -77,7 +90,8 @@ def api_puzzle(conn, m, q, body):
         row = conn.execute(
             "SELECT p.id, p.level, p.givens, p.solution, p.tech_grade FROM favorites f JOIN puzzles p ON p.id = f.ref_id"
             " WHERE f.kind = 'puzzle' ORDER BY (SELECT COALESCE(MAX(g.id), 0) FROM games g WHERE g.puzzle_id = p.id),"
-            " RANDOM() LIMIT 1").fetchone()
+            " RANDOM() LIMIT 1"
+        ).fetchone()
         if row is None:
             raise ApiError(404, tr("в избранном нет задач"))
         return _puzzle_out(conn, row)
@@ -93,18 +107,22 @@ def api_puzzle(conn, m, q, body):
     if grade is not None:
         cond, args = f"{cond} AND tech_grade = ?", [grade]
     if level == "random":
-        have = [r[0] for r in conn.execute(f"SELECT DISTINCT level FROM puzzles WHERE 1=1{cond}", args)
-                if r[0] in LEVELS]
+        have = [
+            r[0] for r in conn.execute(f"SELECT DISTINCT level FROM puzzles WHERE 1=1{cond}", args) if r[0] in LEVELS
+        ]
         if not have:
             raise ApiError(404, tr("нет задач с такими параметрами"))
         level = random.choice(have)
     cols = "id, level, givens, solution, tech_grade"
     row = conn.execute(
         f"SELECT {cols} FROM puzzles WHERE level = ?{cond} AND id NOT IN (SELECT puzzle_id FROM games)"
-        " ORDER BY RANDOM() LIMIT 1", [level] + args).fetchone()
+        " ORDER BY RANDOM() LIMIT 1",
+        [level] + args,
+    ).fetchone()
     if row is None:  # every puzzle of this kind was played: allow repeats
-        row = conn.execute(f"SELECT {cols} FROM puzzles WHERE level = ?{cond} ORDER BY RANDOM() LIMIT 1",
-                           [level] + args).fetchone()
+        row = conn.execute(
+            f"SELECT {cols} FROM puzzles WHERE level = ?{cond} ORDER BY RANDOM() LIMIT 1", [level] + args
+        ).fetchone()
     if row is None:
         raise ApiError(404, tr("нет задач с такими параметрами"))
     return _puzzle_out(conn, row)
@@ -128,11 +146,15 @@ def _add_custom(conn, givens, level="custom"):
         raise ApiError(400, tr("решение не единственное"))
     givens = to_str(g)
     bank_id = "custom-" + ("" if level == "custom" else level + "-") + givens
-    conn.execute("INSERT OR IGNORE INTO puzzles (bank_id, level, givens, solution, se_rating, tech_grade)"
-                 " VALUES (?, ?, ?, ?, NULL, ?)", (bank_id, level, givens, to_str(solve(g)), grade(g)))
+    conn.execute(
+        "INSERT OR IGNORE INTO puzzles (bank_id, level, givens, solution, se_rating, tech_grade)"
+        " VALUES (?, ?, ?, ?, NULL, ?)",
+        (bank_id, level, givens, to_str(solve(g)), grade(g)),
+    )
     conn.commit()
-    return conn.execute("SELECT id, level, givens, solution, tech_grade FROM puzzles WHERE bank_id = ?",
-                        (bank_id,)).fetchone()
+    return conn.execute(
+        "SELECT id, level, givens, solution, tech_grade FROM puzzles WHERE bank_id = ?", (bank_id,)
+    ).fetchone()
 
 
 def api_add_puzzle(conn, m, q, body):
@@ -141,12 +163,16 @@ def api_add_puzzle(conn, m, q, body):
 
 def api_puzzle_options(conn, m, q, body):
     counts = {lv: {} for lv in LEVELS}
-    for level, g, n in conn.execute(f"SELECT level, tech_grade, COUNT(*) FROM puzzles WHERE {BANK_ONLY}"
-                                    " GROUP BY level, tech_grade ORDER BY level, tech_grade"):
+    for level, g, n in conn.execute(
+        f"SELECT level, tech_grade, COUNT(*) FROM puzzles WHERE {BANK_ONLY}"
+        " GROUP BY level, tech_grade ORDER BY level, tech_grade"
+    ):
         if level in counts:  # skip 'custom'
             counts[level][str(g)] = n
-    return {"levels": [{"level": lv, "grades": grades} for lv, grades in counts.items()],
-            "grade_titles": {str(k): tr(v) for k, v in GRADE_TITLE.items()}}
+    return {
+        "levels": [{"level": lv, "grades": grades} for lv, grades in counts.items()],
+        "grade_titles": {str(k): tr(v) for k, v in GRADE_TITLE.items()},
+    }
 
 
 def api_games_list(conn, m, q, body):
@@ -154,7 +180,9 @@ def api_games_list(conn, m, q, body):
     limit = min(int(limit), 200) if limit.isdigit() else 20
     rows = conn.execute(
         "SELECT g.id, g.puzzle_id, p.level, g.mode, g.status, g.started_at, g.finished_at, g.time_ms, g.mistakes"
-        " FROM games g JOIN puzzles p ON p.id = g.puzzle_id ORDER BY g.id DESC LIMIT ?", (limit,))
+        " FROM games g JOIN puzzles p ON p.id = g.puzzle_id ORDER BY g.id DESC LIMIT ?",
+        (limit,),
+    )
     return [dict(r) for r in rows]
 
 
@@ -172,8 +200,10 @@ def api_create_game(conn, m, q, body):
     for (stale,) in conn.execute("SELECT id FROM games WHERE status = 'active'").fetchall():
         moves = analysis.load_moves(conn, stale)
         _close_game(conn, _game(conn, stale), "abandoned", max((mv["t_ms"] for mv in moves), default=0), moves)
-    cur = conn.execute("INSERT INTO games (puzzle_id, mode, mistake_limit, started_at, status) VALUES (?, ?, ?, ?, 'active')",
-                       (puzzle_id, mode, limit, now_iso()))
+    cur = conn.execute(
+        "INSERT INTO games (puzzle_id, mode, mistake_limit, started_at, status) VALUES (?, ?, ?, ?, 'active')",
+        (puzzle_id, mode, limit, now_iso()),
+    )
     conn.commit()
     return {"id": cur.lastrowid}
 
@@ -218,10 +248,14 @@ def api_moves(conn, m, q, body):
     with conn:
         for seq, t_ms, cell, value, kind in rows:
             correct = int(solution[cell] == str(value)) if kind == "place" else None
-            conn.execute("INSERT OR REPLACE INTO moves (game_id, seq, t_ms, cell, value, kind, correct)"
-                         " VALUES (?, ?, ?, ?, ?, ?, ?)", (gid, seq, t_ms, cell, value, kind, correct))
-    mistakes = conn.execute("SELECT COUNT(*) FROM moves WHERE game_id = ? AND kind = 'place' AND correct = 0",
-                            (gid,)).fetchone()[0]
+            conn.execute(
+                "INSERT OR REPLACE INTO moves (game_id, seq, t_ms, cell, value, kind, correct)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (gid, seq, t_ms, cell, value, kind, correct),
+            )
+    mistakes = conn.execute(
+        "SELECT COUNT(*) FROM moves WHERE game_id = ? AND kind = 'place' AND correct = 0", (gid,)
+    ).fetchone()[0]
     return {"ok": True, "stored": len(rows), "mistakes": mistakes}
 
 
@@ -245,10 +279,28 @@ def _close_game(conn, game, status, t_ms, moves=None):
         conn.execute(
             "UPDATE games SET status = ?, finished_at = ?, time_ms = ?, mistakes = ?, corrections = ?, checks = ?,"
             " note_actions = ?, first_move_ms = ?, max_pause_ms = ?, long_pauses = ? WHERE id = ?",
-            (status, finished_at, metrics["time_ms"], metrics["mistakes"], metrics["corrections"], metrics["checks"],
-             metrics["note_actions"], metrics["first_move_ms"], metrics["max_pause_ms"], metrics["long_pauses"], gid))
-    return {"id": gid, "status": status, "finished_at": finished_at, "mode": game["mode"],
-            "mistake_limit": limit, **metrics}
+            (
+                status,
+                finished_at,
+                metrics["time_ms"],
+                metrics["mistakes"],
+                metrics["corrections"],
+                metrics["checks"],
+                metrics["note_actions"],
+                metrics["first_move_ms"],
+                metrics["max_pause_ms"],
+                metrics["long_pauses"],
+                gid,
+            ),
+        )
+    return {
+        "id": gid,
+        "status": status,
+        "finished_at": finished_at,
+        "mode": game["mode"],
+        "mistake_limit": limit,
+        **metrics,
+    }
 
 
 def api_review(conn, m, q, body):
@@ -339,12 +391,18 @@ def api_favorite_remove(conn, m, q, body):
 
 def api_favorites_export(conn, m, q, body):
     """Starred puzzles and drills by keys that survive another database: bank_id, (technique, board)."""
-    puzzles = conn.execute("SELECT p.bank_id FROM favorites f JOIN puzzles p ON p.id = f.ref_id"
-                           " WHERE f.kind = 'puzzle' ORDER BY f.at, f.ref_id")
-    drill_rows = conn.execute("SELECT d.technique, d.board FROM favorites f JOIN drills d ON d.id = f.ref_id"
-                              " WHERE f.kind = 'drill' ORDER BY f.at, f.ref_id")
-    return {"puzzles": [{"bank_id": r[0]} for r in puzzles],
-            "drills": [{"technique": r[0], "board": r[1]} for r in drill_rows]}
+    puzzles = conn.execute(
+        "SELECT p.bank_id FROM favorites f JOIN puzzles p ON p.id = f.ref_id"
+        " WHERE f.kind = 'puzzle' ORDER BY f.at, f.ref_id"
+    )
+    drill_rows = conn.execute(
+        "SELECT d.technique, d.board FROM favorites f JOIN drills d ON d.id = f.ref_id"
+        " WHERE f.kind = 'drill' ORDER BY f.at, f.ref_id"
+    )
+    return {
+        "puzzles": [{"bank_id": r[0]} for r in puzzles],
+        "drills": [{"technique": r[0], "board": r[1]} for r in drill_rows],
+    }
 
 
 def api_favorites_import(conn, m, q, body):
@@ -355,10 +413,13 @@ def api_favorites_import(conn, m, q, body):
     found, missing = [], 0
     for p in puzzles:
         bank_id = p.get("bank_id")
-        row = conn.execute("SELECT id FROM puzzles WHERE bank_id = ?", (bank_id,)).fetchone() \
-            if isinstance(bank_id, str) else None
+        row = (
+            conn.execute("SELECT id FROM puzzles WHERE bank_id = ?", (bank_id,)).fetchone()
+            if isinstance(bank_id, str)
+            else None
+        )
         if row is None and isinstance(bank_id, str) and bank_id.startswith("custom-"):
-            level, _, givens = bank_id[len("custom-"):].rpartition("-")  # givens never contain "-"
+            level, _, givens = bank_id[len("custom-") :].rpartition("-")  # givens never contain "-"
             try:
                 row = _add_custom(conn, givens, level or "custom")
             except ApiError:
@@ -369,15 +430,22 @@ def api_favorites_import(conn, m, q, body):
             found.append(("puzzle", row["id"]))
     for d in drill_refs:
         tech, board = d.get("technique"), d.get("board")
-        row = conn.execute("SELECT id FROM drills WHERE technique = ? AND board = ? ORDER BY id", (tech, board)).fetchone() \
-            if isinstance(tech, str) and isinstance(board, str) else None
+        row = (
+            conn.execute(
+                "SELECT id FROM drills WHERE technique = ? AND board = ? ORDER BY id", (tech, board)
+            ).fetchone()
+            if isinstance(tech, str) and isinstance(board, str)
+            else None
+        )
         if row is None:
             missing += 1
         else:
             found.append(("drill", row["id"]))
     at = now_iso()
-    added = sum(conn.execute("INSERT OR IGNORE INTO favorites (kind, ref_id, at) VALUES (?, ?, ?)",
-                             (kind, ref_id, at)).rowcount for kind, ref_id in found)
+    added = sum(
+        conn.execute("INSERT OR IGNORE INTO favorites (kind, ref_id, at) VALUES (?, ?, ?)", (kind, ref_id, at)).rowcount
+        for kind, ref_id in found
+    )
     conn.commit()
     return {"added": added, "missing": missing, "counts": favorite_counts(conn)}
 
@@ -399,8 +467,9 @@ def api_theory_list(conn, m, q, body):
 
 
 def api_theory_page(conn, m, q, body):
-    row = conn.execute("SELECT slug, title, level, ord, drill, body_md FROM techniques WHERE slug = ?",
-                       (unquote(m.group(1)),)).fetchone()
+    row = conn.execute(
+        "SELECT slug, title, level, ord, drill, body_md FROM techniques WHERE slug = ?", (unquote(m.group(1)),)
+    ).fetchone()
     if row is None:
         raise ApiError(404, tr("страница теории не найдена"))
     return {**dict(row), **_theory_en(row["slug"])}

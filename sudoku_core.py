@@ -2,6 +2,7 @@
 
 Cells are 0..80 (row * 9 + col). Units are 0..26: rows 0-8, columns 9-17, boxes 18-26.
 """
+
 from dataclasses import dataclass, field
 from itertools import combinations
 
@@ -11,17 +12,22 @@ Grid = list  # 81 ints, 0 = empty
 
 ROWS = [[r * 9 + c for c in range(9)] for r in range(9)]
 COLS = [[r * 9 + c for r in range(9)] for c in range(9)]
-BOXES = [[(br * 3 + r) * 9 + bc * 3 + c for r in range(3) for c in range(3)]
-         for br in range(3) for bc in range(3)]
+BOXES = [[(br * 3 + r) * 9 + bc * 3 + c for r in range(3) for c in range(3)] for br in range(3) for bc in range(3)]
 UNITS = ROWS + COLS + BOXES
 PEERS = [frozenset().union(*(u for u in UNITS if i in u)) - {i} for i in range(81)]
 BOX_OF = [18 + (i // 27) * 3 + (i % 9) // 3 for i in range(81)]
 
 TECH_TIER = {
-    "naked_single": 1, "hidden_single_box": 1, "hidden_single_row": 1, "hidden_single_col": 1,
-    "pointing": 2, "claiming": 2,
-    "naked_pair": 3, "hidden_pair": 3,
-    "x_wing": 4, "y_wing": 4,
+    "naked_single": 1,
+    "hidden_single_box": 1,
+    "hidden_single_row": 1,
+    "hidden_single_col": 1,
+    "pointing": 2,
+    "claiming": 2,
+    "naked_pair": 3,
+    "hidden_pair": 3,
+    "x_wing": 4,
+    "y_wing": 4,
 }
 GRADE_TITLE = {1: "одиночки", 2: "+ pointing / claiming", 3: "+ пары", 4: "+ X-Wing / Y-Wing", 5: "сложнее"}
 TECH_TITLE = {
@@ -36,8 +42,11 @@ TECH_TITLE = {
     "x_wing": "X-Wing",
     "y_wing": "Y-Wing (XY-Wing)",
 }
-_HIDDEN_UNITS = {"hidden_single_row": range(0, 9), "hidden_single_col": range(9, 18),
-                 "hidden_single_box": range(18, 27)}
+_HIDDEN_UNITS = {
+    "hidden_single_row": range(0, 9),
+    "hidden_single_col": range(9, 18),
+    "hidden_single_box": range(18, 27),
+}
 
 
 @dataclass
@@ -79,7 +88,9 @@ def _search(g: Grid, limit: int):
             r, c, b = i // 9, i % 9, BOX_OF[i] - 18
             if (rows[r] | cols[c] | boxes[b]) & bit:
                 return 0, None
-            rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit
+            rows[r] |= bit
+            cols[c] |= bit
+            boxes[b] |= bit
     empties = [i for i in range(81) if not g[i]]
     found = [0, None]
 
@@ -107,9 +118,13 @@ def _search(g: Grid, limit: int):
             bit = 1 << v
             if best_free & bit:
                 g[i] = v
-                rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit
+                rows[r] |= bit
+                cols[c] |= bit
+                boxes[b] |= bit
                 rec(k + 1)
-                rows[r] ^= bit; cols[c] ^= bit; boxes[b] ^= bit
+                rows[r] ^= bit
+                cols[c] ^= bit
+                boxes[b] ^= bit
                 if found[0] >= limit:
                     break
         g[i] = 0

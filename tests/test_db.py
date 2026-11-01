@@ -30,14 +30,21 @@ class DbTest(unittest.TestCase):
 
     def test_migrates_drills_kind(self):
         import sqlite3
+
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "old.db")
             old = sqlite3.connect(path)
-            old.execute("CREATE TABLE drills (id INTEGER PRIMARY KEY, technique TEXT NOT NULL,"
-                        " puzzle_id INTEGER NOT NULL, board TEXT NOT NULL, answers TEXT NOT NULL)")
-            old.execute("INSERT INTO drills (technique, puzzle_id, board, answers) VALUES ('naked_single', 1, 'b', '[]')")
-            old.execute("CREATE TABLE drill_attempts (id INTEGER PRIMARY KEY, drill_id INTEGER NOT NULL, at TEXT NOT NULL,"
-                        " time_ms INTEGER NOT NULL, correct INTEGER NOT NULL, cell INTEGER, value INTEGER)")
+            old.execute(
+                "CREATE TABLE drills (id INTEGER PRIMARY KEY, technique TEXT NOT NULL,"
+                " puzzle_id INTEGER NOT NULL, board TEXT NOT NULL, answers TEXT NOT NULL)"
+            )
+            old.execute(
+                "INSERT INTO drills (technique, puzzle_id, board, answers) VALUES ('naked_single', 1, 'b', '[]')"
+            )
+            old.execute(
+                "CREATE TABLE drill_attempts (id INTEGER PRIMARY KEY, drill_id INTEGER NOT NULL, at TEXT NOT NULL,"
+                " time_ms INTEGER NOT NULL, correct INTEGER NOT NULL, cell INTEGER, value INTEGER)"
+            )
             old.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct) VALUES (1, 'x', 1, 0)")
             old.commit()
             old.close()

@@ -1,4 +1,5 @@
 """Game analytics: replay, metrics from moves, pause review and overall statistics."""
+
 import statistics
 from datetime import date, timedelta
 
@@ -91,19 +92,31 @@ def game_info(conn, game_id: int) -> dict | None:
     """Game row plus the puzzle's level, givens, solution and tech_grade; None if unknown."""
     row = conn.execute(
         "SELECT g.*, p.level, p.givens, p.solution, p.tech_grade FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
-        " WHERE g.id = ?", (game_id,)).fetchone()
+        " WHERE g.id = ?",
+        (game_id,),
+    ).fetchone()
     return dict(row) if row else None
 
 
 def load_moves(conn, game_id: int) -> list:
-    return [dict(r) for r in conn.execute(
-        "SELECT seq, t_ms, cell, value, kind, correct FROM moves WHERE game_id = ? ORDER BY seq", (game_id,))]
+    return [
+        dict(r)
+        for r in conn.execute(
+            "SELECT seq, t_ms, cell, value, kind, correct FROM moves WHERE game_id = ? ORDER BY seq", (game_id,)
+        )
+    ]
 
 
 def _step_dict(st) -> dict:
-    return {"technique": st.technique, "title": tr(TECH_TITLE[st.technique]), "cell": st.cell, "value": st.value,
-            "unit": st.unit, "unit_name": None if st.unit is None else unit_name(st.unit),
-            "eliminations": [list(e) for e in st.eliminations]}
+    return {
+        "technique": st.technique,
+        "title": tr(TECH_TITLE[st.technique]),
+        "cell": st.cell,
+        "value": st.value,
+        "unit": st.unit,
+        "unit_name": None if st.unit is None else unit_name(st.unit),
+        "eliminations": [list(e) for e in st.eliminations],
+    }
 
 
 def _distinct(steps) -> list:
@@ -131,8 +144,15 @@ def review(conn, game_id: int) -> dict | None:
         clean = board[:]
         for i in wrong:
             clean[i] = 0
-        out.append({**p, "board": to_str(board), "had_errors": bool(wrong), "wrong_cells": wrong,
-                    "steps": [_step_dict(s) for s in _distinct(easiest_steps(clean))[:MAX_REVIEW_STEPS]]})
+        out.append(
+            {
+                **p,
+                "board": to_str(board),
+                "had_errors": bool(wrong),
+                "wrong_cells": wrong,
+                "steps": [_step_dict(s) for s in _distinct(easiest_steps(clean))[:MAX_REVIEW_STEPS]],
+            }
+        )
     return {"game": game, "pauses": out}
 
 
@@ -146,24 +166,29 @@ def records(conn) -> list:
     Only solved games without «Проверить» count (a check reveals mistakes); on a tie the earlier game keeps it."""
     best = {}
     for gid, level, mode, ms, at in conn.execute(
-            "SELECT g.id, p.level, g.mode, g.time_ms, g.started_at FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
-            " WHERE g.status = 'solved' AND g.time_ms IS NOT NULL AND COALESCE(g.checks, 0) = 0"
-            " ORDER BY g.time_ms, g.id"):
+        "SELECT g.id, p.level, g.mode, g.time_ms, g.started_at FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
+        " WHERE g.status = 'solved' AND g.time_ms IS NOT NULL AND COALESCE(g.checks, 0) = 0"
+        " ORDER BY g.time_ms, g.id"
+    ):
         key = (level, mode)
         if key in best:
             best[key]["solved"] += 1
         else:
             best[key] = {"best_ms": ms, "game_id": gid, "at": at, "solved": 1}
     empty = {"best_ms": None, "game_id": None, "at": None, "solved": 0}
-    return [{"level": lv, "mode": md, **best.get((lv, md), empty)}
-            for lv in sorted(LEVEL_ORDER, key=LEVEL_ORDER.get) for md in ("original", "hardcore")]
+    return [
+        {"level": lv, "mode": md, **best.get((lv, md), empty)}
+        for lv in sorted(LEVEL_ORDER, key=LEVEL_ORDER.get)
+        for md in ("original", "hardcore")
+    ]
 
 
 def stats(conn) -> dict:
     games = conn.execute(
         "SELECT g.status, g.mode, g.time_ms, g.mistakes, date(g.started_at, 'localtime') AS day, p.level"
         " FROM games g JOIN puzzles p ON p.id = g.puzzle_id WHERE g.status IN (?, ?) ORDER BY g.id",
-        FINISHED).fetchall()
+        FINISHED,
+    ).fetchall()
 
     def group(key):
         groups = {}
@@ -172,34 +197,58 @@ def stats(conn) -> dict:
         return groups
 
     by_lm = []
-    for (level, mode), gs in sorted(group(lambda g: (g["level"], g["mode"])).items(),
-                                    key=lambda kv: (LEVEL_ORDER.get(kv[0][0], 9), kv[0][1])):
+    for (level, mode), gs in sorted(
+        group(lambda g: (g["level"], g["mode"])).items(), key=lambda kv: (LEVEL_ORDER.get(kv[0][0], 9), kv[0][1])
+    ):
         solved = [g["time_ms"] for g in gs if g["status"] == "solved" and g["time_ms"] is not None]
-        by_lm.append({
-            "level": level, "mode": mode, "n": len(gs), "solved": len(solved),
-            "median_ms": _median(solved), "best_ms": min(solved) if solved else None,
-            "mistakes_per_game": sum(g["mistakes"] or 0 for g in gs) / len(gs),
-            "fail_rate": sum(1 for g in gs if g["status"] == "failed") / len(gs),
-        })
+        by_lm.append(
+            {
+                "level": level,
+                "mode": mode,
+                "n": len(gs),
+                "solved": len(solved),
+                "median_ms": _median(solved),
+                "best_ms": min(solved) if solved else None,
+                "mistakes_per_game": sum(g["mistakes"] or 0 for g in gs) / len(gs),
+                "fail_rate": sum(1 for g in gs if g["status"] == "failed") / len(gs),
+            }
+        )
     daily = []
-    for (day, level, mode), gs in sorted(group(lambda g: (g["day"], g["level"], g["mode"])).items(),
-                                         key=lambda kv: (kv[0][0], LEVEL_ORDER.get(kv[0][1], 9), kv[0][2])):
+    for (day, level, mode), gs in sorted(
+        group(lambda g: (g["day"], g["level"], g["mode"])).items(),
+        key=lambda kv: (kv[0][0], LEVEL_ORDER.get(kv[0][1], 9), kv[0][2]),
+    ):
         solved = [g["time_ms"] for g in gs if g["status"] == "solved" and g["time_ms"] is not None]
-        daily.append({"day": day, "level": level, "mode": mode, "n": len(gs), "solved": len(solved),
-                      "median_ms": _median(solved)})
+        daily.append(
+            {
+                "day": day,
+                "level": level,
+                "mode": mode,
+                "n": len(gs),
+                "solved": len(solved),
+                "median_ms": _median(solved),
+            }
+        )
     attempts = {}
     for t, correct, ms in conn.execute(
-            "SELECT d.technique, a.correct, a.time_ms FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
-            f" WHERE NOT {NEUTRAL}"):  # a true move by another technique / right after a hint: neither right nor wrong
+        "SELECT d.technique, a.correct, a.time_ms FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
+        f" WHERE NOT {NEUTRAL}"
+    ):  # a true move by another technique / right after a hint: neither right nor wrong
         attempts.setdefault(t, []).append((correct, ms))
     techniques = []
     for t in TECH_TIER:
         rows = attempts.get(t, [])
-        techniques.append({
-            "technique": t, "title": tr(TECH_TITLE[t]), "kind": "place" if TECH_TIER[t] == 1 else "eliminate",
-            "tier": TECH_TIER[t], "n": len(rows), "median_ms": _median([ms for ok, ms in rows if ok]),
-            "accuracy": sum(1 for ok, _ in rows if ok) / len(rows) if rows else None,
-        })
+        techniques.append(
+            {
+                "technique": t,
+                "title": tr(TECH_TITLE[t]),
+                "kind": "place" if TECH_TIER[t] == 1 else "eliminate",
+                "tier": TECH_TIER[t],
+                "n": len(rows),
+                "median_ms": _median([ms for ok, ms in rows if ok]),
+                "accuracy": sum(1 for ok, _ in rows if ok) / len(rows) if rows else None,
+            }
+        )
     return {"by_level_mode": by_lm, "daily": daily, "techniques": techniques}
 
 
@@ -210,11 +259,14 @@ def activity(conn, today: str | None = None) -> dict:
     still empty, yesterday — it is not broken until the day is over."""
     today = today or conn.execute("SELECT date('now', 'localtime')").fetchone()[0]
     per_day = {}
-    for day, n in conn.execute("SELECT date(started_at, 'localtime'), COUNT(*) FROM games"
-                               " WHERE status = 'solved' GROUP BY 1"):
+    for day, n in conn.execute(
+        "SELECT date(started_at, 'localtime'), COUNT(*) FROM games WHERE status = 'solved' GROUP BY 1"
+    ):
         per_day.setdefault(day, {"day": day, "games": 0, "drills": 0})["games"] = n
-    for day, n in conn.execute("SELECT date(a.at, 'localtime'), COUNT(*) FROM drill_attempts a"
-                               f" WHERE a.correct = 1 AND NOT {NEUTRAL} GROUP BY 1"):
+    for day, n in conn.execute(
+        "SELECT date(a.at, 'localtime'), COUNT(*) FROM drill_attempts a"
+        f" WHERE a.correct = 1 AND NOT {NEUTRAL} GROUP BY 1"
+    ):
         per_day.setdefault(day, {"day": day, "games": 0, "drills": 0})["drills"] = n
     t = date.fromisoformat(today)
     start = (t - timedelta(days=t.weekday() + 52 * 7)).isoformat()
@@ -231,7 +283,13 @@ def activity(conn, today: str | None = None) -> dict:
     current, k = 0, t if today in per_day else t - timedelta(days=1)
     while k.isoformat() in per_day:
         current, k = current + 1, k - timedelta(days=1)
-    return {"today": today, "days": days,
-            "streak": {"current": current, "best": best, "today": today in per_day},
-            "totals": {"games": sum(d["games"] for d in year), "drills": sum(d["drills"] for d in year),
-                       "active_days": len(year)}}
+    return {
+        "today": today,
+        "days": days,
+        "streak": {"current": current, "best": best, "today": today in per_day},
+        "totals": {
+            "games": sum(d["games"] for d in year),
+            "drills": sum(d["drills"] for d in year),
+            "active_days": len(year),
+        },
+    }

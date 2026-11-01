@@ -1,5 +1,6 @@
 """Every text marked for translation has an English version: tr("…") keys in web/js against web/js/en.js,
 tr("…") templates in the Python code against i18n.EN; and English output has no Russian left."""
+
 import ast
 import json
 import os
@@ -41,8 +42,10 @@ def js_keys():
 def en_js():
     with open(os.path.join(ROOT, "web", "js", "en.js"), encoding="utf-8") as f:
         text = f.read()
-    return {json.loads(k): json.loads(v) for k, v in re.findall(r"^\s*(" + LIT + r"):\s*(?:\n\s*)?(" + LIT + r"),?$",
-                                                            text, re.M)}
+    return {
+        json.loads(k): json.loads(v)
+        for k, v in re.findall(r"^\s*(" + LIT + r"):\s*(?:\n\s*)?(" + LIT + r"),?$", text, re.M)
+    }
 
 
 def py_keys():
@@ -96,13 +99,17 @@ class TestI18n(unittest.TestCase):
     def test_every_theory_page_has_english(self):
         theory = os.path.join(ROOT, "theory")
         head = lambda path: dict(  # noqa: E731
-            line.split(":", 1) for line in open(path, encoding="utf-8").read().split("---")[1].strip().splitlines())
+            line.split(":", 1) for line in open(path, encoding="utf-8").read().split("---")[1].strip().splitlines()
+        )
         names = sorted(n for n in os.listdir(theory) if n.endswith(".md"))
         self.assertEqual(names, sorted(os.listdir(os.path.join(theory, "en"))))
         for n in names:
             ru, en = head(os.path.join(theory, n)), head(os.path.join(theory, "en", n))
-            self.assertEqual({k: ru[k].strip() for k in ("slug", "level", "order", "drill")},
-                             {k: en[k].strip() for k in ("slug", "level", "order", "drill")}, n)
+            self.assertEqual(
+                {k: ru[k].strip() for k in ("slug", "level", "order", "drill")},
+                {k: en[k].strip() for k in ("slug", "level", "order", "drill")},
+                n,
+            )
             with open(os.path.join(theory, "en", n), encoding="utf-8") as f:
                 self.assertIsNone(CYR.search(f.read()), n)
 

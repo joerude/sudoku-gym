@@ -2,6 +2,7 @@
 
 Usage: python3 tools/regrade.py [--db data/sudoku.db]
 """
+
 import argparse
 import os
 import sys

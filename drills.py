@@ -5,6 +5,7 @@ Two kinds of drills:
 - eliminate: everything else — answer is a candidate removal [cell, value].
 Candidates are always computed fresh from the digits on the board.
 """
+
 import json
 import random
 import statistics
@@ -36,20 +37,28 @@ def drill_prompt(t: str) -> str:
     """DRILL_PROMPT in the request's language."""
     return tr(_PROMPTS[t]) if t in _PROMPTS else tr("Найди ход: {title}", title=tr(TECH_TITLE.get(t, t)))
 
+
 SINGLES = [t for t in DRILL_TECHNIQUES if TECH_TIER[t] == 1]
 ELIMINATORS = [t for t in DRILL_TECHNIQUES if TECH_TIER[t] > 1]
 MAX_TIER = max(TECH_TIER.values())
-RECENT_EXCLUDE = 50      # drills attempted most recently are not shown again
-MEDIAN_WINDOW = 10       # last N correct attempts for the speed median
-ERROR_WINDOW = 20        # last N attempts for the error rate
+RECENT_EXCLUDE = 50  # drills attempted most recently are not shown again
+MEDIAN_WINDOW = 10  # last N correct attempts for the speed median
+ERROR_WINDOW = 20  # last N attempts for the error rate
 UNLOCK_MIN_CORRECT = 15  # a technique counts as mastered after this many correct answers…
 UNLOCK_MIN_ACCURACY = 0.8  # …with at least this accuracy over the last ERROR_WINDOW attempts
 # Neither right nor wrong: a true move by another technique, or the right answer found after a hint.
 NEUTRAL = "(a.valid_other = 1 OR (a.hint > 0 AND a.correct = 1))"
 THEORY_SLUG = {
-    "naked_single": "naked-single", "hidden_single_box": "hidden-single", "hidden_single_row": "hidden-single",
-    "hidden_single_col": "hidden-single", "pointing": "pointing-claiming", "claiming": "pointing-claiming",
-    "naked_pair": "naked-pair", "hidden_pair": "hidden-pair", "x_wing": "x-wing", "y_wing": "y-wing",
+    "naked_single": "naked-single",
+    "hidden_single_box": "hidden-single",
+    "hidden_single_row": "hidden-single",
+    "hidden_single_col": "hidden-single",
+    "pointing": "pointing-claiming",
+    "claiming": "pointing-claiming",
+    "naked_pair": "naked-pair",
+    "hidden_pair": "hidden-pair",
+    "x_wing": "x-wing",
+    "y_wing": "y-wing",
 }
 
 
@@ -139,8 +148,10 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
 
     def store(t, pid, board, pairs):
         nonlocal added
-        conn.execute("INSERT INTO drills (technique, kind, puzzle_id, board, answers) VALUES (?, ?, ?, ?, ?)",
-                     (t, KIND[t], pid, board, json.dumps([list(p) for p in pairs])))
+        conn.execute(
+            "INSERT INTO drills (technique, kind, puzzle_id, board, answers) VALUES (?, ?, ?, ?, ?)",
+            (t, KIND[t], pid, board, json.dumps([list(p) for p in pairs])),
+        )
         seen.add((t, board))
         have[t] += 1
         added += 1
@@ -148,7 +159,9 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
     def pool(levels, min_grade=1):
         rows = conn.execute(
             f"SELECT id, level, givens, solution FROM puzzles WHERE level IN ({','.join('?' * len(levels))})"
-            " AND tech_grade >= ? ORDER BY id", (*levels, min_grade)).fetchall()
+            " AND tech_grade >= ? ORDER BY id",
+            (*levels, min_grade),
+        ).fetchall()
         rng.shuffle(rows)
         return rows
 
@@ -171,8 +184,7 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
     for pid, level, givens, solution in pool(("medium", "hard", "expert"), min_grade=2):
         if time.monotonic() > deadline or all(have[t] >= per_technique for t in ELIMINATORS):
             break
-        need = [t for t in ELIMINATORS if have[t] < per_technique
-                and (level != "expert" or TECH_TIER[t] == MAX_TIER)]
+        need = [t for t in ELIMINATORS if have[t] < per_technique and (level != "expert" or TECH_TIER[t] == MAX_TIER)]
         if not need:
             continue
         for g in _stuck_positions(givens):
@@ -195,12 +207,19 @@ def _score(conn, technique: str):
     """None if never attempted; else median of recent correct times × (1 + recent error rate)."""
     rows = conn.execute(
         "SELECT a.correct FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
-        f" WHERE d.technique = ? AND NOT {NEUTRAL} ORDER BY a.id DESC LIMIT ?", (technique, ERROR_WINDOW)).fetchall()
+        f" WHERE d.technique = ? AND NOT {NEUTRAL} ORDER BY a.id DESC LIMIT ?",
+        (technique, ERROR_WINDOW),
+    ).fetchall()
     if not rows:
         return None
-    correct_times = [r[0] for r in conn.execute(
-        "SELECT a.time_ms FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
-        " WHERE d.technique = ? AND a.correct = 1 AND a.hint = 0 ORDER BY a.id DESC LIMIT ?", (technique, MEDIAN_WINDOW))]
+    correct_times = [
+        r[0]
+        for r in conn.execute(
+            "SELECT a.time_ms FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
+            " WHERE d.technique = ? AND a.correct = 1 AND a.hint = 0 ORDER BY a.id DESC LIMIT ?",
+            (technique, MEDIAN_WINDOW),
+        )
+    ]
     if not correct_times:
         return float("inf")
     error_rate = sum(1 for r in rows if not r[0]) / len(rows)
@@ -217,14 +236,25 @@ def mastery(conn, technique: str) -> dict:
 
     A true move found by another technique and a right answer after a hint are neutral (NEUTRAL);
     a revealed answer is an error."""
-    correct = conn.execute("SELECT COUNT(*) FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
-                           " WHERE d.technique = ? AND a.correct = 1 AND a.hint = 0", (technique,)).fetchone()[0]
-    recent = [r[0] for r in conn.execute(
-        "SELECT a.correct FROM drill_attempts a JOIN drills d ON d.id = a.drill_id WHERE d.technique = ?"
-        f" AND NOT {NEUTRAL} ORDER BY a.id DESC LIMIT ?", (technique, ERROR_WINDOW))]
+    correct = conn.execute(
+        "SELECT COUNT(*) FROM drill_attempts a JOIN drills d ON d.id = a.drill_id"
+        " WHERE d.technique = ? AND a.correct = 1 AND a.hint = 0",
+        (technique,),
+    ).fetchone()[0]
+    recent = [
+        r[0]
+        for r in conn.execute(
+            "SELECT a.correct FROM drill_attempts a JOIN drills d ON d.id = a.drill_id WHERE d.technique = ?"
+            f" AND NOT {NEUTRAL} ORDER BY a.id DESC LIMIT ?",
+            (technique, ERROR_WINDOW),
+        )
+    ]
     accuracy = sum(recent) / len(recent) if recent else None
-    return {"correct": correct, "accuracy": accuracy,
-            "mastered": correct >= UNLOCK_MIN_CORRECT and (accuracy or 0) >= UNLOCK_MIN_ACCURACY}
+    return {
+        "correct": correct,
+        "accuracy": accuracy,
+        "mastered": correct >= UNLOCK_MIN_CORRECT and (accuracy or 0) >= UNLOCK_MIN_ACCURACY,
+    }
 
 
 def unlocked_tier(conn) -> int:
@@ -277,23 +307,35 @@ def next_drill(conn, technique: str | None = None) -> dict | None:
     row = conn.execute(
         f"SELECT id, technique, kind, board FROM drills WHERE {where} AND id NOT IN"
         " (SELECT drill_id FROM drill_attempts ORDER BY id DESC LIMIT ?) ORDER BY RANDOM() LIMIT 1",
-        (*args, RECENT_EXCLUDE)).fetchone()
+        (*args, RECENT_EXCLUDE),
+    ).fetchone()
     if row is None:  # everything was attempted recently: take the least recently attempted one
         row = conn.execute(
             "SELECT d.id, d.technique, d.kind, d.board FROM drills d LEFT JOIN drill_attempts a ON a.drill_id = d.id"
-            f" WHERE d.{where} GROUP BY d.id ORDER BY MAX(COALESCE(a.id, 0)), RANDOM() LIMIT 1", args).fetchone()
+            f" WHERE d.{where} GROUP BY d.id ORDER BY MAX(COALESCE(a.id, 0)), RANDOM() LIMIT 1",
+            args,
+        ).fetchone()
     if row is None:
         return None
     board = row[3]
-    return {"id": row[0], "technique": row[1], "kind": row[2], "prompt": drill_prompt(row[1]),
-            "title": tr(TECH_TITLE[row[1]]), "board": board,
-            "candidates": [sorted(c) for c in candidates(parse(board))], "fav": is_favorite(conn, "drill", row[0])}
+    return {
+        "id": row[0],
+        "technique": row[1],
+        "kind": row[2],
+        "prompt": drill_prompt(row[1]),
+        "title": tr(TECH_TITLE[row[1]]),
+        "board": board,
+        "candidates": [sorted(c) for c in candidates(parse(board))],
+        "fav": is_favorite(conn, "drill", row[0]),
+    }
 
 
 def _drill(conn, drill_id: int):
     return conn.execute(
         "SELECT d.board, d.answers, d.kind, p.solution, d.technique FROM drills d JOIN puzzles p ON p.id = d.puzzle_id"
-        " WHERE d.id = ?", (drill_id,)).fetchone()
+        " WHERE d.id = ?",
+        (drill_id,),
+    ).fetchone()
 
 
 def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int, hint: int = 0) -> dict | None:
@@ -313,13 +355,19 @@ def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int, hint: int 
             valid_other = str(value) != solution[cell] and value in candidates(parse(board))[cell]
         else:
             valid_other = solution[cell] == str(value)
-    conn.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct, cell, value, valid_other, hint)"
-                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                 (drill_id, _now(), time_ms, int(correct), cell, value, int(valid_other), hint))
+    conn.execute(
+        "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, cell, value, valid_other, hint)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (drill_id, _now(), time_ms, int(correct), cell, value, int(valid_other), hint),
+    )
     conn.commit()
-    return {"correct": correct, "valid_other_move": valid_other, "answers": answers,
-            **explain(board, row[4], answers, (cell, value) if correct else None),
-            "theory": THEORY_SLUG.get(row[4])}
+    return {
+        "correct": correct,
+        "valid_other_move": valid_other,
+        "answers": answers,
+        **explain(board, row[4], answers, (cell, value) if correct else None),
+        "theory": THEORY_SLUG.get(row[4]),
+    }
 
 
 def reveal(conn, drill_id: int, time_ms: int) -> dict | None:
@@ -328,11 +376,18 @@ def reveal(conn, drill_id: int, time_ms: int) -> dict | None:
     if row is None:
         return None
     answers = json.loads(row[1])
-    conn.execute("INSERT INTO drill_attempts (drill_id, at, time_ms, correct, hint) VALUES (?, ?, ?, 0, 2)",
-                 (drill_id, _now(), time_ms))
+    conn.execute(
+        "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, hint) VALUES (?, ?, ?, 0, 2)",
+        (drill_id, _now(), time_ms),
+    )
     conn.commit()
-    return {"correct": False, "valid_other_move": False, "answers": answers,
-            **explain(row[0], row[4], answers), "theory": THEORY_SLUG.get(row[4])}
+    return {
+        "correct": False,
+        "valid_other_move": False,
+        "answers": answers,
+        **explain(row[0], row[4], answers),
+        "theory": THEORY_SLUG.get(row[4]),
+    }
 
 
 def hint(conn, drill_id: int) -> dict | None:
@@ -350,9 +405,19 @@ def technique_list(conn) -> list:
     """[{technique, title, kind, tier, n, unlocked, theory, correct, accuracy, mastered}] for every drill technique."""
     counts = dict(conn.execute("SELECT technique, COUNT(*) FROM drills GROUP BY technique").fetchall())
     top = unlocked_tier(conn)
-    return [{"technique": t, "title": tr(TECH_TITLE[t]), "kind": KIND[t], "tier": TECH_TIER[t], "n": counts.get(t, 0),
-             "unlocked": TECH_TIER[t] <= top, "theory": THEORY_SLUG.get(t), **mastery(conn, t)}
-            for t in DRILL_TECHNIQUES]
+    return [
+        {
+            "technique": t,
+            "title": tr(TECH_TITLE[t]),
+            "kind": KIND[t],
+            "tier": TECH_TIER[t],
+            "n": counts.get(t, 0),
+            "unlocked": TECH_TIER[t] <= top,
+            "theory": THEORY_SLUG.get(t),
+            **mastery(conn, t),
+        }
+        for t in DRILL_TECHNIQUES
+    ]
 
 
 def _rc(c: int) -> str:
@@ -377,49 +442,94 @@ def _elims(elims) -> str:
 def _explain_step(s, cands) -> str:
     t = s.technique
     if t == "naked_single":
-        return tr("В {cell} остался один кандидат — {v}: остальные цифры уже стоят в её строке, столбце или блоке.",
-                  cell=_rc(s.cell), v=s.value)
+        return tr(
+            "В {cell} остался один кандидат — {v}: остальные цифры уже стоят в её строке, столбце или блоке.",
+            cell=_rc(s.cell),
+            v=s.value,
+        )
     if t.startswith("hidden_single"):
-        return tr("В {unit} цифра {v} может стоять только в {cell}.", unit=_in_unit(s.unit), v=s.value, cell=_rc(s.cell))
+        return tr(
+            "В {unit} цифра {v} может стоять только в {cell}.", unit=_in_unit(s.unit), v=s.value, cell=_rc(s.cell)
+        )
     v, elims = s.eliminations[0][1], _elims(s.eliminations)
     if t == "pointing":
         same_row = len({c // 9 for c in s.pattern}) == 1
         line = tr("строке {n}", n=s.pattern[0] // 9 + 1) if same_row else tr("столбце {n}", n=s.pattern[0] % 9 + 1)
         this = tr("этой строке") if same_row else tr("этом столбце")
-        return tr("В {unit} цифра {v} может стоять только в {line} ({cells}). "
-                  "Значит, в {this} вне блока {v} быть не может → убираем {elims}.",
-                  unit=_in_unit(s.unit), v=v, line=line, cells=_cells(s.pattern), this=this, elims=elims)
+        return tr(
+            "В {unit} цифра {v} может стоять только в {line} ({cells}). "
+            "Значит, в {this} вне блока {v} быть не может → убираем {elims}.",
+            unit=_in_unit(s.unit),
+            v=v,
+            line=line,
+            cells=_cells(s.pattern),
+            this=this,
+            elims=elims,
+        )
     if t == "claiming":
         box = BOX_OF[s.pattern[0]]
-        return tr("В {unit} цифра {v} может стоять только внутри блока {box} ({cells}). "
-                  "Значит, в остальных клетках блока {box} её быть не может → убираем {elims}.",
-                  unit=_in_unit(s.unit), v=v, box=box - 17, cells=_cells(s.pattern), elims=elims)
+        return tr(
+            "В {unit} цифра {v} может стоять только внутри блока {box} ({cells}). "
+            "Значит, в остальных клетках блока {box} её быть не может → убираем {elims}.",
+            unit=_in_unit(s.unit),
+            v=v,
+            box=box - 17,
+            cells=_cells(s.pattern),
+            elims=elims,
+        )
     if t == "naked_pair":
         a, b = s.pattern
         x, y = sorted(cands[a])
-        return tr("В {unit} клетки {a} и {b} содержат только {x} и {y} — эти две цифры займут именно их → убираем {elims}.",
-                  unit=_in_unit(s.unit), a=_rc(a), b=_rc(b), x=x, y=y, elims=elims)
+        return tr(
+            "В {unit} клетки {a} и {b} содержат только {x} и {y} — эти две цифры займут именно их → убираем {elims}.",
+            unit=_in_unit(s.unit),
+            a=_rc(a),
+            b=_rc(b),
+            x=x,
+            y=y,
+            elims=elims,
+        )
     if t == "hidden_pair":
         a, b = s.pattern
         removed = {v for _, v in s.eliminations}
         x, y = sorted((cands[a] & cands[b]) - removed)[:2]
-        return tr("В {unit} цифры {x} и {y} могут стоять только в {a} и {b} → эти клетки "
-                  "заняты ими, остальные кандидаты оттуда убираем: {elims}.",
-                  unit=_in_unit(s.unit), x=x, y=y, a=_rc(a), b=_rc(b), elims=elims)
+        return tr(
+            "В {unit} цифры {x} и {y} могут стоять только в {a} и {b} → эти клетки "
+            "заняты ими, остальные кандидаты оттуда убираем: {elims}.",
+            unit=_in_unit(s.unit),
+            x=x,
+            y=y,
+            a=_rc(a),
+            b=_rc(b),
+            elims=elims,
+        )
     if t == "x_wing":
         rows = sorted({c // 9 + 1 for c in s.pattern})
         cols = sorted({c % 9 + 1 for c in s.pattern})
         by_rows = all((c % 9 + 1) in cols for c, _ in s.eliminations)
         in_rows, in_cols = tr("строках {a} и {b}", a=rows[0], b=rows[1]), tr("столбцах {a} и {b}", a=cols[0], b=cols[1])
         base, cover = (in_rows, in_cols) if by_rows else (in_cols, in_rows)
-        return tr("В {base} цифра {v} может стоять только в {cover} (углы: {cells}). В каждой из этих линий "
-                  "{v} займёт один из углов → убираем {elims}.", base=base, v=v, cover=cover, cells=_cells(s.pattern), elims=elims)
+        return tr(
+            "В {base} цифра {v} может стоять только в {cover} (углы: {cells}). В каждой из этих линий "
+            "{v} займёт один из углов → убираем {elims}.",
+            base=base,
+            v=v,
+            cover=cover,
+            cells=_cells(s.pattern),
+            elims=elims,
+        )
     if t == "y_wing":
         p, a, b = s.pattern
         fmt = lambda c: f"{_rc(c)} ({'/'.join(map(str, sorted(cands[c])))})"  # noqa: E731
-        return tr("Опора {p} видит крылья {a} и {b}. Что бы ни встало в опору, в одном из крыльев "
-                  "окажется {v} → {v} нельзя там, где клетка видит оба крыла: убираем {elims}.",
-                  p=fmt(p), a=fmt(a), b=fmt(b), v=v, elims=elims)
+        return tr(
+            "Опора {p} видит крылья {a} и {b}. Что бы ни встало в опору, в одном из крыльев "
+            "окажется {v} → {v} нельзя там, где клетка видит оба крыла: убираем {elims}.",
+            p=fmt(p),
+            a=fmt(a),
+            b=fmt(b),
+            v=v,
+            elims=elims,
+        )
     return tr("{title}: убираем {elims}.", title=tr(TECH_TITLE[t]), elims=elims)
 
 
@@ -428,30 +538,49 @@ def _hint_step(s, cands) -> dict:
     unit, digit, cells = s.unit, None, []
     if t == "naked_single":
         unit = BOX_OF[s.cell]
-        text = tr("Смотри в {unit}: там есть пустая клетка, где строка, столбец и блок уже закрыли "
-                  "все цифры, кроме одной.", unit=_in_unit(unit))
+        text = tr(
+            "Смотри в {unit}: там есть пустая клетка, где строка, столбец и блок уже закрыли все цифры, кроме одной.",
+            unit=_in_unit(unit),
+        )
     elif t.startswith("hidden_single"):
-        text = tr("Смотри в {unit}: одной из недостающих цифр там осталось только одно место. "
-                  "Для каждой недостающей цифры вычеркни клетки, которые она «видит».", unit=_in_unit(unit))
+        text = tr(
+            "Смотри в {unit}: одной из недостающих цифр там осталось только одно место. "
+            "Для каждой недостающей цифры вычеркни клетки, которые она «видит».",
+            unit=_in_unit(unit),
+        )
     elif t == "pointing":
         digit = s.eliminations[0][1]
-        text = tr("Смотри цифру {d} в {unit}: внутри блока она возможна только на одной линии.", d=digit, unit=_in_unit(unit))
+        text = tr(
+            "Смотри цифру {d} в {unit}: внутри блока она возможна только на одной линии.", d=digit, unit=_in_unit(unit)
+        )
     elif t == "claiming":
         digit = s.eliminations[0][1]
-        text = tr("Смотри цифру {d} в {unit}: в этой линии она возможна только внутри одного блока.", d=digit, unit=_in_unit(unit))
+        text = tr(
+            "Смотри цифру {d} в {unit}: в этой линии она возможна только внутри одного блока.",
+            d=digit,
+            unit=_in_unit(unit),
+        )
     elif t == "naked_pair":
         text = tr("Смотри в {unit}: у двух клеток там одна и та же пара кандидатов.", unit=_in_unit(unit))
     elif t == "hidden_pair":
         text = tr("Смотри в {unit}: две цифры там возможны только в двух одних и тех же клетках.", unit=_in_unit(unit))
     elif t == "x_wing":
         unit, digit = None, s.eliminations[0][1]
-        text = tr("Смотри цифру {d}: найди две строки (или два столбца), где она возможна ровно в двух "
-                  "одинаковых позициях — получится прямоугольник.", d=digit)
+        text = tr(
+            "Смотри цифру {d}: найди две строки (или два столбца), где она возможна ровно в двух "
+            "одинаковых позициях — получится прямоугольник.",
+            d=digit,
+        )
     elif t == "y_wing":
         unit, cells = None, [s.pattern[0]]
         x, y = sorted(cands[s.pattern[0]])
-        text = tr("Опора — {cell} ({x}/{y}). Найди две клетки-крыла, которые она видит: у каждой два "
-                  "кандидата, один общий с опорой, а второй — одинаковый у обоих крыльев.", cell=_rc(s.pattern[0]), x=x, y=y)
+        text = tr(
+            "Опора — {cell} ({x}/{y}). Найди две клетки-крыла, которые она видит: у каждой два "
+            "кандидата, один общий с опорой, а второй — одинаковый у обоих крыльев.",
+            cell=_rc(s.pattern[0]),
+            x=x,
+            y=y,
+        )
     else:
         text = tr("Ищи: {title}.", title=tr(TECH_TITLE[t]))
     return {"hint": text, "unit": unit, "digit": digit, "cells": cells}
@@ -462,8 +591,9 @@ def _steps(board: str, technique: str, answers: list):
     g = parse(board)
     cands = candidates(g)
     want = {tuple(a) for a in answers}
-    return [s for s in find_steps(g, cands, [technique])
-            if (s.cell, s.value) in want or want & set(s.eliminations)], cands
+    return [
+        s for s in find_steps(g, cands, [technique]) if (s.cell, s.value) in want or want & set(s.eliminations)
+    ], cands
 
 
 def explain(board: str, technique: str, answers: list, picked=None) -> dict:

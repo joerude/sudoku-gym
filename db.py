@@ -1,4 +1,5 @@
 """SQLite schema and connection for Sudoku Gym."""
+
 import os
 import sqlite3
 
@@ -98,9 +99,11 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
     # databases created before these columns existed
-    for table, column, ddl in (("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
-                               ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),
-                               ("drill_attempts", "hint", "INTEGER NOT NULL DEFAULT 0")):
+    for table, column, ddl in (
+        ("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
+        ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),
+        ("drill_attempts", "hint", "INTEGER NOT NULL DEFAULT 0"),
+    ):
         if column not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
             conn.commit()
