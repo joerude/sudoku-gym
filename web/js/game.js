@@ -13,7 +13,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     puzzle, gameId, mode, limit,
     given: givens.map(Boolean), vals: givens.slice(), sol: toDigits(puzzle.solution),
     notes: Array(81).fill(0), sel: givens.indexOf(0), notesMode: false, autoNotes: true,
-    undo: [], redo: [], showBad: new Set(), mistakes: 0, seq: 0,
+    undo: [], redo: [], showBad: new Set(), mistakes: 0, seq: 0, hints: 0,
     start: performance.now(), end: null, status: "active", msg: null, result: null,
   };
   const queue = createMoveQueue(gameId, { onError: onQueueError });

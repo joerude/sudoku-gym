@@ -99,6 +99,7 @@ export function metricsGrid(g) {
     [tr("Исправления"), g.corrections ?? "—"],
     [tr("Проверки"), g.checks ?? "—"],
   ];
+  if (g.hints) items.push([tr("Подсказки"), g.hints]);
   return h("div", { class: "metrics" }, items.map(([k, v]) => h("div", { class: "metric" }, h("b", {}, v), h("span", {}, k))));
 }
 

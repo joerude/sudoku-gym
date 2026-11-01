@@ -1,8 +1,9 @@
 // #/play — game page: setup controls, board, timer, results. The game survives navigation.
 import { tr } from "./i18n.js";
-import { addPuzzle, createGame, getDaily, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
-import { PEERS, createBoard, createPad, fmtTime, parseGrid, stepCell, toDigits } from "./board.js";
+import { addPuzzle, createGame, gameHint, getDaily, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
+import { PEERS, computeCandidates, createBoard, createPad, fmtTime, parseGrid, stepCell, toDigits } from "./board.js";
 import { startGame } from "./game.js";
+import { ladderText, ladderView } from "./ladder.js";
 import { closeReward, showReward } from "./reward.js";
 import { dayStrip } from "./daystrip.js";
 import { recordLine } from "./records.js";
@@ -27,6 +28,8 @@ let digit = 0;         // last digit pressed: highlighted everywhere until a fil
 let favCount = null;   // starred puzzles (null until /api/favorites answers)
 let asking = null;     // close() of the open «Бросить партию?» dialog
 let edit = null;       // own grid being entered ({vals, sel}); survives navigation like G
+let hint = null;       // {seq, level, lad}: the hint ladder opened for the position after move seq
+let hinting = false;   // a hint request is on its way
 
 const bits = m => { const out = []; for (let v = 1; v <= 9; v++) if (m & (1 << v)) out.push(v); return out; };
 
@@ -161,6 +164,8 @@ export function mount(el, params, query) {
     onchange: e => { prefs.counts = e.target.checked; savePrefs(); refresh(); } });
   const clearBtn = h("button", { type: "button", id: "clearBtn", title: tr("Стереть все свои цифры и заметки (отменяется «↶ отменить»)"),
     onclick: () => G?.clear() }, tr("Очистить"));
+  const hintBtn = h("button", { type: "button", id: "hintBtn", title: tr("Подсказка (H): каждое нажатие — ступень глубже"),
+    onclick: () => askHint() }, tr("💡 Подсказка"));
   // give up needs a second click within 3 s, so a stray click doesn't end the game
   let armed = null;
   const giveUpBtn = h("button", { type: "button", id: "giveUpBtn", title: tr("Завершить партию как брошенную"), onclick: () => {
@@ -197,6 +202,7 @@ export function mount(el, params, query) {
     fav, badge: h("span", { class: "badge", id: "badge" }), errs: h("span", { class: "counter", id: "errors" }),
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
     results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, setup,
+    hintBtn, hintBox: h("div", { id: "hintBox", class: "hint-box zen-hide" }),
   };
   ui.records = recordLine();
   ui.day = dayStrip();
@@ -215,16 +221,17 @@ export function mount(el, params, query) {
         h("button", { type: "button", id: "undoBtn", title: tr("Отменить (Ctrl+Z)"), onclick: () => G?.undoLast() }, tr("↶ отменить")),
         h("button", { type: "button", id: "redoBtn", title: tr("Вернуть отменённое (Ctrl+Y или Ctrl+Shift+Z)"), onclick: () => G?.redoLast() }, tr("↷ вернуть")),
         h("button", { type: "button", id: "checkBtn", title: tr("Подсветить ошибки (учитывается в итогах)"), onclick: () => G?.check() }, tr("Проверить")),
-        clearBtn, giveUpBtn,
+        hintBtn, clearBtn, giveUpBtn,
         h("label", { class: "check zen-hide" }, autoBox, tr("автоочистка заметок")),
         h("label", { class: "check zen-hide", title: tr("Сколько каждой цифры осталось поставить") }, countsBox, tr("счётчик цифр"))),
-      ui.msg),
+      ui.msg, ui.hintBox),
     setup.box, ui.editor.box,
     h("div", {}, ui.results, ui.records.el,
       h("details", { class: "fold zen-hide", id: "keysHelp" }, h("summary", {}, tr("Клавиши")), h("p", { class: "hint", style: "margin:0", html:
         tr("<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
         "<kbd>Ctrl+Y</kbd> — вернуть, " +
+        "<kbd>H</kbd> — подсказка (каждое нажатие — ступень глубже), " +
         "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением), " +
         "<kbd>Enter</kbd> — новая партия, когда партия не идёт. " +
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».") }))));
@@ -289,19 +296,26 @@ function refresh() {
     ui.root?.classList.remove("notes-on");
     ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
     ui.root.querySelector("#undoBtn").disabled = ui.root.querySelector("#redoBtn").disabled = true;
+    renderHint(true);
     if (pendingMsg) { setMsg(pendingMsg.text, pendingMsg.cls); pendingMsg = null; }
     else if (!ui.msg.textContent) setMsg(tr("Нажми «▶ Играть» или Enter."));
     return;
   }
   const S = G.S, over = S.status !== "active";
+  if (hint && hint.seq !== S.seq) hint = null;  // any move, note, undo or clear: the ladder starts over
+  const hv = hint && !over ? ladderView(hint.lad, hint.level) : null;
+  const cands = hv?.elims.size ? computeCandidates(S.vals) : null;
   ui.board.render({
-    values: S.vals, given: S.given, sel: over ? -1 : S.sel, highlight: true, locked: over && S.status !== "solved", digit,
-    notes: i => (S.vals[i] ? null : bits(S.notes[i])),
-    cellClass: i => (G.isWrong(i) && (S.mode === "original" || S.showBad.has(i) || over) ? ["bad"] : []),
+    values: S.vals, given: S.given, sel: over ? -1 : S.sel, highlight: true, locked: over && S.status !== "solved",
+    digit: hv?.digit || digit, ghost: hv?.ghost,
+    notes: i => (S.vals[i] ? null : cands && hv.elims.has(i) && !S.notes[i] ? cands[i] : bits(S.notes[i])),
+    candClass: (i, v) => (hv?.elims.get(i)?.includes(v) ? "c-x" : ""),
+    cellClass: i => [...(G.isWrong(i) && (S.mode === "original" || S.showBad.has(i) || over) ? ["bad"] : []),
+      ...(hv ? hv.cellClass(i) : [])],
   });
   ui.pad.update(prefs.counts ? S.vals : null);
   const p = S.puzzle, showGrade = !meta.hideGrade || over;
-  ui.badge.textContent = `${meta.daily ? tr("📅 задача дня") + " · " : ""}${LEVEL_NAME[p.level] || p.level} · ${showGrade ? tr("техника: {title}", { title: p.grade_title }) : tr("техника скрыта")} · ${S.mode}`;
+  ui.badge.textContent = `${meta.daily ? tr("📅 задача дня") + " · " : ""}${LEVEL_NAME[p.level] || p.level} · ${showGrade ? tr("техника: {title}", { title: p.grade_title }) : tr("техника скрыта")} · ${S.mode}${S.hints ? ` · 💡 ${S.hints}` : ""}`;
   ui.errs.textContent = S.mode === "original" ? tr("Ошибки {n}/{limit}", { n: S.mistakes, limit: S.limit ?? "∞" }) : "";
   ui.errs.classList.toggle("bad", S.mode === "original" && S.mistakes > 0);
   ui.timer.textContent = fmtTime(G.elapsed());
@@ -317,6 +331,7 @@ function refresh() {
   ui.autoBox.checked = S.autoNotes;
   if (S.msg) setMsg(S.msg.text, S.msg.cls);
   else if (!over) setMsg("");
+  renderHint(over);
 }
 
 /** The board as an editor of the grid being entered: its digits are the givens, repeats are red. */
@@ -326,6 +341,7 @@ function renderEditor() {
   ui.board.render({ values: edit.vals, given: edit.vals.map(Boolean), sel: edit.sel, highlight: true,
     cellClass: i => (conf.has(i) ? ["bad"] : []) });
   ui.pad.update(null);
+  renderHint(true);
   ui.badge.textContent = tr("своя сетка · ввод условия");
   ui.errs.textContent = "";
   ui.timer.textContent = fmtTime(0);
@@ -379,6 +395,7 @@ async function begin(getPuzzleFn, hideGrade, daily = false) {
     const { id } = await createGame(puzzle.id, mode, limit, daily);
     meta = { hideGrade, daily };
     digit = 0;
+    hint = null;
     G = startGame({
       puzzle, gameId: id, mode, limit,
       onChange: refresh, onEnd: endGame,
@@ -503,6 +520,45 @@ function press(v, asNote) {
   refresh();
 }
 
+/** H: the next level of the hint ladder for the position as it is now (level 1 again after any move). */
+async function askHint() {
+  if (!G || G.S.status !== "active" || hinting) return;
+  const S = G.S, seq = S.seq, fresh = !hint || hint.seq !== seq;
+  if (!fresh && hint.level >= hint.lad.max_level) return;
+  hinting = true;
+  try {
+    const lad = await gameHint(S.gameId, { board: S.vals.join(""), notes: S.notes, t_ms: Math.round(G.elapsed()),
+      level: fresh ? 1 : hint.level + 1 });
+    S.hints++;
+    if (S.seq === seq) hint = { seq, level: lad.level, lad };
+  } catch (e) {
+    setMsg(e.message, "bad");
+  } finally {
+    hinting = false;
+  }
+  refresh();
+}
+
+/** «Убрать в заметках»: the ladder's eliminations as note toggles (each one undoable). */
+function strikeNotes(elims) {
+  const sel = G.S.sel;
+  for (const [c, v] of elims) { G.select(c); G.input(v, true); }
+  G.select(sel);
+}
+
+function renderHint(over) {
+  ui.hintBox.textContent = "";
+  ui.hintBtn.disabled = over || !G;
+  ui.hintBtn.textContent = tr("💡 Подсказка");
+  if (!hint || over) return;
+  const { lad, level } = hint;
+  ui.hintBox.append(...ladderText(lad, level));
+  if (level < lad.max_level) ui.hintBtn.textContent = tr("💡 Глубже ({n}/{max})", { n: level + 1, max: lad.max_level });
+  const strike = level === 4 ? lad.levels[3].elims.filter(([c, v]) => G.S.notes[c] & (1 << v)) : [];
+  if (strike.length) ui.hintBox.append(h("button", { type: "button", id: "hintStrike", onclick: () => strikeNotes(strike) },
+    tr("Убрать в заметках")));
+}
+
 /** Esc on «Играть» (app.js): a game in progress is thrown away only after a yes in the dialog. */
 export function escape() {
   if (!ui || asking) return;
@@ -539,6 +595,7 @@ function handleKey(e) {
   }
   if (e.ctrlKey || e.metaKey) return;
   if (e.code === "KeyF") { ui?.fav.toggle(); e.preventDefault(); return; }
+  if (e.code === "KeyH") { askHint(); e.preventDefault(); return; }
   const d = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
   if (d && d[1] !== "0") { press(+d[1], e.shiftKey || G.S.notesMode); e.preventDefault(); return; }
   if (e.key.startsWith("Arrow")) { digit = 0; G.move(e.key); e.preventDefault(); return; }

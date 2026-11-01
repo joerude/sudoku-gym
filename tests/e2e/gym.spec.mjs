@@ -206,6 +206,26 @@ try {
   await page.waitForSelector("#noMoves");
   ok(/Ходов нет/.test(await page.textContent("#noMoves")), "review of migrated game 1: «ходов нет»");
 
+  // --- hint in a game: four levels, a move resets them, the game is marked ---------------------------
+  await page.goto(`${BASE}/#/play`);
+  await page.waitForSelector("#grade option[value=\"1\"]", { state: "attached" });
+  const gh = await startGame(page, { level: "easy", mode: "original", limit: "none", grade: "" });
+  for (let n = 1; n <= 4; n++) {
+    await page.keyboard.press("h");
+    await page.waitForFunction(n => document.querySelectorAll("#hintBox .ladder-step").length === n, n);
+  }
+  ok(await page.$$eval("#board .cell.ans", els => els.length) === 1, "hint: level 4 shows the move on the board");
+  ok((await page.textContent("#badge")).includes("💡 4"), "hint: the badge counts hints");
+  const target = await page.$eval("#board .cell.ans", e => +e.dataset.cell);
+  await typeAt(page, target, gh.solution[target]);
+  ok(await page.$$eval("#hintBox .ladder-step", els => els.length) === 0, "hint: a move resets the ladder");
+  await shot(page, "play-hint");
+  await page.click("#giveUpBtn");
+  await page.click("#giveUpBtn");
+  await page.waitForSelector("#resultsCard");
+  ok(/Подсказки/.test(await page.textContent("#resultsCard")), "hint: results show the hints");
+  ok((await api(`/api/games/${gh.id}`)).hints === 4, "server: 4 hints stored");
+
   // --- 2. original, limit 3: three mistakes → failed + locked -------------------------------
   await page.goto(`${BASE}/#/play`);
   await page.waitForSelector("#grade option[value=\"1\"]", { state: "attached" });

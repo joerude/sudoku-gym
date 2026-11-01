@@ -216,8 +216,8 @@ export default {
   "Сколько каждой цифры осталось поставить": "How many of each digit are left to place",
   "счётчик цифр": "digit counter",
   "Клавиши": "Keys",
-  "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, <kbd>Ctrl+Y</kbd> — вернуть, <kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением), <kbd>Enter</kbd> — новая партия, когда партия не идёт. <kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».":
-    "<kbd>1–9</kbd> digit, <kbd>Shift</kbd>+digit — note, <kbd>N</kbd>/<kbd>Space</kbd> — notes mode, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — erase, arrows — move, <kbd>Ctrl+Z</kbd> — undo, <kbd>Ctrl+Y</kbd> — redo, <kbd>F</kbd> — favourite, <kbd>Z</kbd> — zen mode (<kbd>Esc</kbd> — leave), <kbd>Esc</kbd> — abandon the game (asks first), <kbd>Enter</kbd> — new game when none is going. <kbd>Ctrl+V</kbd> of a grid (81 digits, 0 or . for empty, <kbd>|</kbd> and <kbd>-</kbd> allowed) opens it in “Own grid”.",
+  "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, <kbd>Ctrl+Y</kbd> — вернуть, <kbd>H</kbd> — подсказка (каждое нажатие — ступень глубже), <kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением), <kbd>Enter</kbd> — новая партия, когда партия не идёт. <kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».":
+    "<kbd>1–9</kbd> digit, <kbd>Shift</kbd>+digit — note, <kbd>N</kbd>/<kbd>Space</kbd> — notes mode, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — erase, arrows — move, <kbd>Ctrl+Z</kbd> — undo, <kbd>Ctrl+Y</kbd> — redo, <kbd>H</kbd> — hint (each press goes a level deeper), <kbd>F</kbd> — favourite, <kbd>Z</kbd> — zen mode (<kbd>Esc</kbd> — leave), <kbd>Esc</kbd> — abandon the game (asks first), <kbd>Enter</kbd> — new game when none is going. <kbd>Ctrl+V</kbd> of a grid (81 digits, 0 or . for empty, <kbd>|</kbd> and <kbd>-</kbd> allowed) opens it in “Own grid”.",
   "партия не начата": "no game started",
   "Нажми «▶ Играть» или Enter.": "Press “▶ Play” or Enter.",
   "техника: {title}": "technique: {title}",
@@ -287,6 +287,10 @@ export default {
   "Неверные цифры ({cells}) он сначала убирает.": "It takes off the wrong digits ({cells}) first.",
   "Позиция решена.": "Position solved.",
   "💡 Подсказка (H)": "💡 Hint (H)",
+  "Подсказка (H): каждое нажатие — ступень глубже": "Hint (H): each press goes a level deeper",
+  "💡 Глубже ({n}/{max})": "💡 Deeper ({n}/{max})",
+  "Убрать в заметках": "Strike from notes",
+  "Подсказки": "Hints",
   "💡 Глубже (H)": "💡 Deeper (H)",
   "Сделать ход (Пробел)": "Make the move (Space)",
   "{v} в {cell} не встаёт": "{v} doesn't fit in {cell}",

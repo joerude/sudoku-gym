@@ -109,7 +109,7 @@ export function mount(el) {
       games.length
         ? table([["#"], [tr("Дата")], [tr("Уровень")], [tr("Режим")], [tr("Итог")], [tr("Время"), 1], [tr("Ошибки"), 1], [""]],
           games.map(g => [g.id, dateRu(g.started_at), LEVEL_NAME[g.level] || g.level, g.mode,
-            h("span", { class: `status-${g.status}` }, STATUS_NAME[g.status] || g.status), fmtTime(g.time_ms, false), g.mistakes ?? "—",
+            h("span", { class: `status-${g.status}` }, STATUS_NAME[g.status] || g.status, g.hints ? ` · 💡${g.hints}` : ""), fmtTime(g.time_ms, false), g.mistakes ?? "—",
             g.status === "active" ? "" : h("a", { href: `#/review/${g.id}` }, tr("разбор"))]), "gamesTable")
         : h("p", { class: "hint", style: "margin:0" }, tr("Партий пока нет."))));
   }).catch(e => { box.textContent = ""; box.append(errorBox(e)); });

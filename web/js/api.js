@@ -41,6 +41,7 @@ export const finishGame = (id, status, tMs) => call("POST", `/api/games/${id}/fi
 export const getReview = id => call("GET", `/api/games/${id}/review`);
 export const gameAnalysis = (id, board, cands) =>
   call("POST", `/api/games/${id}/analysis`, { board, ...(cands ? { cands } : {}) });
+export const gameHint = (id, body) => call("POST", `/api/games/${id}/hint`, body);
 export const getStats = () => call("GET", "/api/stats");
 export const getRecords = () => call("GET", "/api/records");
 export const getActivity = () => call("GET", "/api/activity");
