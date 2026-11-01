@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 import analysis
 import drills
+import hints
 from db import DEFAULT_DB, FAVORITE_KINDS, connect, favorite_counts, is_favorite, now_iso
 from i18n import get_lang, set_lang, tr
 from sudoku_core import GRADE_TITLE, count_solutions, grade, parse, solve, to_str
@@ -240,6 +241,43 @@ def _validate_move(mv) -> tuple:
     else:
         value = _int(mv, "value", 0, 9, required=False)
     return seq, t_ms, cell, value, kind
+
+
+def _board(body, givens: str) -> list:
+    """The position a hint or analysis is asked for: 81 digits (0 = empty) that keep the puzzle's givens."""
+    b = body.get("board")
+    if not isinstance(b, str) or len(b) != 81 or not b.isdigit():
+        raise ApiError(400, tr("поле board — 81 цифра (0 — пусто)"))
+    if any(g != "0" and g != c for g, c in zip(givens, b, strict=True)):
+        raise ApiError(400, tr("board не совпадает с условием"))
+    return [int(c) for c in b]
+
+
+def _masks(body, key: str):
+    """81 candidate bit masks (bit v = digit v) or None when the field is absent."""
+    m = body.get(key)
+    if m is None:
+        return None
+    if (
+        not isinstance(m, list)
+        or len(m) != 81
+        or any(isinstance(x, bool) or not isinstance(x, int) or not 0 <= x < 1024 for x in m)
+    ):
+        raise ApiError(400, tr("поле {key} — 81 битовая маска", key=key))
+    return m
+
+
+def api_game_analysis(conn, m, q, body):
+    game = _game(conn, int(m.group(1)))
+    board, cands = _board(body, game["givens"]), _masks(body, "cands")
+    givens, solution = game["givens"], game["solution"]
+    line = hints.solve_line(givens, solution, board, cands)
+    return {
+        "wrong_cells": line["wrong_cells"],
+        "next": hints.next_ladder(givens, solution, board, cands=cands),
+        "line": line["steps"],
+        "solved": line["solved"],
+    }
 
 
 def api_moves(conn, m, q, body):
@@ -504,6 +542,7 @@ ROUTES = [
     ("POST", r"/api/games/(\d+)/moves", api_moves),
     ("POST", r"/api/games/(\d+)/finish", api_finish),
     ("GET", r"/api/games/(\d+)/review", api_review),
+    ("POST", r"/api/games/(\d+)/analysis", api_game_analysis),
     ("GET", r"/api/stats", api_stats),
     ("GET", r"/api/activity", api_activity),
     ("GET", r"/api/records", api_records),

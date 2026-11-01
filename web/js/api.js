@@ -39,6 +39,8 @@ export const listGames = (limit = 20) => call("GET", `/api/games${qs({ limit })}
 export const getGame = id => call("GET", `/api/games/${id}`);
 export const finishGame = (id, status, tMs) => call("POST", `/api/games/${id}/finish`, { status, t_ms: Math.round(tMs) });
 export const getReview = id => call("GET", `/api/games/${id}/review`);
+export const gameAnalysis = (id, board, cands) =>
+  call("POST", `/api/games/${id}/analysis`, { board, ...(cands ? { cands } : {}) });
 export const getStats = () => call("GET", "/api/stats");
 export const getRecords = () => call("GET", "/api/records");
 export const getActivity = () => call("GET", "/api/activity");

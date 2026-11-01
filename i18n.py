@@ -132,4 +132,7 @@ EN = {
     "Нужна техника сложнее": "A harder technique is needed",
     "Цифра из решения": "Digit from the solution",
     "Логикой хода нет — цифра из решения: {cell} = {v}.": "No logical move — digit from the solution: {cell} = {v}.",
+    "поле board — 81 цифра (0 — пусто)": "board must be 81 digits (0 = empty)",
+    "board не совпадает с условием": "board does not match the puzzle's givens",
+    "поле {key} — 81 битовая маска": "{key} must be 81 bit masks",
 }

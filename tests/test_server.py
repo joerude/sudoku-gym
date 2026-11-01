@@ -279,6 +279,29 @@ class ServerTest(unittest.TestCase):
             {"id", "puzzle_id", "level", "mode", "status", "started_at", "finished_at", "time_ms", "mistakes"},
         )
 
+    def test_analysis(self):
+        _, P, S = L1[0]
+        gid = self.new_game(self.easy["L1-1"], "hardcore")
+        e = [i for i, c in enumerate(P) if c == "0"]
+        bad = P[: e[0]] + str(int(S[e[0]]) % 9 + 1) + P[e[0] + 1 :]
+        r = self.api("POST", f"/api/games/{gid}/analysis", {"board": bad})
+        self.assertEqual(set(r), {"wrong_cells", "next", "line", "solved"})
+        self.assertEqual((r["wrong_cells"], r["next"]["kind"], r["solved"]), ([e[0]], "error", True))
+        r = self.api("POST", f"/api/games/{gid}/analysis", {"board": P})
+        self.assertEqual((r["next"]["kind"], len(r["next"]["levels"]), r["wrong_cells"]), ("step", 4, []))
+        first = r["line"][0]
+        cell, v = r["next"]["levels"][3]["place"]
+        self.assertEqual((first["cell"], first["value"], int(S[cell])), (cell, v, v))
+        same = self.api("POST", f"/api/games/{gid}/analysis", {"board": P, "cands": first["cands"]})
+        self.assertEqual(same["next"], r["next"])
+        self.api("POST", f"/api/games/{gid}/analysis", {"board": "1" * 81}, status=400)  # not this puzzle's givens
+        self.api("POST", f"/api/games/{gid}/analysis", {"board": P[:80]}, status=400)
+        self.api("POST", f"/api/games/{gid}/analysis", {"board": P, "cands": [0] * 80}, status=400)
+        self.api("POST", f"/api/games/{gid}/analysis", {"board": P, "cands": [2048] * 81}, status=400)
+        self.api("POST", "/api/games/99999/analysis", {"board": P}, status=404)
+        self.api("POST", f"/api/games/{gid}/finish", {"status": "abandoned", "t_ms": 1000})
+        self.assertEqual(self.api("POST", f"/api/games/{gid}/analysis", {"board": P})["next"], r["next"])  # any status
+
     def test_new_game_abandons_stale(self):
         # the player reloaded the page mid-game: the next game closes the old one as abandoned
         old = self.new_game(self.easy["L1-1"], "hardcore")
