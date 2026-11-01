@@ -317,6 +317,8 @@ export default {
   "меньше": "less",
   "больше": "more",
   "Серия: {n} дн.": "Streak: {n} d",
+  "Серия: {n} дн. подряд — сегодня засчитано": "Streak: {n} days in a row — today counted",
+  "Серия: {n} дн. подряд — сегодня ещё не засчитано, не прерви": "Streak: {n} days in a row — today not counted yet, keep it going",
   "лучшая: {n} дн.": "best: {n} d",
   "за год: партий — {g}, упражнений — {d}, активных дней — {a}": "this year: {g} games, {d} drills, {a} active days",
   "медиана {time} ({solved} из {n})": "median {time} ({solved} of {n})",

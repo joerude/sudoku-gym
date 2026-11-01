@@ -1,6 +1,6 @@
-// Today's plan as one line on #/play: medium hardcore games played today (goal 2), the warm-up, the last game's review.
+// Today's plan as one line on #/play: medium hardcore games played today (goal 2), the streak, the warm-up, the last game's review.
 import { tr } from "./i18n.js";
-import { getStats, listGames } from "./api.js";
+import { getActivity, getStats, listGames } from "./api.js";
 import { h } from "./ui.js";
 
 const GOAL = 2;
@@ -10,6 +10,11 @@ function localDay() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// dimmed until today counts: the streak is still alive, but only until midnight
+const streak = s => h("span", { class: `streak${s.today ? "" : " pending"}`, id: "dayStreak",
+  title: s.today ? tr("Серия: {n} дн. подряд — сегодня засчитано", { n: s.current })
+    : tr("Серия: {n} дн. подряд — сегодня ещё не засчитано, не прерви", { n: s.current }) }, `🔥 ${s.current}`);
+
 /** load() refetches; on an error the line just stays hidden — it is a reminder, not a page. */
 export function dayStrip() {
   const el = h("p", { class: "day-strip zen-hide", id: "dayStrip", hidden: true,
@@ -17,7 +22,7 @@ export function dayStrip() {
   return {
     el,
     load() {
-      return Promise.all([getStats(), listGames(20)]).then(([st, games]) => {
+      return Promise.all([getStats(), listGames(20), getActivity()]).then(([st, games, act]) => {
         const today = localDay();
         const n = st.daily.filter(d => d.day === today && d.level === "medium" && d.mode === "hardcore").reduce((a, r) => a + r.n, 0);
         const done = Math.min(n, GOAL);
@@ -27,6 +32,7 @@ export function dayStrip() {
         el.append(h("b", {}, tr("Сегодня")), " ",
           h("span", { class: "dots", "aria-hidden": "true" }, "●".repeat(done) + "○".repeat(GOAL - done)),
           ` ${done}/${GOAL} medium · hardcore · `,
+          ...(act.streak.current ? [streak(act.streak), " · "] : []),
           h("a", { href: "#/drills", id: "dayDrills" }, tr("разминка →")),
           ...(last ? [" · ", h("a", { href: `#/review/${last.id}`, id: "dayReview" }, tr("разбор #{id} →", { id: last.id }))] : []));
         el.hidden = false;

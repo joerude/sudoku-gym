@@ -259,6 +259,8 @@ td.num, th.num { text-align: right; }
 .day-strip .dots { color: var(--accent); letter-spacing: .15em; }
 .day-strip.done .dots { color: var(--ok); }
 .day-strip a { text-decoration: none; }
+.day-strip .streak { color: var(--ink); }
+.day-strip .streak.pending { opacity: .5; }
 details.fold > summary { cursor: pointer; width: max-content; font-size: 12px; font-weight: 600; text-transform: uppercase;
   letter-spacing: .08em; color: var(--muted); }
 details.fold > summary:hover { color: var(--accent); }
