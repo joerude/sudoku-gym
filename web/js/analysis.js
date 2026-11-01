@@ -86,7 +86,7 @@ export function analysisSection(game, moves, pauses) {
       if (keyOf(cur()) === want) { data = r; render(); }
     } catch (e) {
       cache.delete(want);
-      note = e.message; render();
+      if (keyOf(cur()) === want) { note = e.message; render(); }
     }
   }
   function moved() { level = 0; data = null; note = ""; sel = -1; render(); load(); }
@@ -107,9 +107,9 @@ export function analysisSection(game, moves, pauses) {
     const b = base();
     push(applyStep(b.board, b.cands, s.cell, s.value, s.eliminations), s.cell === null ? `${s.title} ✂` : `${cellName(s.cell)}=${s.value}`);
   }
-  /** A digit typed on the selected empty cell: the right one goes into the branch, a wrong one is refused. */
+  /** A digit typed on the selected empty (or wrongly filled) cell: the right one goes into the branch, a wrong one is refused. */
   function put(v) {
-    if (!data || sel < 0 || given[sel] || cur().board[sel]) return;
+    if (!data || sel < 0 || given[sel] || (cur().board[sel] && !data.wrong_cells.includes(sel))) return;
     if (sol[sel] !== v) { note = tr("{v} в {cell} не встаёт", { v, cell: cellName(sel) }); render(); return; }
     const b = base();
     push(applyStep(b.board, b.cands, sel, v), `${cellName(sel)}=${v}`);
@@ -126,7 +126,8 @@ export function analysisSection(game, moves, pauses) {
       if (at === i && branch.length) list.append(h("span", { class: "an-branch" }, "(",
         branch.map((x, j) => item(x.label, "", bat === j, () => { bat = j; moved(); })), ")"));
     });
-    list.querySelector(".an-move.on")?.scrollIntoView({ block: "nearest" });
+    const on = list.querySelector(".an-move.on");  // centre it in the list only; scrollIntoView would move the page too
+    if (on) list.scrollTop = on.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop - (list.clientHeight - on.offsetHeight) / 2;
   }
 
   function renderEngine() {
@@ -159,6 +160,7 @@ export function analysisSection(game, moves, pauses) {
 
   const onKey = e => {
     if (e.ctrlKey || e.metaKey || e.altKey || ignoreKey(e)) return;
+    if (e.target.closest?.("button, a, input, select, textarea, summary") && (e.code === "Space" || e.key === "Home" || e.key === "End")) return;
     const d = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
     if (d) put(+d[1]);
     else if (e.key === "ArrowLeft") step(-1);

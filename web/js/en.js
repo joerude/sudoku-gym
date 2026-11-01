@@ -249,6 +249,7 @@ export default {
   "решено без проверки: {n}": "solved without checking: {n}",
   "Только решённые партии без «Проверить».": "Only solved games without “Check”.",
   "Использовалась «Проверить» — партия не идёт в рекорды.": "“Check” was used — the game does not count for records.",
+  "Использовалась подсказка — партия не идёт в рекорды.": "A hint was used — the game does not count for records.",
   "🏆 Первый рекорд на этом уровне и в этом режиме!": "🏆 First record at this level and mode!",
   "🏆 Новый личный рекорд!": "🏆 New personal best!",
   "Первая решённая партия на этом уровне и в этом режиме.": "First solved game at this level and mode.",

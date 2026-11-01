@@ -200,6 +200,14 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector("#anMoves .an-branch"));
   ok(page.url().endsWith(`#/review/${gp}`), "analysis: Esc leaves the branch, not the page");
+  // the game position holds a wrong digit (em[1]): the right one replaces it in a branch
+  await page.waitForSelector("#anEngine #anLine");
+  await page.click(`#anBoard .cell[data-cell="${em[1]}"]`);
+  await page.keyboard.press(pz.solution[em[1]]);
+  await page.waitForFunction(() => document.querySelectorAll("#anMoves .an-branch .an-move").length === 1);
+  ok((await page.textContent(`#anBoard .cell[data-cell="${em[1]}"]`)).trim() === pz.solution[em[1]], "analysis: a wrong digit is replaced with the right one");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector("#anMoves .an-branch"));
   await shot(page, "review-analysis");
   await shot(page, "review");
   await page.goto(`${BASE}/#/review/1`);
@@ -218,6 +226,11 @@ try {
   ok((await page.textContent("#badge")).includes("💡 4"), "hint: the badge counts hints");
   ok(await page.$eval("#hintBtn", b => b.disabled), "hint: the button is off at the last level");
   await shot(page, "play-hint");
+  await page.click("#checkBtn");  // «Проверить» is no move: the ladder stays, H does not log another hint
+  await page.keyboard.press("h");
+  await page.waitForTimeout(400);
+  ok(await page.$$eval("#hintBox .ladder-step", els => els.length) === 4 && (await page.textContent("#badge")).includes("💡 4"),
+    "hint: «Проверить» keeps the ladder");
   const target = await page.$eval("#board .cell.ans", e => +e.dataset.cell);
   await typeAt(page, target, gh.solution[target]);
   ok(await page.$$eval("#hintBox .ladder-step", els => els.length) === 0, "hint: a move resets the ladder");

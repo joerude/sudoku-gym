@@ -59,6 +59,32 @@ class DbTest(unittest.TestCase):
             conn.close()
             connect(path).close()
 
+    def test_migrates_games_hints(self):
+        import sqlite3
+
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "old.db")
+            old = sqlite3.connect(path)
+            old.execute(
+                "CREATE TABLE games (id INTEGER PRIMARY KEY, puzzle_id INTEGER NOT NULL, mode TEXT NOT NULL,"
+                " started_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', time_ms INTEGER)"
+            )
+            old.execute(
+                "INSERT INTO games (puzzle_id, mode, started_at, status, time_ms)"
+                " VALUES (1, 'original', 'x', 'solved', 1)"
+            )
+            old.commit()
+            old.close()
+            conn = connect(path)
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(games)")}
+            self.assertIn("hints", cols)
+            self.assertEqual(conn.execute("SELECT hints FROM games").fetchone()[0], 0)
+            self.assertIsNotNone(
+                conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'game_hints'").fetchone()
+            )
+            conn.close()
+            connect(path).close()
+
     def test_import_is_idempotent_and_skips_non_unique(self):
         conn = connect(":memory:")
         self.assertEqual(import_lines(conn, LINES, "medium"), 2)

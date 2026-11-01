@@ -28,7 +28,7 @@ let digit = 0;         // last digit pressed: highlighted everywhere until a fil
 let favCount = null;   // starred puzzles (null until /api/favorites answers)
 let asking = null;     // close() of the open «Бросить партию?» dialog
 let edit = null;       // own grid being entered ({vals, sel}); survives navigation like G
-let hint = null;       // {seq, level, lad}: the hint ladder opened for the position after move seq
+let hint = null;       // {sig, level, lad}: the hint ladder opened for the position sig (board + notes; «Проверить» keeps it)
 let hinting = false;   // a hint request is on its way
 
 const bits = m => { const out = []; for (let v = 1; v <= 9; v++) if (m & (1 << v)) out.push(v); return out; };
@@ -302,7 +302,7 @@ function refresh() {
     return;
   }
   const S = G.S, over = S.status !== "active";
-  if (hint && hint.seq !== S.seq) hint = null;  // any move, note, undo or clear: the ladder starts over
+  if (hint && hint.sig !== posSig(S)) hint = null;  // any move, note, undo or clear: the ladder starts over
   const hv = hint && !over ? ladderView(hint.lad, hint.level) : null;
   const cands = hv?.elims.size ? computeCandidates(S.vals) : null;
   ui.board.render({
@@ -520,17 +520,19 @@ function press(v, asNote) {
   refresh();
 }
 
+const posSig = S => S.vals.join("") + "|" + S.notes.join(",");
+
 /** H: the next level of the hint ladder for the position as it is now (level 1 again after any move). */
 async function askHint() {
   if (!G || G.S.status !== "active" || hinting) return;
-  const S = G.S, seq = S.seq, fresh = !hint || hint.seq !== seq;
+  const S = G.S, sig = posSig(S), fresh = !hint || hint.sig !== sig;
   if (!fresh && hint.level >= hint.lad.max_level) return;
   hinting = true;
   try {
     const lad = await gameHint(S.gameId, { board: S.vals.join(""), notes: S.notes, t_ms: Math.round(G.elapsed()),
       level: fresh ? 1 : hint.level + 1 });
     S.hints++;
-    if (G?.S === S && S.seq === seq) hint = { seq, level: lad.level, lad };  // not a new game or a move in the meantime
+    if (G?.S === S && posSig(S) === sig) hint = { sig, level: lad.level, lad };  // not a new game or a move in the meantime
     refresh();
   } catch (e) {
     setMsg(e.message, "bad");  // after refresh(), which would clear it

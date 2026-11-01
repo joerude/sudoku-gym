@@ -8,11 +8,12 @@ import { speedChart } from "./speedchart.js";
 let current = null;  // the open dialog's close()
 
 /** How this time compares with the player's results on the same level and mode (stats already include it).
- *  Records only count games without «Проверить», so a checked game never claims one. */
+ *  Records only count games without «Проверить» or hints, so such a game never claims one. */
 function compare(r, level, stats, records) {
   const row = stats?.by_level_mode.find(x => x.level === level && x.mode === r.mode);
   const rec = records?.find(x => x.level === level && x.mode === r.mode);
   if (r.checks > 0) return tr("Использовалась «Проверить» — партия не идёт в рекорды.");
+  if (r.hints > 0) return tr("Использовалась подсказка — партия не идёт в рекорды.");
   if (rec?.game_id === r.id) return rec.solved <= 1 ? tr("🏆 Первый рекорд на этом уровне и в этом режиме!") : tr("🏆 Новый личный рекорд!");
   if (!row || row.solved <= 1) return tr("Первая решённая партия на этом уровне и в этом режиме.");
   const diff = row.median_ms - r.time_ms;
