@@ -5,7 +5,7 @@ ARG GID=1000
 RUN groupadd -g "$GID" gym && useradd -u "$UID" -g "$GID" -M -s /usr/sbin/nologin gym
 
 WORKDIR /app
-COPY sudoku_core.py db.py analysis.py drills.py server.py i18n.py docker-entrypoint.sh ./
+COPY sudoku_core.py db.py analysis.py drills.py hints.py rating.py server.py i18n.py docker-entrypoint.sh ./
 COPY tools/import_bank.py tools/
 COPY web/ web/
 COPY theory/ theory/
