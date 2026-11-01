@@ -8,11 +8,11 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from db import connect  # noqa: E402
-from drills import DRILL_TECHNIQUES, make_drills  # noqa: E402
-from fixtures import L1, L2, L3, insert_puzzle, seed_variants  # noqa: E402
-from server import make_server  # noqa: E402
-from sudoku_core import GRADE_TITLE, grade, parse  # noqa: E402
+from db import connect
+from drills import DRILL_TECHNIQUES, make_drills
+from fixtures import L1, L2, L3, insert_puzzle, seed_variants
+from server import make_server
+from sudoku_core import GRADE_TITLE, grade, parse
 
 LEVELS = ["easy", "medium", "hard", "expert"]
 

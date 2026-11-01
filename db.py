@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+from datetime import UTC, datetime
 
 DEFAULT_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "sudoku.db")
 
@@ -87,6 +88,11 @@ CREATE TABLE IF NOT EXISTS favorites (
 """
 
 FAVORITE_KINDS = ("puzzle", "drill")
+
+
+def now_iso() -> str:
+    """Timestamp for the started_at / finished_at / at columns."""
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:

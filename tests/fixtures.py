@@ -101,7 +101,7 @@ def seed_variants(conn, n: int, seed: int = 7, level: str = "easy", base=None, t
     rng = random.Random(seed)
     ids = []
     for k in range(n):
-        name, g, s = base[k % len(base)]
+        _, g, s = base[k % len(base)]
         vg, vs = variant(g, s, rng)
         ids.append(insert_puzzle(conn, f"var-{level}-{seed}-{k}", level, vg, vs, tech_grade))
     conn.commit()

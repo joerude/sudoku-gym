@@ -12,11 +12,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import i18n  # noqa: E402
-from i18n import EN, set_lang, tr  # noqa: E402
-from drills import explain, hint, make_drills, next_drill, technique_list  # noqa: E402
-from sudoku_core import GRADE_TITLE, TECH_TITLE, unit_name  # noqa: E402
 from test_drills import seeded_conn  # noqa: E402
+
+import i18n  # noqa: E402
+from drills import explain, hint, make_drills, next_drill, technique_list  # noqa: E402
+from i18n import EN, set_lang, tr  # noqa: E402
+from sudoku_core import GRADE_TITLE, TECH_TITLE, unit_name  # noqa: E402
 
 CYR = re.compile(r"[А-Яа-яЁё]")
 LIT = r'"(?:[^"\\\n]|\\.)*"'
@@ -98,9 +99,11 @@ class TestI18n(unittest.TestCase):
 
     def test_every_theory_page_has_english(self):
         theory = os.path.join(ROOT, "theory")
-        head = lambda path: dict(  # noqa: E731
-            line.split(":", 1) for line in open(path, encoding="utf-8").read().split("---")[1].strip().splitlines()
-        )
+
+        def head(path):
+            with open(path, encoding="utf-8") as f:
+                return dict(line.split(":", 1) for line in f.read().split("---")[1].strip().splitlines())
+
         names = sorted(n for n in os.listdir(theory) if n.endswith(".md"))
         self.assertEqual(names, sorted(os.listdir(os.path.join(theory, "en"))))
         for n in names:

@@ -10,8 +10,8 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from db import DEFAULT_DB, connect  # noqa: E402
-from sudoku_core import count_solutions, grade, parse, solve, to_str  # noqa: E402
+from db import DEFAULT_DB, connect
+from sudoku_core import count_solutions, grade, parse, solve, to_str
 
 BANK_URL = "https://raw.githubusercontent.com/grantm/sudoku-exchange-puzzle-bank/master/{}.txt"
 LEVELS = {"easy": "easy", "medium": "medium", "hard": "hard", "diabolical": "expert"}

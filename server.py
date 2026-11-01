@@ -11,14 +11,13 @@ import re
 import sys
 import threading
 import traceback
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import analysis
 import drills
+from db import DEFAULT_DB, FAVORITE_KINDS, connect, favorite_counts, is_favorite, now_iso
 from i18n import get_lang, set_lang, tr
-from db import DEFAULT_DB, FAVORITE_KINDS, connect, favorite_counts, is_favorite
 from sudoku_core import GRADE_TITLE, count_solutions, grade, parse, solve, to_str
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -49,10 +48,6 @@ class ApiError(Exception):
         self.status = status
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
 def _int(data: dict, key: str, lo=None, hi=None, required=True, default=None):
     if key not in data or data[key] is None:
         if required:
@@ -81,15 +76,17 @@ def _puzzle_out(conn, row) -> dict:
     }
 
 
-# entered or pasted grids (api_add_puzzle) are played on purpose: never served by level selection, nor counted in options
+# entered or pasted grids (api_add_puzzle) are played on purpose:
+# never served by level selection, nor counted in options
 BANK_ONLY = "bank_id NOT LIKE 'custom-%'"
 
 
 def api_puzzle(conn, m, q, body):
     if q.get("favorite") == "1":  # a starred puzzle, least recently played first
         row = conn.execute(
-            "SELECT p.id, p.level, p.givens, p.solution, p.tech_grade FROM favorites f JOIN puzzles p ON p.id = f.ref_id"
-            " WHERE f.kind = 'puzzle' ORDER BY (SELECT COALESCE(MAX(g.id), 0) FROM games g WHERE g.puzzle_id = p.id),"
+            "SELECT p.id, p.level, p.givens, p.solution, p.tech_grade"
+            " FROM favorites f JOIN puzzles p ON p.id = f.ref_id WHERE f.kind = 'puzzle'"
+            " ORDER BY (SELECT COALESCE(MAX(g.id), 0) FROM games g WHERE g.puzzle_id = p.id),"
             " RANDOM() LIMIT 1"
         ).fetchone()
         if row is None:
@@ -138,7 +135,7 @@ def _add_custom(conn, givens, level="custom"):
     try:
         g = parse(givens)
     except ValueError as e:
-        raise ApiError(400, str(e))
+        raise ApiError(400, str(e)) from e
     n = count_solutions(g)
     if n == 0:
         raise ApiError(400, tr("нет решения"))
@@ -332,7 +329,7 @@ def api_drill_next(conn, m, q, body):
     try:
         d = drills.next_drill(conn, technique)
     except ValueError as e:
-        raise ApiError(400, str(e))
+        raise ApiError(400, str(e)) from e
     if d is None:
         raise ApiError(404, tr("в избранном нет упражнений") if technique == "favorites" else tr("упражнений нет"))
     return d
@@ -527,7 +524,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(raw.decode("utf-8")) if raw else {}
         except (UnicodeDecodeError, json.JSONDecodeError):
-            raise ApiError(400, tr("некорректный JSON"))
+            raise ApiError(400, tr("некорректный JSON")) from None
         if not isinstance(data, dict):
             raise ApiError(400, tr("тело запроса должно быть JSON-объектом"))
         return data

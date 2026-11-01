@@ -5,8 +5,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from db import connect  # noqa: E402
-from drills import (  # noqa: E402
+from db import connect
+from drills import (
     DRILL_PROMPT,
     DRILL_TECHNIQUES,
     KIND,
@@ -20,8 +20,8 @@ from drills import (  # noqa: E402
     technique_list,
     unlocked_tier,
 )
-from fixtures import L2, L3, seed_variants  # noqa: E402
-from sudoku_core import TECH_TIER, TECH_TITLE, candidates, find_steps, parse  # noqa: E402
+from fixtures import L2, L3, seed_variants
+from sudoku_core import TECH_TIER, TECH_TITLE, candidates, find_steps, parse
 
 ELIM = [t for t in DRILL_TECHNIQUES if KIND[t] == "eliminate"]
 PLACE = [t for t in DRILL_TECHNIQUES if KIND[t] == "place"]
@@ -50,7 +50,8 @@ def add_attempts(conn, technique, times_correct, n_wrong=0):
         )
     for _ in range(n_wrong):
         conn.execute(
-            "INSERT INTO drill_attempts (drill_id, at, time_ms, correct) VALUES (?, '2026-10-30T10:00:00+00:00', 999, 0)",
+            "INSERT INTO drill_attempts (drill_id, at, time_ms, correct)"
+            " VALUES (?, '2026-10-30T10:00:00+00:00', 999, 0)",
             (drill_id,),
         )
     conn.commit()
@@ -89,7 +90,7 @@ class MakeDrillsTest(unittest.TestCase):
 
     def test_count_and_caps(self):
         self.assertEqual(self.made, len(self.rows))
-        per = {t: 0 for t in DRILL_TECHNIQUES}
+        per = dict.fromkeys(DRILL_TECHNIQUES, 0)
         for r in self.rows:
             per[r["technique"]] += 1
             self.assertEqual(r["kind"], KIND[r["technique"]])

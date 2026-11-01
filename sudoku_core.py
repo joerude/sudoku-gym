@@ -42,11 +42,7 @@ TECH_TITLE = {
     "x_wing": "X-Wing",
     "y_wing": "Y-Wing (XY-Wing)",
 }
-_HIDDEN_UNITS = {
-    "hidden_single_row": range(0, 9),
-    "hidden_single_col": range(9, 18),
-    "hidden_single_box": range(18, 27),
-}
+_HIDDEN_UNITS = {"hidden_single_row": range(9), "hidden_single_col": range(9, 18), "hidden_single_box": range(18, 27)}
 
 
 @dataclass
@@ -152,7 +148,7 @@ def _hidden_singles(g, cands, technique):
 
 def _locked(g, cands, technique):
     # pointing: candidates in a box confined to one line; claiming: in a line confined to one box
-    sources = range(18, 27) if technique == "pointing" else range(0, 18)
+    sources = range(18, 27) if technique == "pointing" else range(18)
     for u in sources:
         for v in range(1, 10):
             spots = [i for i in UNITS[u] if v in cands[i]]
@@ -191,7 +187,7 @@ def _hidden_pairs(g, cands):
 
 def _x_wings(g, cands):
     # base lines: rows (cover = columns) then columns (cover = rows)
-    for base, cover_of in ((range(0, 9), lambda i: 9 + i % 9), (range(9, 18), lambda i: i // 9)):
+    for base, cover_of in ((range(9), lambda i: 9 + i % 9), (range(9, 18), lambda i: i // 9)):
         for v in range(1, 10):
             lines = []
             for u in base:

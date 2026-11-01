@@ -4,10 +4,10 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from analysis import LONG_PAUSE_MS, activity, compute_metrics, game_info, pauses, records, replay, review, stats  # noqa: E402
-from db import connect  # noqa: E402
-from fixtures import L1, insert_puzzle  # noqa: E402
-from sudoku_core import TECH_TIER, TECH_TITLE, parse, to_str, unit_name  # noqa: E402
+from analysis import LONG_PAUSE_MS, activity, compute_metrics, game_info, pauses, records, replay, review, stats
+from db import connect
+from fixtures import L1, insert_puzzle
+from sudoku_core import TECH_TIER, TECH_TITLE, parse, to_str, unit_name
 
 _, P, S = L1[0]  # cells 1..4 are empty; solution 4, 7, 2, 8
 

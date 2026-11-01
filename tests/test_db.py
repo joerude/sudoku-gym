@@ -5,8 +5,9 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
 
-from db import connect  # noqa: E402
-from import_bank import import_lines, parse_theory, seed_theory  # noqa: E402
+from import_bank import import_lines, parse_theory, seed_theory
+
+from db import connect
 
 LINES = [
     "0000847b216e 020900000048000031000063020009407003003080200400105600030570000250000180000006050  2.3",

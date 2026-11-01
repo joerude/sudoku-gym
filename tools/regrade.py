@@ -9,8 +9,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from db import DEFAULT_DB, connect  # noqa: E402
-from sudoku_core import grade, parse  # noqa: E402
+from db import DEFAULT_DB, connect
+from sudoku_core import grade, parse
 
 
 def main():

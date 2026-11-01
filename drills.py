@@ -10,9 +10,8 @@ import json
 import random
 import statistics
 import time
-from datetime import datetime, timezone
 
-from db import is_favorite
+from db import is_favorite, now_iso
 from i18n import tr
 from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, candidates, find_steps, parse, to_str
 
@@ -60,10 +59,6 @@ THEORY_SLUG = {
     "x_wing": "x-wing",
     "y_wing": "y-wing",
 }
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _place(g, cands, cell, value):
@@ -138,7 +133,7 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
     skipped, so re-running only tops up. Returns the number of rows inserted."""
     rng = random.Random(seed)
     deadline = time.monotonic() + max_seconds
-    have = {t: 0 for t in DRILL_TECHNIQUES}
+    have = dict.fromkeys(DRILL_TECHNIQUES, 0)
     seen = set()
     for t, board in conn.execute("SELECT technique, board FROM drills"):
         if t in have:
@@ -358,7 +353,7 @@ def attempt(conn, drill_id: int, time_ms: int, cell: int, value: int, hint: int 
     conn.execute(
         "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, cell, value, valid_other, hint)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (drill_id, _now(), time_ms, int(correct), cell, value, int(valid_other), hint),
+        (drill_id, now_iso(), time_ms, int(correct), cell, value, int(valid_other), hint),
     )
     conn.commit()
     return {
@@ -378,7 +373,7 @@ def reveal(conn, drill_id: int, time_ms: int) -> dict | None:
     answers = json.loads(row[1])
     conn.execute(
         "INSERT INTO drill_attempts (drill_id, at, time_ms, correct, hint) VALUES (?, ?, ?, 0, 2)",
-        (drill_id, _now(), time_ms),
+        (drill_id, now_iso(), time_ms),
     )
     conn.commit()
     return {
