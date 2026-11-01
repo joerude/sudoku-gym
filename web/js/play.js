@@ -19,7 +19,7 @@ prefs.limitN = toLimit(prefs.limitN) || (prefs.limit === "none" ? "3" : prefs.li
 const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ } };
 
 let G = null;          // current game (game.js api)
-let meta = {};         // {hideGrade}
+let meta = {};         // {hideGrade, daily}
 let options = null;    // /api/puzzle/options
 let ui = null;         // DOM refs while mounted
 let pendingMsg = null; // message to show on next refresh

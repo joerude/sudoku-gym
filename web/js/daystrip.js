@@ -18,9 +18,9 @@ const streak = s => h("span", { class: `streak${s.today ? "" : " pending"}`, id:
 
 // the daily puzzle: solved → time linking to its review; otherwise a link that starts it
 const dailyItem = d => d.result
-  ? h("a", { href: `#/review/${d.result.game_id}`, id: "dayDaily", class: "daily done",
+  ? h("a", { href: `#/review/${d.result.game_id}`, id: "dayDaily",
     title: tr("Задача дня решена — разбор") }, `📅 ✓ ${fmtTime(d.result.time_ms)}`)
-  : h("a", { href: "#/play?daily=1", id: "dayDaily", class: "daily" }, tr("📅 задача дня →"));
+  : h("a", { href: "#/play?daily=1", id: "dayDaily" }, tr("📅 задача дня →"));
 
 /** load() refetches; on an error the line just stays hidden — it is a reminder, not a page. */
 export function dayStrip() {
