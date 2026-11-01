@@ -299,6 +299,30 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.api("GET", f"/api/games/{new}")["status"], "active")
         self.api("POST", f"/api/games/{new}/finish", {"status": "abandoned", "t_ms": 1000})
 
+    def test_zy_daily(self):  # runs late: adds games, which test_full_cycle counts
+        d = self.api("GET", "/api/daily")
+        self.assertRegex(d["day"], r"^\d{4}-\d{2}-\d{2}$")
+        self.assertIn(d["puzzle"]["id"], self.medium)
+        self.assertEqual(d["puzzle"]["level"], "medium")
+        self.assertIn("grade_title", d["puzzle"])
+        self.assertEqual(self.api("GET", "/api/daily")["puzzle"]["id"], d["puzzle"]["id"])
+        pid, n0 = d["puzzle"]["id"], d["attempts"]
+        other = next(i for i in self.medium if i != pid)
+        self.api("POST", "/api/games", {"puzzle_id": other, "mode": "hardcore", "daily": True}, status=400)
+        self.api("POST", "/api/games", {"puzzle_id": pid, "mode": "original", "daily": True}, status=400)
+        gid = self.new_game(pid, "hardcore", daily=True)
+        self.assertEqual(self.api("GET", f"/api/games/{gid}")["daily"], d["day"])
+        self.assertIsNone(self.api("GET", f"/api/games/{self.new_game(pid, 'hardcore')}")["daily"])
+        self.assertEqual(self.api("GET", "/api/daily")["attempts"], n0 + 1)
+        gid = self.new_game(pid, "hardcore", daily=True)  # the previous one is closed as abandoned
+        self.api("POST", f"/api/games/{gid}/finish", {"status": "solved", "t_ms": 123400})
+        self.assertEqual(self.api("GET", "/api/daily")["result"], {"game_id": gid, "time_ms": 123400})
+        h = self.api("GET", "/api/daily/history")
+        self.assertEqual(
+            h["days"][0], {"day": d["day"], "game_id": gid, "time_ms": 123400, "attempts": n0 + 2, "tech_grade": 2}
+        )
+        self.assertEqual(h["best_ms"], 123400)
+
     def test_drills(self):
         techs = self.api("GET", "/api/drills/techniques")
         self.assertEqual([t["technique"] for t in techs], DRILL_TECHNIQUES)

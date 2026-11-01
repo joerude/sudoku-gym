@@ -193,13 +193,21 @@ def api_create_game(conn, m, q, body):
         limit = _int(body, "mistake_limit", lo=1, required=False) if "mistake_limit" in body else DEFAULT_MISTAKE_LIMIT
     if not conn.execute("SELECT 1 FROM puzzles WHERE id = ?", (puzzle_id,)).fetchone():
         raise ApiError(404, tr("задача не найдена"))
+    daily = None
+    if body.get("daily") is True:
+        if mode != "hardcore":
+            raise ApiError(400, tr("задача дня играется в hardcore"))
+        daily = analysis.local_today(conn)
+        if puzzle_id != analysis.daily_puzzle_id(conn, daily):
+            raise ApiError(400, tr("это не задача дня"))
     # a game left by a reload or navigation would stay "active" forever: close it at its last move
     for (stale,) in conn.execute("SELECT id FROM games WHERE status = 'active'").fetchall():
         moves = analysis.load_moves(conn, stale)
         _close_game(conn, _game(conn, stale), "abandoned", max((mv["t_ms"] for mv in moves), default=0), moves)
     cur = conn.execute(
-        "INSERT INTO games (puzzle_id, mode, mistake_limit, started_at, status) VALUES (?, ?, ?, ?, 'active')",
-        (puzzle_id, mode, limit, now_iso()),
+        "INSERT INTO games (puzzle_id, mode, mistake_limit, started_at, status, daily)"
+        " VALUES (?, ?, ?, ?, 'active', ?)",
+        (puzzle_id, mode, limit, now_iso(), daily),
     )
     conn.commit()
     return {"id": cur.lastrowid}
@@ -318,6 +326,19 @@ def api_activity(conn, m, q, body):
 
 def api_records(conn, m, q, body):
     return analysis.records(conn)
+
+
+def api_daily(conn, m, q, body):
+    day = analysis.local_today(conn)
+    pid = analysis.daily_puzzle_id(conn, day)
+    if pid is None:
+        raise ApiError(404, tr("нет задач с такими параметрами"))
+    row = conn.execute("SELECT id, level, givens, solution, tech_grade FROM puzzles WHERE id = ?", (pid,)).fetchone()
+    return {"day": day, "puzzle": _puzzle_out(conn, row), **analysis.daily_today(conn, day)}
+
+
+def api_daily_history(conn, m, q, body):
+    return analysis.daily_history(conn)
 
 
 def api_drill_techniques(conn, m, q, body):
@@ -486,6 +507,8 @@ ROUTES = [
     ("GET", r"/api/stats", api_stats),
     ("GET", r"/api/activity", api_activity),
     ("GET", r"/api/records", api_records),
+    ("GET", r"/api/daily", api_daily),
+    ("GET", r"/api/daily/history", api_daily_history),
     ("GET", r"/api/drills/techniques", api_drill_techniques),
     ("GET", r"/api/drills/next", api_drill_next),
     ("POST", r"/api/drills/(\d+)/attempt", api_drill_attempt),

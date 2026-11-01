@@ -91,6 +91,8 @@ EN = {
     "решение не единственное": "the solution is not unique",
     "mode должен быть original или hardcore": "mode must be original or hardcore",
     "задача не найдена": "puzzle not found",
+    "задача дня играется в hardcore": "the daily puzzle is played in hardcore",
+    "это не задача дня": "this is not today's daily puzzle",
     "партия не найдена": "game not found",
     "ход должен быть объектом": "a move must be an object",
     "неизвестный тип хода: {kind}": "unknown move type: {kind}",
