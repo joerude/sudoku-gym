@@ -4,6 +4,7 @@ import { getGame, getReview } from "./api.js";
 import { cellName, computeCandidates, createBoard, fmtTime, toDigits, unitCells } from "./board.js";
 import { LEVEL_NAME, createFav, dateRu, errorBox, h, metricsGrid, statusLine } from "./ui.js";
 import { speedChart } from "./speedchart.js";
+import { analysisSection } from "./analysis.js";
 
 export function stepText(s) {
   const unit = s.unit_name ? ` (${s.unit_name})` : "";
@@ -58,7 +59,9 @@ function pauseCard(p, game, n) {
 export function mount(el, [id]) {
   const box = h("div", {}, h("p", { class: "hint" }, tr("Загрузка…")));
   el.append(box);
+  let an = null, gone = false;
   Promise.all([getReview(id), getGame(id)]).then(([rv, full]) => {
+    if (gone) return;
     const g = rv.game;
     const fav = createFav("puzzle", { label: true });
     fav.set(g.puzzle_id, g.fav);
@@ -74,6 +77,8 @@ export function mount(el, [id]) {
         h("div", { class: "bar", style: "margin:0" },
           h("a", { class: "btn", href: "#/play" }, tr("Играть дальше")), h("a", { class: "btn", href: "#/stats" }, tr("Статистика")),
           fav.el)));
+    an = analysisSection(g, full.moves, rv.pauses);
+    box.append(an.el);
     if (!full.moves.length) {
       box.append(h("section", { id: "noMoves" }, h("h2", {}, tr("Ходов нет")),
         h("p", { class: "hint", style: "margin:0" }, tr("Ходы этой партии не записаны (партия перенесена или брошена до первого хода), " +
@@ -93,4 +98,5 @@ export function mount(el, [id]) {
         "можно было убрать; жёлтым — группа (строка, столбец или блок). Нажми на шаг, чтобы показать его на доске.")),
       ...rv.pauses.map((p, k) => pauseCard(p, g, k + 1)));
   }).catch(e => { box.textContent = ""; box.append(errorBox(e)); });
+  return () => { gone = true; an?.dispose(); };
 }

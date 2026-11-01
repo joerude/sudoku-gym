@@ -179,6 +179,28 @@ try {
   ok(/Пауза 0:35 после хода 2/.test(pt) && /Тут был доступен: /.test(pt), "review: pause with available step", pt.slice(0, 120));
   ok(await page.$$eval(".pause-item .cell.bad", els => els.length === 1), "review: wrong cell marked");
   ok(await page.$$eval(".pause-item .cell.ghost, .pause-item .c-x", els => els.length > 0), "review: step highlighted on board");
+  // analysis: opens where the game stopped, ?? on the wrong digit, H climbs the ladder, Space plays into a branch
+  await page.waitForSelector("#analysis #anLine");
+  ok(await page.$$eval("#anMoves .an-move", els => els.length) === 4, "analysis: start + 3 moves");
+  ok(await page.$eval("#anMoves .an-move.on", e => /^3\. /.test(e.textContent)), "analysis: opens at the last move");
+  ok(await page.$eval("#anMoves .an-move.blunder", e => /^2\. .*\?\?$/.test(e.textContent)), "analysis: ?? on the wrong digit");
+  await page.keyboard.press("h");
+  ok(await page.$$eval("#anEngine .ladder-step", els => els.length) === 1, "analysis: H opens level 1");
+  await page.keyboard.press("h");
+  ok(await page.$$eval("#anEngine .ladder-step", els => els.length) === 2, "analysis: level 2 (the wrong cell)");
+  await page.keyboard.press("Space");
+  await page.waitForSelector("#anMoves .an-branch .an-move.on");
+  await page.waitForSelector("#anEngine #anLine");
+  const free = await page.$$eval("#anBoard .cell", els => els.findIndex(e => !e.textContent.trim()));
+  await page.click(`#anBoard .cell[data-cell="${free}"]`);
+  await page.keyboard.press(String(+pz.solution[free] % 9 + 1));
+  ok(/не встаёт/.test(await page.textContent("#anMsg")), "analysis: a wrong digit is refused");
+  await page.keyboard.press(pz.solution[free]);
+  await page.waitForFunction(() => document.querySelectorAll("#anMoves .an-branch .an-move").length === 2);
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector("#anMoves .an-branch"));
+  ok(page.url().endsWith(`#/review/${gp}`), "analysis: Esc leaves the branch, not the page");
+  await shot(page, "review-analysis");
   await shot(page, "review");
   await page.goto(`${BASE}/#/review/1`);
   await page.waitForSelector("#noMoves");

@@ -49,7 +49,7 @@ export function showReward(r, puzzle, { onNew }) {
       item(r.long_pauses ?? "—", tr("Пауз > 20 с")),
       item(r.mistakes ?? "—", tr("Ошибки"))),
     h("div", { class: "bar reward-actions" }, newBtn,
-      h("a", { class: "btn", href: `#/review/${r.id}`, id: "rewardReview", onclick: () => close() }, tr("Разбор пауз")),
+      h("a", { class: "btn", href: `#/review/${r.id}`, id: "rewardReview", onclick: () => close() }, tr("Разбор")),
       h("button", { type: "button", id: "rewardClose", onclick: () => close() }, tr("Закрыть"))),
     h("p", { class: "hint", style: "margin:0" }, h("kbd", {}, "Enter"), tr(" — новая партия, "), h("kbd", {}, "Esc"), tr(" — закрыть")));
   const overlay = h("div", { class: "reward", id: "reward", onclick: e => { if (e.target === overlay) close(); } }, dialog);

@@ -345,7 +345,7 @@ function showResults() {
     h("p", { class: "hint" }, `${LEVEL_NAME[p.level] || p.level} · ${tr("техника: {title}", { title: p.grade_title })} · ${r.mode}`),
     metricsGrid(r),
     h("div", { class: "bar", style: "margin:0" },
-      h("a", { class: "btn primary", href: `#/review/${r.id}`, id: "reviewLink" }, tr("Разбор пауз")),
+      h("a", { class: "btn primary", href: `#/review/${r.id}`, id: "reviewLink" }, tr("Разбор")),
       h("button", { type: "button", onclick: () => newGame(false) }, tr("Новая партия")))));
   if (matchMedia("(max-width: 820px)").matches) ui.results.scrollIntoView({ block: "nearest" });
 }
