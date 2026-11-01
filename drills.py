@@ -393,7 +393,7 @@ def hint(conn, drill_id: int) -> dict | None:
     steps, cands = _steps(row[0], row[4], json.loads(row[1]))
     if not steps:
         return {"hint": tr("Ищи: {title}.", title=tr(TECH_TITLE[row[4]])), "unit": None, "digit": None, "cells": []}
-    return _hint_step(steps[0], cands)
+    return hint_step(steps[0], cands)
 
 
 def technique_list(conn) -> list:
@@ -415,37 +415,35 @@ def technique_list(conn) -> list:
     ]
 
 
-def _rc(c: int) -> str:
+def rc(c: int) -> str:
     return f"r{c // 9 + 1}c{c % 9 + 1}"
 
 
-def _in_unit(u: int) -> str:
+def in_unit(u: int) -> str:
     return tr(("строке {n}", "столбце {n}", "блоке {n}")[u // 9], n=u % 9 + 1)
 
 
-def _cells(cells) -> str:
-    return ", ".join(_rc(c) for c in cells)
+def cells_text(cells) -> str:
+    return ", ".join(rc(c) for c in cells)
 
 
 def _elims(elims) -> str:
     digits = {v for _, v in elims}
     if len(digits) == 1:
-        return tr("{v} из {cells}", v=next(iter(digits)), cells=_cells(c for c, _ in elims))
-    return ", ".join(tr("{v} из {cells}", v=v, cells=_rc(c)) for c, v in elims)
+        return tr("{v} из {cells}", v=next(iter(digits)), cells=cells_text(c for c, _ in elims))
+    return ", ".join(tr("{v} из {cells}", v=v, cells=rc(c)) for c, v in elims)
 
 
-def _explain_step(s, cands) -> str:
+def explain_step(s, cands) -> str:
     t = s.technique
     if t == "naked_single":
         return tr(
             "В {cell} остался один кандидат — {v}: остальные цифры уже стоят в её строке, столбце или блоке.",
-            cell=_rc(s.cell),
+            cell=rc(s.cell),
             v=s.value,
         )
     if t.startswith("hidden_single"):
-        return tr(
-            "В {unit} цифра {v} может стоять только в {cell}.", unit=_in_unit(s.unit), v=s.value, cell=_rc(s.cell)
-        )
+        return tr("В {unit} цифра {v} может стоять только в {cell}.", unit=in_unit(s.unit), v=s.value, cell=rc(s.cell))
     v, elims = s.eliminations[0][1], _elims(s.eliminations)
     if t == "pointing":
         same_row = len({c // 9 for c in s.pattern}) == 1
@@ -454,10 +452,10 @@ def _explain_step(s, cands) -> str:
         return tr(
             "В {unit} цифра {v} может стоять только в {line} ({cells}). "
             "Значит, в {this} вне блока {v} быть не может → убираем {elims}.",
-            unit=_in_unit(s.unit),
+            unit=in_unit(s.unit),
             v=v,
             line=line,
-            cells=_cells(s.pattern),
+            cells=cells_text(s.pattern),
             this=this,
             elims=elims,
         )
@@ -466,10 +464,10 @@ def _explain_step(s, cands) -> str:
         return tr(
             "В {unit} цифра {v} может стоять только внутри блока {box} ({cells}). "
             "Значит, в остальных клетках блока {box} её быть не может → убираем {elims}.",
-            unit=_in_unit(s.unit),
+            unit=in_unit(s.unit),
             v=v,
             box=box - 17,
-            cells=_cells(s.pattern),
+            cells=cells_text(s.pattern),
             elims=elims,
         )
     if t == "naked_pair":
@@ -477,9 +475,9 @@ def _explain_step(s, cands) -> str:
         x, y = sorted(cands[a])
         return tr(
             "В {unit} клетки {a} и {b} содержат только {x} и {y} — эти две цифры займут именно их → убираем {elims}.",
-            unit=_in_unit(s.unit),
-            a=_rc(a),
-            b=_rc(b),
+            unit=in_unit(s.unit),
+            a=rc(a),
+            b=rc(b),
             x=x,
             y=y,
             elims=elims,
@@ -491,11 +489,11 @@ def _explain_step(s, cands) -> str:
         return tr(
             "В {unit} цифры {x} и {y} могут стоять только в {a} и {b} → эти клетки "
             "заняты ими, остальные кандидаты оттуда убираем: {elims}.",
-            unit=_in_unit(s.unit),
+            unit=in_unit(s.unit),
             x=x,
             y=y,
-            a=_rc(a),
-            b=_rc(b),
+            a=rc(a),
+            b=rc(b),
             elims=elims,
         )
     if t == "x_wing":
@@ -510,12 +508,12 @@ def _explain_step(s, cands) -> str:
             base=base,
             v=v,
             cover=cover,
-            cells=_cells(s.pattern),
+            cells=cells_text(s.pattern),
             elims=elims,
         )
     if t == "y_wing":
         p, a, b = s.pattern
-        fmt = lambda c: f"{_rc(c)} ({'/'.join(map(str, sorted(cands[c])))})"  # noqa: E731
+        fmt = lambda c: f"{rc(c)} ({'/'.join(map(str, sorted(cands[c])))})"  # noqa: E731
         return tr(
             "Опора {p} видит крылья {a} и {b}. Что бы ни встало в опору, в одном из крыльев "
             "окажется {v} → {v} нельзя там, где клетка видит оба крыла: убираем {elims}.",
@@ -528,37 +526,37 @@ def _explain_step(s, cands) -> str:
     return tr("{title}: убираем {elims}.", title=tr(TECH_TITLE[t]), elims=elims)
 
 
-def _hint_step(s, cands) -> dict:
+def hint_step(s, cands) -> dict:
     t = s.technique
     unit, digit, cells = s.unit, None, []
     if t == "naked_single":
         unit = BOX_OF[s.cell]
         text = tr(
             "Смотри в {unit}: там есть пустая клетка, где строка, столбец и блок уже закрыли все цифры, кроме одной.",
-            unit=_in_unit(unit),
+            unit=in_unit(unit),
         )
     elif t.startswith("hidden_single"):
         text = tr(
             "Смотри в {unit}: одной из недостающих цифр там осталось только одно место. "
             "Для каждой недостающей цифры вычеркни клетки, которые она «видит».",
-            unit=_in_unit(unit),
+            unit=in_unit(unit),
         )
     elif t == "pointing":
         digit = s.eliminations[0][1]
         text = tr(
-            "Смотри цифру {d} в {unit}: внутри блока она возможна только на одной линии.", d=digit, unit=_in_unit(unit)
+            "Смотри цифру {d} в {unit}: внутри блока она возможна только на одной линии.", d=digit, unit=in_unit(unit)
         )
     elif t == "claiming":
         digit = s.eliminations[0][1]
         text = tr(
             "Смотри цифру {d} в {unit}: в этой линии она возможна только внутри одного блока.",
             d=digit,
-            unit=_in_unit(unit),
+            unit=in_unit(unit),
         )
     elif t == "naked_pair":
-        text = tr("Смотри в {unit}: у двух клеток там одна и та же пара кандидатов.", unit=_in_unit(unit))
+        text = tr("Смотри в {unit}: у двух клеток там одна и та же пара кандидатов.", unit=in_unit(unit))
     elif t == "hidden_pair":
-        text = tr("Смотри в {unit}: две цифры там возможны только в двух одних и тех же клетках.", unit=_in_unit(unit))
+        text = tr("Смотри в {unit}: две цифры там возможны только в двух одних и тех же клетках.", unit=in_unit(unit))
     elif t == "x_wing":
         unit, digit = None, s.eliminations[0][1]
         text = tr(
@@ -572,7 +570,7 @@ def _hint_step(s, cands) -> dict:
         text = tr(
             "Опора — {cell} ({x}/{y}). Найди две клетки-крыла, которые она видит: у каждой два "
             "кандидата, один общий с опорой, а второй — одинаковый у обоих крыльев.",
-            cell=_rc(s.pattern[0]),
+            cell=rc(s.pattern[0]),
             x=x,
             y=y,
         )
@@ -599,7 +597,7 @@ def explain(board: str, technique: str, answers: list, picked=None) -> dict:
     if not steps:
         return {"explanation": None, "pattern": []}
     s = steps[0]
-    text = _explain_step(s, cands)
+    text = explain_step(s, cands)
     if len(steps) > 1:
         text += tr(" (Здесь таких ходов {n}, засчитывается любой.)", n=len(steps))
     return {"explanation": text, "pattern": list(s.pattern)}
