@@ -222,7 +222,8 @@ export function mount(el, params, query) {
         tr("<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
         "<kbd>Ctrl+Y</kbd> — вернуть, " +
-        "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением). " +
+        "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением), " +
+        "<kbd>Enter</kbd> — новая партия, когда партия не идёт. " +
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».") }))));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
   el.append(ui.root);
@@ -509,9 +510,13 @@ function handleKey(e) {
   if (ignoreKey(e)) return;
   if (e.altKey) { keyTrace.skip = tr("зажат Alt"); return; }
   if (edit) { editorKey(e); return; }
+  // Enter starts a game whenever none is going (none yet, or the last one is over). A control focused from the
+  // keyboard (Tab) keeps its own Enter; one focused by a mouse click does not.
+  if (e.key === "Enter" && G?.S.status !== "active" && !e.target.matches("button:focus-visible, a:focus-visible, input:focus-visible")) {
+    newGame(false); e.preventDefault(); return;
+  }
   if (!G) {  // no game yet (e.g. after a page reload): say so instead of silently ignoring the key
     keyTrace.skip = tr("партия не начата");
-    if (e.key === "Enter" && e.target === document.body) { newGame(false); e.preventDefault(); return; }
     if (/^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
       setMsg(tr("Партия не начата — нажми «▶ Играть» или Enter."), "bad"); e.preventDefault();
     }

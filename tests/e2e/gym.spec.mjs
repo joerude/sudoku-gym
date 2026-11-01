@@ -320,6 +320,8 @@ try {
      "Enter in the dialog abandons the game");
   await page.keyboard.press("Escape");
   ok(!(await page.$("#confirm")), "Esc with no game in progress: nothing to ask");
+  const gAfter = await waitGame(page, () => page.keyboard.press("Enter"));
+  ok(gAfter.status === "active" && gAfter.id !== gEnter.id, "the game is over: Enter starts the next one");
   // «Играть» is the main page: the empty route and Esc from any other page lead there
   await page.goto(`${BASE}/#/stats`);
   await page.waitForSelector("#nav a.active[data-route=stats]");
