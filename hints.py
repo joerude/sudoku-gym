@@ -62,7 +62,12 @@ def _next_step(g, cands, notes=None):
         if not steps:
             return None
         s = _pick(steps)
-        if s.cell is None and notes and all(notes[c] and not notes[c] >> v & 1 for c, v in s.eliminations):
+        if (
+            s.cell is None
+            and s.eliminations
+            and notes
+            and all(notes[c] and not notes[c] >> v & 1 for c, v in s.eliminations)
+        ):
             for c, v in s.eliminations:
                 cands[c].discard(v)
             continue
@@ -118,10 +123,26 @@ def _step_levels(s, cands, follow):
         )
         fourth = _level(expl, unit=s.unit, digit=s.value, cells=[s.cell], place=[s.cell, s.value])
     else:
-        d = s.eliminations[0][1]
-        third = _level(
-            tr("Узор: {cells}, цифра {d}.", cells=cells_text(s.pattern), d=d), unit=hn["unit"], digit=d, cells=s.pattern
-        )
+        if t in ("naked_pair", "hidden_pair"):
+            a, b = s.pattern[:2]
+            if t == "naked_pair":
+                x, y = sorted(cands[a])
+            else:
+                x, y = sorted((cands[a] & cands[b]) - {v for _, v in s.eliminations})[:2]
+            d = None
+            third = _level(
+                tr("Узор: {cells}, цифры {x} и {y}.", cells=cells_text(s.pattern), x=x, y=y),
+                unit=hn["unit"],
+                cells=s.pattern,
+            )
+        else:
+            d = s.eliminations[0][1]
+            third = _level(
+                tr("Узор: {cells}, цифра {d}.", cells=cells_text(s.pattern), d=d),
+                unit=hn["unit"],
+                digit=d,
+                cells=s.pattern,
+            )
         if follow is not None:
             expl += " " + tr("Это даёт: {cell} = {v}.", cell=rc(follow.cell), v=follow.value)
         fourth = _level(expl, digit=d, cells=s.pattern, elims=s.eliminations)

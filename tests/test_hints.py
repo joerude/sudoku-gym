@@ -35,6 +35,19 @@ def empties(givens):
     return [i for i, c in enumerate(givens) if c == "0"]
 
 
+def line_state(technique):
+    """The first (board, candidates, Step) along L2-1's solve line where `technique` is available."""
+    _, gv, sol = L2[0]
+    g = parse(gv)
+    for item in solve_line(gv, sol, g)["steps"]:
+        cs = [{v for v in range(1, 10) if m >> v & 1} for m in item["cands"]]
+        if steps := find_steps(g, cs, [technique]):
+            return g, cs, steps[0]
+        if item["cell"] is not None:
+            g[item["cell"]] = item["value"]
+    raise AssertionError(technique)
+
+
 class IssuesTest(unittest.TestCase):
     def test_wrong_digit_and_bad_note(self):
         _, gv, sol = L1[0]
@@ -172,6 +185,32 @@ class LineTest(unittest.TestCase):
         for c, v in first["eliminations"]:
             after[c] &= ~(1 << v)
         self.assertNotEqual(solve_line(gv, sol, g, after)["steps"][0]["eliminations"], first["eliminations"])
+
+    def test_naked_pair_levels(self):
+        _, cs, s = line_state("naked_pair")
+        x, y = sorted(cs[s.pattern[0]])
+        lad = _step_levels(s, cs, None)
+        third, fourth = lad[2], lad[3]
+        self.assertIsNone(third["digit"])
+        self.assertEqual(third["cells"], list(s.pattern))
+        self.assertTrue(f"{x} и {y}" in third["text"], third["text"])
+        self.assertEqual(fourth["elims"], [list(e) for e in s.eliminations])
+        self.assertTrue(all(v in (x, y) for _, v in s.eliminations))
+        self.assertIsNone(fourth["digit"])
+
+    def test_hidden_pair_levels(self):
+        _, cs, s = line_state("hidden_pair")
+        a, b = s.pattern
+        removed = {v for _, v in s.eliminations}
+        x, y = sorted((cs[a] & cs[b]) - removed)[:2]
+        lad = _step_levels(s, cs, None)
+        third, fourth = lad[2], lad[3]
+        self.assertIsNone(third["digit"])
+        self.assertEqual(third["cells"], list(s.pattern))
+        self.assertTrue(f"{x} и {y}" in third["text"], third["text"])
+        self.assertTrue({x, y}.isdisjoint(removed))
+        self.assertEqual(fourth["elims"], [list(e) for e in s.eliminations])
+        self.assertIsNone(fourth["digit"])
 
 
 if __name__ == "__main__":

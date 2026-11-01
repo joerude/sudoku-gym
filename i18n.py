@@ -117,6 +117,7 @@ EN = {
     "Клетка — {cell}: какая цифра ей осталась?": "The cell is {cell}: which digit is left for it?",
     "Ищи место для цифры {v} в {unit}.": "Find the spot for {v} in {unit}.",
     "Узор: {cells}, цифра {d}.": "Pattern: {cells}, digit {d}.",
+    "Узор: {cells}, цифры {x} и {y}.": "Pattern: {cells}, digits {x} and {y}.",
     "Это даёт: {cell} = {v}.": "This gives: {cell} = {v}.",
     "На доске неверных цифр: {n}. Пока они стоят, логика не сходится.": "Wrong digits on the board: {n}. While they stay, the logic won't work out.",
     "Неверные цифры: {cells}. Сотри их.": "Wrong digits: {cells}. Erase them.",
