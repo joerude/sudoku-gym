@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS drill_attempts (
     cell INTEGER,
     value INTEGER,
     valid_other INTEGER NOT NULL DEFAULT 0,  -- a true move/elimination, but not by the drill's technique
-    hint INTEGER NOT NULL DEFAULT 0  -- 0 none, 1 answered after «где искать», 2 answer revealed (cell/value NULL)
+    hint INTEGER NOT NULL DEFAULT 0,  -- 0 none, 1 answered after «где искать», 2 answer revealed (cell/value NULL)
+    rated INTEGER NOT NULL DEFAULT 1  -- 0: answered in «Избранное» (a repeat), kept out of the rating
 );
 
 CREATE TABLE IF NOT EXISTS favorites (
@@ -84,6 +85,13 @@ CREATE TABLE IF NOT EXISTS favorites (
     ref_id INTEGER NOT NULL,  -- puzzles.id or drills.id
     at TEXT NOT NULL,
     PRIMARY KEY (kind, ref_id)
+);
+
+CREATE TABLE IF NOT EXISTS rating_norms (
+    technique TEXT PRIMARY KEY,
+    norm_ms INTEGER NOT NULL,  -- median of correct hint-free answers when frozen; never recomputed
+    from_attempt_id INTEGER NOT NULL,  -- only this technique's attempts with a larger id are rated
+    frozen_at TEXT NOT NULL
 );
 """
 
@@ -109,6 +117,7 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
         ("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
         ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),
         ("drill_attempts", "hint", "INTEGER NOT NULL DEFAULT 0"),
+        ("drill_attempts", "rated", "INTEGER NOT NULL DEFAULT 1"),
     ):
         if column not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
