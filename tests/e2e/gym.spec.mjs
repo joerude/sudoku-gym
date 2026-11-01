@@ -542,6 +542,7 @@ try {
   ok(await page.$(`#gamesTable a[href="#/review/${g1.id}"]`) !== null, "stats: review link for the solved game");
   ok(await page.$("#chart svg polyline") !== null, "stats: daily chart drawn");
   ok(/Голая одиночка/.test(await page.textContent("#techTable")), "stats: techniques table");
+  ok(await page.$('#techTable a[href="#/theory/x-wing"]') !== null, "stats: technique name links to its theory page");
   await shot(page, "stats");
 
   // --- 7. theory ------------------------------------------------------------------------------

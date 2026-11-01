@@ -91,7 +91,7 @@ export function mount(el) {
     const techs = [...st.techniques].sort((a, b) => (b.median_ms ?? -1) - (a.median_ms ?? -1));
     box.append(h("section", {}, h("h2", {}, tr("Упражнения по техникам (медленные сверху)")),
       table([[tr("Техника")], [tr("Попыток"), 1], [tr("Медиана"), 1], [tr("Точность"), 1], [""]],
-        techs.map(t => [t.title, t.n, sec(t.median_ms), pct(t.accuracy),
+        techs.map(t => [t.theory ? h("a", { href: `#/theory/${t.theory}` }, t.title) : t.title, t.n, sec(t.median_ms), pct(t.accuracy),
           h("a", { href: `#/drills?technique=${t.technique}` }, tr("тренировать"))]), "techTable")));
     box.append(h("section", {}, h("h2", {}, tr("Последние партии")),
       games.length

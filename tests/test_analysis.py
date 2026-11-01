@@ -279,6 +279,9 @@ class StatsTest(unittest.TestCase):
         ns = techs[0]
         self.assertEqual(ns["title"], TECH_TITLE["naked_single"])
         self.assertEqual((ns["n"], ns["median_ms"], ns["kind"], ns["tier"]), (3, 4000, "place", 1))
+        self.assertEqual(
+            [t["theory"] for t in techs[:5]], ["naked-single", *["hidden-single"] * 3, "pointing-claiming"]
+        )
         self.assertAlmostEqual(ns["accuracy"], 2 / 3)
         self.assertEqual(
             (techs[4]["technique"], techs[4]["n"], techs[4]["median_ms"], techs[4]["accuracy"]),

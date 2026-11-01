@@ -3,7 +3,7 @@
 import statistics
 from datetime import date, timedelta
 
-from drills import NEUTRAL
+from drills import NEUTRAL, THEORY_SLUG
 from i18n import tr
 from sudoku_core import TECH_TIER, TECH_TITLE, easiest_steps, parse, to_str, unit_name
 
@@ -244,6 +244,7 @@ def stats(conn) -> dict:
                 "title": tr(TECH_TITLE[t]),
                 "kind": "place" if TECH_TIER[t] == 1 else "eliminate",
                 "tier": TECH_TIER[t],
+                "theory": THEORY_SLUG.get(t),
                 "n": len(rows),
                 "median_ms": _median([ms for ok, ms in rows if ok]),
                 "accuracy": sum(1 for ok, _ in rows if ok) / len(rows) if rows else None,
