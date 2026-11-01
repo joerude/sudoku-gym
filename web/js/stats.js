@@ -1,6 +1,7 @@
-// #/stats — by level/mode, daily median chart, techniques, recent games.
+// #/stats — activity calendar, by level/mode, daily median chart, techniques, recent games.
 import { tr } from "./i18n.js";
-import { getStats, listGames } from "./api.js";
+import { getActivity, getStats, listGames } from "./api.js";
+import { heatmapCard } from "./heatmap.js";
 import { recordsCard } from "./records.js";
 import { fmtTime } from "./board.js";
 import { LEVEL_NAME, STATUS_NAME, dateRu, errorBox, h, pct, sec } from "./ui.js";
@@ -74,8 +75,9 @@ export function mount(el) {
   el.append(h("h1", {}, tr("Статистика")));
   const box = h("div", {}, h("p", { class: "hint" }, tr("Загрузка…")));
   el.append(box);
-  Promise.all([getStats(), listGames(20)]).then(([st, games]) => {
+  Promise.all([getStats(), listGames(20), getActivity()]).then(([st, games, act]) => {
     box.textContent = "";
+    box.append(heatmapCard(act));
     const rec = recordsCard({ title: tr("Рекорды по уровню и режиму"), id: "recordsStats" });
     box.append(rec.el);
     rec.load();

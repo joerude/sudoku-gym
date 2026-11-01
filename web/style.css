@@ -11,6 +11,7 @@
   --unit: #f4ecd2;
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --heat0: #ecebe5; --heat1: #b8dcc6; --heat2: #6fbf8e; --heat3: #2f9a5c; --heat4: #1a6b3d;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -24,6 +25,7 @@
     --unit: #3a3420;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --heat0: #2a2a27; --heat1: #1d4a30; --heat2: #2b7048; --heat3: #3fa066; --heat4: #6fd394;
     color-scheme: dark;
   }
 }
@@ -37,6 +39,7 @@
   --unit: #3a3420;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
   --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --heat0: #2a2a27; --heat1: #1d4a30; --heat2: #2b7048; --heat3: #3fa066; --heat4: #6fd394;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -229,6 +232,15 @@ td.num, th.num { text-align: right; }
 .legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
 .tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--line);
   border-radius: 6px; padding: 4px 8px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.15); z-index: 10; }
+.heat-wrap { overflow-x: auto; }
+.heat-wrap svg { min-width: 640px; width: 100%; height: auto; display: block; }
+.heat-wrap .lbl { fill: var(--muted); font-size: 9px; }
+.heat0 { fill: var(--heat0); background: var(--heat0); } .heat1 { fill: var(--heat1); background: var(--heat1); }
+.heat2 { fill: var(--heat2); background: var(--heat2); } .heat3 { fill: var(--heat3); background: var(--heat3); }
+.heat4 { fill: var(--heat4); background: var(--heat4); }
+.heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.heat-legend i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+.heat-sum { margin: 8px 0 0; }
 
 /* --- theory / markdown --- */
 .md { max-width: 720px; }
