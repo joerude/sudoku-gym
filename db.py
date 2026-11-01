@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS games (
     first_move_ms INTEGER,
     max_pause_ms INTEGER,
     long_pauses INTEGER,
+    hints INTEGER NOT NULL DEFAULT 0,  -- hint ladder requests (game_hints rows): such a game is no record
     daily TEXT  -- local date of the daily puzzle this game was started as; NULL for other games
 );
 CREATE INDEX IF NOT EXISTS games_puzzle ON games(puzzle_id);
@@ -48,6 +49,18 @@ CREATE TABLE IF NOT EXISTS moves (
     correct INTEGER,
     PRIMARY KEY (game_id, seq)
 );
+
+CREATE TABLE IF NOT EXISTS game_hints (
+    id INTEGER PRIMARY KEY,
+    game_id INTEGER NOT NULL REFERENCES games(id),
+    t_ms INTEGER NOT NULL,
+    level INTEGER NOT NULL,  -- the level opened (1-4)
+    kind TEXT NOT NULL,  -- error | notes | step | stuck | solved
+    technique TEXT,  -- of a step; NULL for the other kinds
+    cell INTEGER,  -- the move the ladder leads to, if any
+    value INTEGER
+);
+CREATE INDEX IF NOT EXISTS game_hints_game ON game_hints(game_id);
 
 CREATE TABLE IF NOT EXISTS techniques (
     slug TEXT PRIMARY KEY,
@@ -107,6 +120,7 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     # databases created before these columns existed
     for table, column, ddl in (
+        ("games", "hints", "INTEGER NOT NULL DEFAULT 0"),
         ("games", "daily", "TEXT"),
         ("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
         ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),

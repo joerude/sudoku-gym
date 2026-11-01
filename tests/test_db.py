@@ -20,7 +20,9 @@ class DbTest(unittest.TestCase):
     def test_schema(self):
         conn = connect(":memory:")
         names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertEqual(names, {"puzzles", "games", "moves", "techniques", "drills", "drill_attempts", "favorites"})
+        self.assertEqual(
+            names, {"puzzles", "games", "moves", "game_hints", "techniques", "drills", "drill_attempts", "favorites"}
+        )
 
     def test_reconnect_file(self):
         with tempfile.TemporaryDirectory() as d:

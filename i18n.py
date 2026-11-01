@@ -94,6 +94,7 @@ EN = {
     "задача дня играется в hardcore": "the daily puzzle is played in hardcore",
     "это не задача дня": "this is not today's daily puzzle",
     "партия не найдена": "game not found",
+    "партия уже закончена": "the game is already over",
     "ход должен быть объектом": "a move must be an object",
     "неизвестный тип хода: {kind}": "unknown move type: {kind}",
     "поле moves должно быть списком": "field moves must be a list",

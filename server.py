@@ -177,8 +177,8 @@ def api_games_list(conn, m, q, body):
     limit = q.get("limit", "20")
     limit = min(int(limit), 200) if limit.isdigit() else 20
     rows = conn.execute(
-        "SELECT g.id, g.puzzle_id, p.level, g.mode, g.status, g.started_at, g.finished_at, g.time_ms, g.mistakes"
-        " FROM games g JOIN puzzles p ON p.id = g.puzzle_id ORDER BY g.id DESC LIMIT ?",
+        "SELECT g.id, g.puzzle_id, p.level, g.mode, g.status, g.started_at, g.finished_at, g.time_ms, g.mistakes,"
+        " g.hints FROM games g JOIN puzzles p ON p.id = g.puzzle_id ORDER BY g.id DESC LIMIT ?",
         (limit,),
     )
     return [dict(r) for r in rows]
@@ -280,6 +280,24 @@ def api_game_analysis(conn, m, q, body):
     }
 
 
+def api_game_hint(conn, m, q, body):
+    gid = int(m.group(1))
+    game = _game(conn, gid)
+    if game["status"] != "active":
+        raise ApiError(400, tr("партия уже закончена"))
+    board, notes = _board(body, game["givens"]), _masks(body, "notes")
+    level, t_ms = _int(body, "level", 1, 4), _int(body, "t_ms", lo=0)
+    lad = hints.next_ladder(game["givens"], game["solution"], board, notes)
+    level = min(level, lad["max_level"])
+    cell, value = lad["levels"][-1]["place"] or (None, None)
+    with conn:
+        conn.execute(
+            "INSERT INTO game_hints (game_id, t_ms, level, kind, technique, cell, value) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (gid, t_ms, level, lad["kind"], lad["technique"], cell, value),
+        )
+    return {**lad, "levels": lad["levels"][:level], "level": level}
+
+
 def api_moves(conn, m, q, body):
     gid = int(m.group(1))
     game = _game(conn, gid)
@@ -317,11 +335,12 @@ def _close_game(conn, game, status, t_ms, moves=None):
     limit = game["mistake_limit"]
     if game["mode"] == "original" and limit is not None and metrics["mistakes"] >= limit:
         status = "failed"
+    n_hints = conn.execute("SELECT COUNT(*) FROM game_hints WHERE game_id = ?", (gid,)).fetchone()[0]
     finished_at = now_iso()
     with conn:
         conn.execute(
             "UPDATE games SET status = ?, finished_at = ?, time_ms = ?, mistakes = ?, corrections = ?, checks = ?,"
-            " note_actions = ?, first_move_ms = ?, max_pause_ms = ?, long_pauses = ? WHERE id = ?",
+            " note_actions = ?, first_move_ms = ?, max_pause_ms = ?, long_pauses = ?, hints = ? WHERE id = ?",
             (
                 status,
                 finished_at,
@@ -333,6 +352,7 @@ def _close_game(conn, game, status, t_ms, moves=None):
                 metrics["first_move_ms"],
                 metrics["max_pause_ms"],
                 metrics["long_pauses"],
+                n_hints,
                 gid,
             ),
         )
@@ -342,6 +362,7 @@ def _close_game(conn, game, status, t_ms, moves=None):
         "finished_at": finished_at,
         "mode": game["mode"],
         "mistake_limit": limit,
+        "hints": n_hints,
         **metrics,
     }
 
@@ -543,6 +564,7 @@ ROUTES = [
     ("POST", r"/api/games/(\d+)/finish", api_finish),
     ("GET", r"/api/games/(\d+)/review", api_review),
     ("POST", r"/api/games/(\d+)/analysis", api_game_analysis),
+    ("POST", r"/api/games/(\d+)/hint", api_game_hint),
     ("GET", r"/api/stats", api_stats),
     ("GET", r"/api/activity", api_activity),
     ("GET", r"/api/records", api_records),

@@ -164,11 +164,12 @@ def _median(xs):
 def records(conn) -> list:
     """Personal best per level × mode (all four levels, both modes; empty ones with None).
 
-    Only solved games without «Проверить» count (a check reveals mistakes); on a tie the earlier game keeps it."""
+    Only solved games without «Проверить» and hints count (a check reveals mistakes); on a tie the earlier game
+    keeps it."""
     best = {}
     for gid, level, mode, ms, at in conn.execute(
         "SELECT g.id, p.level, g.mode, g.time_ms, g.started_at FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
-        " WHERE g.status = 'solved' AND g.time_ms IS NOT NULL AND COALESCE(g.checks, 0) = 0"
+        " WHERE g.status = 'solved' AND g.time_ms IS NOT NULL AND COALESCE(g.checks, 0) = 0 AND g.hints = 0"
         " ORDER BY g.time_ms, g.id"
     ):
         key = (level, mode)
@@ -186,7 +187,7 @@ def records(conn) -> list:
 
 def stats(conn) -> dict:
     games = conn.execute(
-        "SELECT g.status, g.mode, g.time_ms, g.mistakes, date(g.started_at, 'localtime') AS day, p.level"
+        "SELECT g.status, g.mode, g.time_ms, g.mistakes, g.hints, date(g.started_at, 'localtime') AS day, p.level"
         " FROM games g JOIN puzzles p ON p.id = g.puzzle_id WHERE g.status IN (?, ?) ORDER BY g.id",
         FINISHED,
     ).fetchall()
@@ -201,13 +202,14 @@ def stats(conn) -> dict:
     for (level, mode), gs in sorted(
         group(lambda g: (g["level"], g["mode"])).items(), key=lambda kv: (LEVEL_ORDER.get(kv[0][0], 9), kv[0][1])
     ):
-        solved = [g["time_ms"] for g in gs if g["status"] == "solved" and g["time_ms"] is not None]
+        won = [g for g in gs if g["status"] == "solved"]
+        solved = [g["time_ms"] for g in won if g["time_ms"] is not None and not g["hints"]]  # hints: no best, no median
         by_lm.append(
             {
                 "level": level,
                 "mode": mode,
                 "n": len(gs),
-                "solved": len(solved),
+                "solved": len(won),
                 "median_ms": _median(solved),
                 "best_ms": min(solved) if solved else None,
                 "mistakes_per_game": sum(g["mistakes"] or 0 for g in gs) / len(gs),
@@ -219,16 +221,10 @@ def stats(conn) -> dict:
         group(lambda g: (g["day"], g["level"], g["mode"])).items(),
         key=lambda kv: (kv[0][0], LEVEL_ORDER.get(kv[0][1], 9), kv[0][2]),
     ):
-        solved = [g["time_ms"] for g in gs if g["status"] == "solved" and g["time_ms"] is not None]
+        won = [g for g in gs if g["status"] == "solved"]
+        solved = [g["time_ms"] for g in won if g["time_ms"] is not None and not g["hints"]]  # hints: no best, no median
         daily.append(
-            {
-                "day": day,
-                "level": level,
-                "mode": mode,
-                "n": len(gs),
-                "solved": len(solved),
-                "median_ms": _median(solved),
-            }
+            {"day": day, "level": level, "mode": mode, "n": len(gs), "solved": len(won), "median_ms": _median(solved)}
         )
     attempts = {}
     for t, correct, ms in conn.execute(
@@ -279,11 +275,12 @@ def daily_puzzle_id(conn, day: str) -> int | None:
 
 
 def _daily_days(conn, day: str | None = None) -> dict:
-    """day → {game_id, time_ms, tech_grade, attempts (up to and with the first solve), total} over games started as
-    a daily puzzle; game_id is None while the day has no solve."""
+    """day → {game_id, time_ms, tech_grade, attempts (up to and with the first solve without hints), total} over games
+    started as a daily puzzle; game_id is None while the day has no solve."""
     out = {}
-    for gid, d, status, ms, tg in conn.execute(
-        "SELECT g.id, g.daily, g.status, g.time_ms, p.tech_grade FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
+    for gid, d, status, ms, n_hints, tg in conn.execute(
+        "SELECT g.id, g.daily, g.status, g.time_ms, g.hints, p.tech_grade"
+        " FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
         " WHERE g.daily IS NOT NULL AND (? IS NULL OR g.daily = ?) ORDER BY g.id",
         (day, day),
     ):
@@ -291,13 +288,13 @@ def _daily_days(conn, day: str | None = None) -> dict:
         rec["total"] += 1
         if rec["game_id"] is None:
             rec["attempts"] += 1
-            if status == "solved":
+            if status == "solved" and not n_hints:
                 rec["game_id"], rec["time_ms"] = gid, ms
     return out
 
 
 def daily_today(conn, day: str) -> dict:
-    """The day's result (its first solved daily game) and how many times it was started."""
+    """The day's result (its first solved daily game without hints) and how many times it was started."""
     rec = _daily_days(conn, day).get(day)
     if rec is None:
         return {"result": None, "attempts": 0}

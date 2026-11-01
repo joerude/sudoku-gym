@@ -276,8 +276,40 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(len(recent), 2)
         self.assertEqual(
             set(recent[0]),
-            {"id", "puzzle_id", "level", "mode", "status", "started_at", "finished_at", "time_ms", "mistakes"},
+            {"id", "puzzle_id", "level", "mode", "status", "started_at", "finished_at", "time_ms", "mistakes", "hints"},
         )
+
+    def test_hint_ladder_is_logged_and_counted(self):
+        _, P, S = L1[0]
+        gid = self.new_game(self.easy["L1-1"], "original")
+        notes = [0] * 81
+        r = self.api("POST", f"/api/games/{gid}/hint", {"board": P, "notes": notes, "t_ms": 1000, "level": 1})
+        self.assertEqual((r["kind"], r["level"], r["max_level"], len(r["levels"])), ("step", 1, 4, 1))
+        r = self.api("POST", f"/api/games/{gid}/hint", {"board": P, "notes": notes, "t_ms": 2000, "level": 4})
+        cell, v = r["levels"][3]["place"]
+        self.assertEqual(int(S[cell]), v)
+        e = next(i for i, c in enumerate(P) if c == "0")
+        bad = P[:e] + str(int(S[e]) % 9 + 1) + P[e + 1 :]
+        r = self.api("POST", f"/api/games/{gid}/hint", {"board": bad, "t_ms": 3000, "level": 4})
+        self.assertEqual((r["kind"], r["level"], len(r["levels"])), ("error", 2, 2))  # capped at the ladder's length
+        self.api("POST", f"/api/games/{gid}/hint", {"board": P, "t_ms": 1, "level": 5}, status=400)
+        self.api("POST", f"/api/games/{gid}/hint", {"board": "1" * 81, "t_ms": 1, "level": 1}, status=400)
+        self.api("POST", f"/api/games/{gid}/hint", {"board": P, "notes": [1] * 3, "t_ms": 1, "level": 1}, status=400)
+        conn = connect(self.db_path)
+        rows = conn.execute(
+            "SELECT t_ms, level, kind, technique, cell, value FROM game_hints WHERE game_id = ? ORDER BY id", (gid,)
+        ).fetchall()
+        conn.close()
+        tech = rows[0][3]
+        self.assertEqual(
+            [tuple(x) for x in rows],
+            [(1000, 1, "step", tech, cell, v), (2000, 4, "step", tech, cell, v), (3000, 2, "error", None, None, None)],
+        )
+        fin = self.api("POST", f"/api/games/{gid}/finish", {"status": "abandoned", "t_ms": 5000})
+        self.assertEqual(fin["hints"], 3)
+        self.assertEqual(self.api("GET", f"/api/games/{gid}")["hints"], 3)
+        self.assertEqual(next(g for g in self.api("GET", "/api/games?limit=200") if g["id"] == gid)["hints"], 3)
+        self.api("POST", f"/api/games/{gid}/hint", {"board": P, "t_ms": 6000, "level": 1}, status=400)  # game over
 
     def test_analysis(self):
         _, P, S = L1[0]

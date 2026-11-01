@@ -211,6 +211,19 @@ class StatsTest(unittest.TestCase):
             )
         c.commit()
 
+    def test_hinted_games_are_no_record_no_best_no_median(self):
+        easy = self.conn.execute("SELECT id FROM puzzles WHERE bank_id = 'e1'").fetchone()[0]
+        hinted = make_game(self.conn, easy, [], "original", "solved", "2026-10-31T09:00:00+00:00", 50000, 0, 3)
+        self.conn.execute("UPDATE games SET hints = 2 WHERE id = ?", (hinted,))
+        self.conn.commit()
+        rec = records(self.conn)[0]
+        self.assertEqual((rec["best_ms"], rec["solved"]), (100000, 3))
+        st = stats(self.conn)
+        row = st["by_level_mode"][0]
+        self.assertEqual((row["n"], row["solved"], row["median_ms"], row["best_ms"]), (5, 4, 200000, 100000))
+        day = next(d for d in st["daily"] if d["day"] == "2026-10-31")
+        self.assertEqual((day["n"], day["solved"], day["median_ms"]), (1, 1, None))
+
     def test_by_level_mode(self):
         s = stats(self.conn)
         self.assertEqual(
@@ -389,6 +402,16 @@ class DailyTest(unittest.TestCase):
             self.conn.execute("UPDATE games SET daily = ? WHERE id = ?", (daily, gid))
             self.conn.commit()
         return gid
+
+    def test_a_solve_with_hints_is_not_the_days_result(self):
+        day = "2026-11-01"
+        pid = daily_puzzle_id(self.conn, day)
+        hinted = self.play(pid, day, "solved", 100000, daily=day)
+        self.conn.execute("UPDATE games SET hints = 1 WHERE id = ?", (hinted,))
+        self.conn.commit()
+        self.assertEqual(daily_today(self.conn, day), {"result": None, "attempts": 1})
+        clean = self.play(pid, day, "solved", 200000, daily=day)
+        self.assertEqual(daily_today(self.conn, day), {"result": {"game_id": clean, "time_ms": 200000}, "attempts": 2})
 
     def test_same_day_same_puzzle_from_the_medium_bank(self):
         a = daily_puzzle_id(self.conn, "2026-11-01")
