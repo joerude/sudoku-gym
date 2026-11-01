@@ -216,10 +216,11 @@ try {
   }
   ok(await page.$$eval("#board .cell.ans", els => els.length) === 1, "hint: level 4 shows the move on the board");
   ok((await page.textContent("#badge")).includes("💡 4"), "hint: the badge counts hints");
+  ok(await page.$eval("#hintBtn", b => b.disabled), "hint: the button is off at the last level");
+  await shot(page, "play-hint");
   const target = await page.$eval("#board .cell.ans", e => +e.dataset.cell);
   await typeAt(page, target, gh.solution[target]);
   ok(await page.$$eval("#hintBox .ladder-step", els => els.length) === 0, "hint: a move resets the ladder");
-  await shot(page, "play-hint");
   await page.click("#giveUpBtn");
   await page.click("#giveUpBtn");
   await page.waitForSelector("#resultsCard");

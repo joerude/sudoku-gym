@@ -202,7 +202,7 @@ export function mount(el, params, query) {
     fav, badge: h("span", { class: "badge", id: "badge" }), errs: h("span", { class: "counter", id: "errors" }),
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
     results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, setup,
-    hintBtn, hintBox: h("div", { id: "hintBox", class: "hint-box zen-hide" }),
+    hintBtn, hintBox: h("div", { id: "hintBox", class: "hint-box" }),
   };
   ui.records = recordLine();
   ui.day = dayStrip();
@@ -530,13 +530,13 @@ async function askHint() {
     const lad = await gameHint(S.gameId, { board: S.vals.join(""), notes: S.notes, t_ms: Math.round(G.elapsed()),
       level: fresh ? 1 : hint.level + 1 });
     S.hints++;
-    if (S.seq === seq) hint = { seq, level: lad.level, lad };
+    if (G?.S === S && S.seq === seq) hint = { seq, level: lad.level, lad };  // not a new game or a move in the meantime
+    refresh();
   } catch (e) {
-    setMsg(e.message, "bad");
+    setMsg(e.message, "bad");  // after refresh(), which would clear it
   } finally {
     hinting = false;
   }
-  refresh();
 }
 
 /** «Убрать в заметках»: the ladder's eliminations as note toggles (each one undoable). */
@@ -548,7 +548,7 @@ function strikeNotes(elims) {
 
 function renderHint(over) {
   ui.hintBox.textContent = "";
-  ui.hintBtn.disabled = over || !G;
+  ui.hintBtn.disabled = over || !G || (hint && hint.level >= hint.lad.max_level);  // the last level: next one after a move
   ui.hintBtn.textContent = tr("💡 Подсказка");
   if (!hint || over) return;
   const { lad, level } = hint;
