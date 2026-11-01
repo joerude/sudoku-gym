@@ -362,4 +362,15 @@ export default {
   "⚙ Настройки": "⚙ Settings",
   "Рекорд {what}: ": "Record {what}: ",
   "Рекорда {what} пока нет": "No {what} record yet",
+  // daily puzzle
+  "📅 Задача дня": "📅 Daily puzzle",
+  "Одна сетка medium на весь день, всегда hardcore; в зачёт — первое решение": "One medium grid for the whole day, always hardcore; the first solve counts",
+  "📅 задача дня": "📅 daily puzzle",
+  "📅 задача дня →": "📅 daily puzzle →",
+  "Задача дня решена — разбор": "Daily puzzle solved — review",
+  "Задача дня": "Daily puzzle",
+  "решено дней: {n}": "days solved: {n}",
+  "лучшее: {t}": "best: {t}",
+  "медиана последних 30: {t}": "median of the last 30: {t}",
+  "Задач дня пока нет — первая ждёт на «Играть» (📅 Задача дня).": "No daily puzzles yet — the first one waits on “Play” (📅 Daily puzzle).",
 };

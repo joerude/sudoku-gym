@@ -1,6 +1,6 @@
-// #/stats — activity calendar, by level/mode, daily median chart, techniques, recent games.
+// #/stats — activity calendar, records, the daily puzzle history, by level/mode, daily median chart, techniques, recent games.
 import { tr } from "./i18n.js";
-import { getActivity, getStats, listGames } from "./api.js";
+import { getActivity, getDailyHistory, getStats, listGames } from "./api.js";
 import { heatmapCard } from "./heatmap.js";
 import { recordsCard } from "./records.js";
 import { fmtTime } from "./board.js";
@@ -17,6 +17,17 @@ const svg = (tag, attrs = {}, ...kids) => {
 const table = (head, rows, id) => h("div", { class: "table-wrap" }, h("table", { id },
   h("thead", {}, h("tr", {}, head.map(([t, num]) => h("th", { class: num ? "num" : "" }, t)))),
   h("tbody", {}, rows.map(r => h("tr", {}, r.map((c, k) => h("td", { class: head[k][1] ? "num" : "" }, c)))))));
+
+function dailyCard(d) {
+  const body = d.days.length
+    ? [h("p", { class: "heat-sum", id: "dailySum" }, tr("решено дней: {n}", { n: d.solved }), " · ",
+        tr("лучшее: {t}", { t: fmtTime(d.best_ms) }), " · ", tr("медиана последних 30: {t}", { t: fmtTime(d.median_ms) })),
+      table([[tr("Дата")], [tr("Время"), 1], [tr("Попыток"), 1], [tr("Техника"), 1]],
+        d.days.map(r => [r.day, h("a", { href: `#/review/${r.game_id}` }, fmtTime(r.time_ms)), r.attempts, r.tech_grade]),
+        "dailyTable")]
+    : [h("p", { class: "hint", style: "margin:0" }, tr("Задач дня пока нет — первая ждёт на «Играть» (📅 Задача дня)."))];
+  return h("section", { id: "daily" }, h("h2", {}, tr("Задача дня")), ...body);
+}
 
 function chart(daily) {
   // custom (pasted) puzzles are not a level: they stay out of the trend
@@ -75,12 +86,13 @@ export function mount(el) {
   el.append(h("h1", {}, tr("Статистика")));
   const box = h("div", {}, h("p", { class: "hint" }, tr("Загрузка…")));
   el.append(box);
-  Promise.all([getStats(), listGames(20), getActivity()]).then(([st, games, act]) => {
+  Promise.all([getStats(), listGames(20), getActivity(), getDailyHistory()]).then(([st, games, act, daily]) => {
     box.textContent = "";
     box.append(heatmapCard(act));
     const rec = recordsCard({ title: tr("Рекорды по уровню и режиму"), id: "recordsStats" });
     box.append(rec.el);
     rec.load();
+    box.append(dailyCard(daily));
     box.append(h("section", {}, h("h2", {}, tr("По уровню и режиму")),
       st.by_level_mode.length
         ? table([[tr("Уровень")], [tr("Режим")], [tr("Партий"), 1], [tr("Решено"), 1], [tr("Медиана"), 1], [tr("Лучшее"), 1], [tr("Ошибок/партия"), 1], [tr("Провалы"), 1]],

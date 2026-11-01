@@ -582,6 +582,28 @@ try {
      "today's line: a solved medium hardcore game counts, review link moves to it");
   await shot(page, "play-home");
 
+  // --- 8a. daily puzzle: the strip link starts it in hardcore, the first solve shows in the strip and on stats ----
+  const today = await api("/api/daily");
+  ok(await page.$eval("#dayDaily", a => a.getAttribute("href")) === "#/play?daily=1" && await page.$("#dailyGame") !== null,
+     "daily: «📅 задача дня →» in the strip and the button in the setup");
+  const gd = await waitGame(page, () => page.click("#dayDaily"));
+  ok(gd.puzzle_id === today.puzzle.id && gd.mode === "hardcore" && gd.daily === today.day && /задача дня/.test(await page.textContent("#badge")),
+     "daily: today's grid in hardcore, marked on the badge", JSON.stringify([gd.puzzle_id, today.puzzle.id, gd.mode, gd.daily]));
+  for (const [i, c] of [...gd.givens].entries()) if (c === "0") await typeAt(page, i, gd.solution[i]);
+  await page.waitForSelector("#resultsCard");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(id => document.querySelector("#dayDaily")?.getAttribute("href") === `#/review/${id}`, gd.id);
+  ok(/📅 ✓ \d+:\d\d\.\d/.test(await page.textContent("#dayDaily")), "daily: solved — «📅 ✓ time» links to the review");
+  const again = await waitGame(page, () => page.click("#dailyGame"));
+  ok(again.puzzle_id === today.puzzle.id && again.mode === "hardcore", "daily: a second attempt the same day is the same grid");
+  await page.click("#giveUpBtn"); await page.click("#giveUpBtn");
+  await page.waitForSelector("#resultsCard");
+  await page.keyboard.press("Escape");
+  await page.goto(`${BASE}/#/stats`);
+  await page.waitForSelector("#daily");
+  ok(await page.$(`#dailyTable a[href="#/review/${gd.id}"]`) !== null && /решено дней: 1/.test(await page.textContent("#dailySum")),
+     "stats: the daily card lists the counted solve");
+
   // --- 8b. look settings ----------------------------------------------------------------------
   await page.goto(`${BASE}/#/settings`);
   await page.waitForSelector("#lookBoard .cell");

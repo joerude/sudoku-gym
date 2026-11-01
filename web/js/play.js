@@ -1,6 +1,6 @@
 // #/play — game page: setup controls, board, timer, results. The game survives navigation.
 import { tr } from "./i18n.js";
-import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
+import { addPuzzle, createGame, getDaily, getFavoritePuzzle, getFavorites, getOptions, getPuzzle } from "./api.js";
 import { PEERS, createBoard, createPad, fmtTime, parseGrid, stepCell, toDigits } from "./board.js";
 import { startGame } from "./game.js";
 import { closeReward, showReward } from "./reward.js";
@@ -96,6 +96,9 @@ function setupSection() {
     onclick: () => begin(getFavoritePuzzle, false) });
   const customBtn = h("button", { type: "button", id: "customGame", title: tr("Ввести задачу самому (например, с usdoku) и решить её как обычную партию"),
     onclick: () => openEditor() }, tr("✎ Своя сетка"));
+  const dailyBtn = h("button", { type: "button", id: "dailyGame",
+    title: tr("Одна сетка medium на весь день, всегда hardcore; в зачёт — первое решение"),
+    onclick: () => startDaily() }, tr("📅 Задача дня"));
   const syncFav = () => {
     favBtn.textContent = tr("★ Из избранного") + `${favCount === null ? "" : ` (${favCount})`}`;
     favBtn.disabled = !favCount;
@@ -103,7 +106,7 @@ function setupSection() {
   syncFav();
   const box = h("section", { class: "first-mobile" },
     h("h2", {}, tr("Новая партия")),
-    h("div", { class: "bar", style: "margin:0" }, newBtn, customBtn),
+    h("div", { class: "bar", style: "margin:0" }, newBtn, dailyBtn, customBtn),
     // everything but the main button is folded: one click to play with the remembered settings
     h("details", { class: "fold", id: "setupMore" }, h("summary", {}, tr("⚙ Настройки")),
       h("div", { class: "bar" }, h("label", { class: "field" }, tr("Уровень"), lvl), h("label", { class: "field" }, tr("Техника"), grade)),
@@ -113,7 +116,7 @@ function setupSection() {
   box.addEventListener("change", relabel);  // the fields' own handlers have saved prefs by now
   box.addEventListener("input", relabel);
   relabel();
-  return { box, sync: () => { sync(); relabel(); }, syncFav, buttons: [newBtn, rndBtn, favBtn, customBtn] };
+  return { box, sync: () => { sync(); relabel(); }, syncFav, buttons: [newBtn, rndBtn, favBtn, customBtn, dailyBtn] };
 }
 
 /** «Своя сетка»: the board becomes an editor of the givens; this panel holds level, mode and start. */
@@ -250,6 +253,7 @@ export function mount(el, params, query) {
       setup.sync();
     }
     if (query.start === "1") { history.replaceState(null, "", "#/play"); newGame(false); }
+    if (query.daily === "1") { history.replaceState(null, "", "#/play"); startDaily(); }
   }).catch(e => setMsg(e.message, "bad"));
   getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
@@ -297,7 +301,7 @@ function refresh() {
   });
   ui.pad.update(prefs.counts ? S.vals : null);
   const p = S.puzzle, showGrade = !meta.hideGrade || over;
-  ui.badge.textContent = `${LEVEL_NAME[p.level] || p.level} · ${showGrade ? tr("техника: {title}", { title: p.grade_title }) : tr("техника скрыта")} · ${S.mode}`;
+  ui.badge.textContent = `${meta.daily ? tr("📅 задача дня") + " · " : ""}${LEVEL_NAME[p.level] || p.level} · ${showGrade ? tr("техника: {title}", { title: p.grade_title }) : tr("техника скрыта")} · ${S.mode}`;
   ui.errs.textContent = S.mode === "original" ? tr("Ошибки {n}/{limit}", { n: S.mistakes, limit: S.limit ?? "∞" }) : "";
   ui.errs.classList.toggle("bad", S.mode === "original" && S.mistakes > 0);
   ui.timer.textContent = fmtTime(G.elapsed());
@@ -360,7 +364,7 @@ async function endGame(status) {
 }
 
 let busy = false;
-async function begin(getPuzzleFn, hideGrade) {
+async function begin(getPuzzleFn, hideGrade, daily = false) {
   if (busy) return;
   busy = true;
   ui?.setup.buttons.forEach(b => { b.disabled = true; });
@@ -370,12 +374,13 @@ async function begin(getPuzzleFn, hideGrade) {
     if (G && G.S.status === "active") await G.finish("abandoned").catch(() => {});
     const puzzle = await getPuzzleFn();
     edit = null;
-    const limit = prefs.mode === "original" ? (prefs.limit === "none" ? null : Number(prefs.limit)) : null;
-    const { id } = await createGame(puzzle.id, prefs.mode, limit);
-    meta = { hideGrade };
+    const mode = daily ? "hardcore" : prefs.mode;
+    const limit = mode === "original" ? (prefs.limit === "none" ? null : Number(prefs.limit)) : null;
+    const { id } = await createGame(puzzle.id, mode, limit, daily);
+    meta = { hideGrade, daily };
     digit = 0;
     G = startGame({
-      puzzle, gameId: id, mode: prefs.mode, limit,
+      puzzle, gameId: id, mode, limit,
       onChange: refresh, onEnd: endGame,
       onQueueError: e => setMsg(tr("Ходы пока не отправлены: {error}. Повторю.", { error: e.message }), "bad"),
     });
@@ -392,6 +397,11 @@ async function begin(getPuzzleFn, hideGrade) {
     ui?.setup.syncFav();
     if (ui && edit) refresh();  // the server turned the grid down: the editor stays, start is clickable again
   }
+}
+
+/** Today's daily puzzle: always hardcore, whatever the saved mode; the saved settings stay as they are. */
+function startDaily() {
+  return begin(() => getDaily().then(d => d.puzzle), false, true);
 }
 
 function newGame(random) {
