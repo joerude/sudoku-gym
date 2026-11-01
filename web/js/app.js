@@ -8,11 +8,9 @@ import * as settings from "./settings.js";
 import * as drills from "./drills.js";
 import * as stats from "./stats.js";
 import * as theory from "./theory.js";
-import * as today from "./today.js";
 import { errorBox, initZen, isZen, keyTrace, setZen, themeButton, typingInto } from "./ui.js";
 
 const ROUTES = [
-  [/^today$/, today.mount, "today"],
   [/^play$/, play.mount, "play"],
   [/^review\/(\d+)$/, review.mount, "stats"],
   [/^drills$/, drills.mount, "drills"],
@@ -21,7 +19,7 @@ const ROUTES = [
   [/^theory\/([^/]+)$/, theory.mountPage, "theory"],
   [/^settings$/, settings.mount, "settings"],
 ];
-const TITLES = { today: tr("Сегодня"), play: tr("Играть"), drills: tr("Упражнения"), stats: tr("Статистика"), theory: tr("Теория"), settings: tr("Вид") };
+const TITLES = { play: tr("Играть"), drills: tr("Упражнения"), stats: tr("Статистика"), theory: tr("Теория"), settings: tr("Вид") };
 const ZEN_PAGES = new Set(["play", "drills"]);
 
 initAppearance();
@@ -48,6 +46,7 @@ function route() {
   }
   document.title = `${TITLES[nav] || "Sudoku Gym"} · Sudoku Gym`;
   document.body.classList.toggle("zen-page", ZEN_PAGES.has(nav));
+  if (zenHome) zenHome.hidden = nav === "play";  // «Играть» is home: no link to itself
   themeBtn?.sync();
   try {
     const res = fn(app, m.slice(1).map(decodeURIComponent), query);
@@ -68,7 +67,7 @@ document.querySelector(".top-in").append(themeBtn, langBtn);
 for (const a of document.querySelectorAll("#nav a")) a.textContent = TITLES[a.dataset.route];
 document.getElementById("nav").setAttribute("aria-label", tr("Разделы"));
 const zenHome = document.querySelector(".zen-home");
-if (zenHome) Object.assign(zenHome, { textContent: `← ${TITLES.today}`, title: tr("На главную (zen остаётся для доски)") });
+if (zenHome) Object.assign(zenHome, { textContent: `← ${TITLES.play}`, title: tr("На главную (zen остаётся для доски)") });
 initZen();
 
 // Z toggles zen mode on the board pages. Esc leaves zen first; otherwise it goes to «Играть» (the main page),

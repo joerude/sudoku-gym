@@ -45,3 +45,24 @@ export function recordsCard({ title = tr("Рекорды"), id = "records" } = {
     mark(level, mode) { cur = level && mode ? { level, mode } : null; if (rows.length) render(); },
   };
 }
+
+/** One line on #/play: the record for the level and mode about to be played, linked to its review.
+ * Same interface as recordsCard; the whole table is on #/stats. */
+export function recordLine() {
+  const el = h("p", { class: "hint record-line zen-hide", id: "recordLine" });
+  let rows = null, cur = null;
+  const render = () => {
+    el.textContent = "";
+    if (!rows || !cur) return;
+    const r = rows.find(x => x.level === cur.level && x.mode === cur.mode);
+    const what = `${LEVEL_NAME[cur.level] || cur.level} · ${cur.mode}`;
+    if (!r || r.best_ms === null) { el.append(tr("Рекорда {what} пока нет", { what })); return; }
+    el.append(tr("Рекорд {what}: ", { what }), h("a", { href: `#/review/${r.game_id}`,
+      title: `${dateRu(r.at)} · ` + tr("решено без проверки: {n}", { n: r.solved }) }, fmtTime(r.best_ms)));
+  };
+  return {
+    el,
+    load() { return getRecords().then(r => { rows = r; render(); }).catch(() => { rows = null; render(); }); },
+    mark(level, mode) { cur = level && mode ? { level, mode } : null; render(); },
+  };
+}

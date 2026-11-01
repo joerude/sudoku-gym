@@ -4,7 +4,8 @@ import { addPuzzle, createGame, getFavoritePuzzle, getFavorites, getOptions, get
 import { PEERS, createBoard, createPad, fmtTime, parseGrid, stepCell, toDigits } from "./board.js";
 import { startGame } from "./game.js";
 import { closeReward, showReward } from "./reward.js";
-import { recordsCard } from "./records.js";
+import { dayStrip } from "./daystrip.js";
+import { recordLine } from "./records.js";
 import { LEVEL_NAME, alignSideToBoard, confirmDialog, createFav, errorBox, h, ignoreKey, keyTrace, metricsGrid, statusLine, zenButton } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
@@ -37,6 +38,11 @@ function gradeCounts(level) {
   return sum;
 }
 const levelTotal = level => Object.values(gradeCounts(level)).reduce((a, b) => a + b, 0);
+/** «▶ Играть · средний · hardcore»: what the main button will start, from the remembered settings. */
+const playLabel = () => [tr("▶ Играть"), LEVEL_NAME[prefs.level], prefs.mode,
+  prefs.grade ? tr("техника {g}", { g: prefs.grade }) : null,
+  prefs.mode === "original" ? (prefs.limit === "none" ? tr("без лимита") : tr("лимит {n}", { n: prefs.limit })) : null,
+].filter(Boolean).map(part => part.replace(/ /g, "\u00a0")).join(" · ");  // wraps only between the parts
 /** Cells whose digit repeats in their row, column or box. */
 const conflicts = vals => new Set(vals.flatMap((v, i) => (v && PEERS[i].some(p => vals[p] === v) ? [i] : [])));
 
@@ -84,7 +90,7 @@ function setupSection() {
   lvl.value = prefs.level;
   lvl.onchange = () => { prefs.level = lvl.value; savePrefs(); sync(); markRecord(); };
   grade.onchange = () => { prefs.grade = grade.value; savePrefs(); };
-  const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) }, tr("Новая партия"));
+  const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) });
   const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, tr("🎲 Случайная партия"));
   const favBtn = h("button", { type: "button", id: "favGame", title: tr("Задача из избранного: сначала та, что давно не игралась"),
     onclick: () => begin(getFavoritePuzzle, false) });
@@ -97,10 +103,17 @@ function setupSection() {
   syncFav();
   const box = h("section", { class: "first-mobile" },
     h("h2", {}, tr("Новая партия")),
-    h("div", { class: "bar" }, h("label", { class: "field" }, tr("Уровень"), lvl), h("label", { class: "field" }, tr("Техника"), grade)),
-    h("div", { class: "bar" }, fields.modeField, fields.limitField),
-    h("div", { class: "bar", style: "margin:0" }, newBtn, rndBtn, favBtn, customBtn));
-  return { box, sync, syncFav, buttons: [newBtn, rndBtn, favBtn, customBtn] };
+    h("div", { class: "bar", style: "margin:0" }, newBtn, customBtn),
+    // everything but the main button is folded: one click to play with the remembered settings
+    h("details", { class: "fold", id: "setupMore" }, h("summary", {}, tr("⚙ Настройки")),
+      h("div", { class: "bar" }, h("label", { class: "field" }, tr("Уровень"), lvl), h("label", { class: "field" }, tr("Техника"), grade)),
+      h("div", { class: "bar" }, fields.modeField, fields.limitField),
+      h("div", { class: "bar", style: "margin:0" }, rndBtn, favBtn)));
+  const relabel = () => { newBtn.textContent = playLabel(); };
+  box.addEventListener("change", relabel);  // the fields' own handlers have saved prefs by now
+  box.addEventListener("input", relabel);
+  relabel();
+  return { box, sync: () => { sync(); relabel(); }, syncFav, buttons: [newBtn, rndBtn, favBtn, customBtn] };
 }
 
 /** «Своя сетка»: the board becomes an editor of the givens; this panel holds level, mode and start. */
@@ -182,8 +195,9 @@ export function mount(el, params, query) {
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
     results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, setup,
   };
-  ui.records = recordsCard();
-  ui.records.el.classList.add("zen-hide");
+  ui.records = recordLine();
+  ui.day = dayStrip();
+  setup.box.prepend(ui.day.el);
   ui.editor = editorSection();
   ui.board = createBoard(boardEl, { onCell: i => {
     if (edit) { edit.sel = i; refresh(); } else if (G) { digit = 0; G.select(i); }
@@ -204,7 +218,7 @@ export function mount(el, params, query) {
       ui.msg),
     setup.box, ui.editor.box,
     h("div", {}, ui.results, ui.records.el,
-      h("section", { class: "zen-hide" }, h("h2", {}, tr("Клавиши")), h("p", { class: "hint", style: "margin:0", html:
+      h("details", { class: "fold zen-hide", id: "keysHelp" }, h("summary", {}, tr("Клавиши")), h("p", { class: "hint", style: "margin:0", html:
         tr("<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
         "<kbd>Ctrl+Y</kbd> — вернуть, " +
@@ -214,6 +228,7 @@ export function mount(el, params, query) {
   el.append(ui.root);
   markRecord();
   ui.records.load();
+  ui.day.load();
   const unalign = alignSideToBoard(ui.root);
 
   const onKey = e => handleKey(e);
@@ -270,7 +285,7 @@ function refresh() {
     ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
     ui.root.querySelector("#undoBtn").disabled = ui.root.querySelector("#redoBtn").disabled = true;
     if (pendingMsg) { setMsg(pendingMsg.text, pendingMsg.cls); pendingMsg = null; }
-    else if (!ui.msg.textContent) setMsg(tr("Выбери уровень и нажми «Новая партия»."));
+    else if (!ui.msg.textContent) setMsg(tr("Нажми «▶ Играть» или Enter."));
     return;
   }
   const S = G.S, over = S.status !== "active";
@@ -339,6 +354,7 @@ async function endGame(status) {
   refresh();
   showResults();
   ui?.records.load();
+  ui?.day.load();
   if (G.S.status === "solved" && G.S.result) showReward(G.S.result, G.S.puzzle, { onNew: () => newGame(false) });
 }
 
@@ -497,7 +513,7 @@ function handleKey(e) {
     keyTrace.skip = tr("партия не начата");
     if (e.key === "Enter" && e.target === document.body) { newGame(false); e.preventDefault(); return; }
     if (/^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
-      setMsg(tr("Партия не начата — нажми «Новая партия» или Enter."), "bad"); e.preventDefault();
+      setMsg(tr("Партия не начата — нажми «▶ Играть» или Enter."), "bad"); e.preventDefault();
     }
     return;
   }

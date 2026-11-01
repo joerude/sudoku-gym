@@ -78,6 +78,8 @@ const shot = (page, name, full = true) => page.screenshot({ path: path.join(SHOT
 const cellSel = i => `#board .cell[data-cell="${i}"]`;
 
 async function setSelect(page, id, value) { await page.selectOption(`#${id}`, value); }
+/** «⚙ Настройки» on #/play is folded by default: open it before touching level, technique, mode or limit. */
+const openSetup = page => page.evaluate(() => { document.querySelector("#setupMore").open = true; });
 
 /** Run action (a click / paste), wait for the POST /api/games it causes and for the board to show the givens. */
 async function waitGame(page, action) {
@@ -91,6 +93,7 @@ async function waitGame(page, action) {
 }
 
 async function startGame(page, { level, mode, limit, grade }) {
+  await openSetup(page);
   if (level) await setSelect(page, "level", level);
   if (grade !== undefined) await setSelect(page, "grade", grade);
   if (mode) await setSelect(page, "mode", mode);
@@ -148,12 +151,10 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForSelector("#reward", { state: "detached" });
   ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: Esc closes the dialog, green stays");
-  // records: the solved game is the record of its level × mode, highlighted and linked to its review
-  await page.waitForFunction(id => !!document.querySelector(`#records a[href="#/review/${id}"]`), g1.id);
-  ok(await page.$eval(`#records td[data-rec="${g1.level}-hardcore"]`, (td, id) =>
-    td.classList.contains("cur") && td.querySelector("a").getAttribute("href") === `#/review/${id}`, g1.id),
-    "records: new record in the play panel, current combination highlighted");
-  ok(await page.$$eval("#records td[data-rec]", tds => tds.length === 8), "records: 4 levels × 2 modes");
+  // record line: the solved game is the record of the level × mode being played, linked to its review
+  await page.waitForFunction(id => !!document.querySelector(`#recordLine a[href="#/review/${id}"]`), g1.id);
+  ok(/^Рекорд лёгкий · hardcore: /.test(await page.textContent("#recordLine")), "record line: new record of the current level × mode");
+  ok(!(await page.$("#records")), "play: the full records table lives on #/stats only");
   await shot(page, "play-solved");
   await page.click("#reviewLink");
   await page.waitForSelector("#noPauses, .pause-item");
@@ -211,6 +212,8 @@ try {
   await page.reload();
   await page.waitForSelector("#grade option[value=\"1\"]", { state: "attached" });
   ok(await page.inputValue("#limit") === "7", "own limit survives a reload");
+  ok(/^▶\sИграть · .* · original · лимит\s7$/.test(await page.textContent("#newGame")), "the play button names the remembered settings",
+     await page.textContent("#newGame"));
   const g2c = await startGame(page, { limit: "none" });
   ok(g2c.mistake_limit === null && await page.$eval("#limit", e => e.disabled), "«без лимита»: no limit, field disabled");
   await page.uncheck("#noLimit");
@@ -274,6 +277,7 @@ try {
   const cE = gEnter.givens.indexOf("0");
   // focus stuck on a select (Firefox keeps it when the same option is picked again) must not swallow digits
   await page.click(cellSel(cE));
+  await openSetup(page);
   await page.focus("#level");
   await page.keyboard.press(`Digit${gEnter.solution[cE]}`);
   ok((await page.textContent(cellSel(cE))).trim() === gEnter.solution[cE], "digit reaches the board while a select has focus");
@@ -300,8 +304,10 @@ try {
   await page.click(cellSel(cE));
   await page.keyboard.press("Escape");
   await page.waitForSelector("#confirm");
+  const beforeEsc = (await page.textContent(cellSel(cE))).trim();
   await page.keyboard.press(`Digit${gEnter.solution[cE]}`);
-  ok((await page.textContent(cellSel(cE))).trim() === "", "Esc mid-game: confirm dialog open, digits don't reach the board");
+  ok((await page.textContent(cellSel(cE))).trim() === beforeEsc, "Esc mid-game: confirm dialog open, digits don't reach the board",
+     `c3=${c3} cE=${cE} before=${beforeEsc}`);
   await shot(page, "play-esc-confirm");
   await page.keyboard.press("Escape");
   await page.waitForSelector("#confirm", { state: "detached" });
@@ -555,13 +561,23 @@ try {
   await page.mouse.click(...await page.$eval("#drillBoard", e => { const r = e.getBoundingClientRect(); return [r.x + 30, r.y + 30]; }));
   ok(await page.$eval("#drillGate", e => e.hidden), "drill gate: a click on the blurred board starts");
 
-  // --- 8. today -------------------------------------------------------------------------------
+  // --- 8. today's line on #/play (the home page; «Сегодня» is gone) ------------------------------
+  ok(await page.$$eval("#nav a", as => !as.some(a => a.getAttribute("href") === "#/today")) && await page.textContent("#nav a") === "Играть",
+     "nav: no «Сегодня», «Играть» first");
   await page.goto(`${BASE}/#/today`);
-  await page.waitForSelector("#plan");
-  ok(await page.$("#planReview") !== null, "today: plan with review link");
-  await shot(page, "today");
-  const g5 = await waitGame(page, () => page.click("#planPlay"));
-  ok(g5.level === "medium" && g5.mode === "hardcore", "today: «Начать партию» starts medium hardcore");
+  await page.waitForFunction(() => location.hash === "#/play");
+  await page.waitForSelector("#dayStrip:not([hidden]) #dayReview");
+  ok(await page.$('#dayStrip a[href="#/drills"]') !== null, "today's line: warm-up and last-game review links; old #/today lands here");
+  const mh = n => new RegExp(`${n}/2 medium · hardcore`);
+  const n0 = +(await page.textContent("#dayStrip")).match(/(\d)\/2/)[1];
+  const g5 = await startGame(page, { level: "medium", mode: "hardcore", grade: "" });
+  for (const [i, c] of [...g5.givens].entries()) if (c === "0") await typeAt(page, i, g5.solution[i]);
+  await page.waitForSelector("#resultsCard");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(re => new RegExp(re).test(document.querySelector("#dayStrip").textContent), mh(Math.min(n0 + 1, 2)).source);
+  ok(await page.$eval("#dayReview", (a, id) => a.getAttribute("href") === `#/review/${id}`, g5.id),
+     "today's line: a solved medium hardcore game counts, review link moves to it");
+  await shot(page, "play-home");
 
   // --- 8b. look settings ----------------------------------------------------------------------
   await page.goto(`${BASE}/#/settings`);
@@ -655,12 +671,11 @@ try {
     return { zen: document.body.classList.contains("zen"), header: getComputedStyle(document.querySelector(".top")).display,
              shown: r.width > 0, clear: r.right < g.left };
   });
-  ok(zenHome.zen && zenHome.header === "none" && zenHome.shown && zenHome.clear, "zen: header hidden, «← Сегодня» in the free corner", JSON.stringify(zenHome));
+  ok(zenHome.zen && zenHome.header === "none" && zenHome.shown && zenHome.clear, "zen: header hidden, «← Играть» in the free corner", JSON.stringify(zenHome));
   await wide.click(".zen-home");
-  const home = await wide.waitForFunction(() => location.hash === "#/today" && !document.body.classList.contains("zen-page")
-    && getComputedStyle(document.querySelector(".zen-home")).display === "none" && getComputedStyle(document.querySelector(".top")).display !== "none",
-    null, { timeout: 3000 }).then(() => true, () => false);
-  ok(home, "zen: «← Сегодня» goes home, where the header is back");
+  const home = await wide.waitForFunction(() => location.hash === "#/play" && document.body.classList.contains("zen")
+    && getComputedStyle(document.querySelector(".zen-home")).display === "none", null, { timeout: 3000 }).then(() => true, () => false);
+  ok(home, "zen: «← Играть» goes home, zen stays for the board, no link to itself");
   await wide.evaluate(() => localStorage.setItem("gym-zen", "0"));
   await wide.context().close();
 
@@ -672,7 +687,7 @@ try {
   const sw = await mob.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
   ok(sw[0] <= sw[1], "390px: no horizontal scroll on #/play", sw.join(" > "));
   await shot(mob, "play-mobile");
-  for (const r of ["drills", "stats", "today", "theory/pointing-claiming", "settings"]) {
+  for (const r of ["drills", "stats", "theory/pointing-claiming", "settings"]) {
     await mob.goto(`${BASE}/#/${r}`);
     await mob.waitForTimeout(700);
     const w = await mob.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
@@ -701,7 +716,7 @@ try {
       .filter(e => e.id !== "langBtn").map(e => `${e.title} ${e.getAttribute("aria-label") || ""}`).join(" ");
     return [...new Set(txt.match(/\S*[А-Яа-яЁё]\S*/g) || [])].slice(0, 8);
   });
-  for (const r of ["today", "play", "drills", "stats", "theory", "theory/x-wing", `review/${gp}`, "settings"]) {
+  for (const r of ["play", "drills", "stats", "theory", "theory/x-wing", `review/${gp}`, "settings"]) {
     await en.goto(`${BASE}/#/${r}`);
     await en.waitForTimeout(800);
     const left = await russianLeft();
@@ -712,11 +727,11 @@ try {
   await en.click("#hintBtn");
   await en.waitForSelector("#drillWhy:not([hidden])");
   ok(/^Hint: /.test(await en.textContent("#drillWhy")), "en: drill hint in English", await en.textContent("#drillWhy"));
-  ok(await en.textContent("#nav a") === "Today" && await en.evaluate(() => document.documentElement.lang) === "en", "en: nav and <html lang>");
+  ok(await en.textContent("#nav a") === "Play" && await en.evaluate(() => document.documentElement.lang) === "en", "en: nav and <html lang>");
   await shot(en, "drills-en");
   await en.click("#langBtn");
   await en.waitForFunction(() => document.documentElement.lang === "ru");
-  ok(await en.textContent("#nav a") === "Сегодня", "en: «RU» in the header switches to Russian");
+  ok(await en.textContent("#nav a") === "Играть", "en: «RU» in the header switches to Russian");
 } catch (e) {
   ok(false, "unexpected exception", e.stack);
 } finally {

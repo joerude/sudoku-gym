@@ -219,7 +219,7 @@ export default {
   "<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, <kbd>Ctrl+Y</kbd> — вернуть, <kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением). <kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».":
     "<kbd>1–9</kbd> digit, <kbd>Shift</kbd>+digit — note, <kbd>N</kbd>/<kbd>Space</kbd> — notes mode, <kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — erase, arrows — move, <kbd>Ctrl+Z</kbd> — undo, <kbd>Ctrl+Y</kbd> — redo, <kbd>F</kbd> — favourite, <kbd>Z</kbd> — zen mode (<kbd>Esc</kbd> — leave), <kbd>Esc</kbd> — abandon the game (asks first). <kbd>Ctrl+V</kbd> of a grid (81 digits, 0 or . for empty, <kbd>|</kbd> and <kbd>-</kbd> allowed) opens it in “Own grid”.",
   "партия не начата": "no game started",
-  "Выбери уровень и нажми «Новая партия».": "Pick a level and press “New game”.",
+  "Нажми «▶ Играть» или Enter.": "Press “▶ Play” or Enter.",
   "техника: {title}": "technique: {title}",
   "техника скрыта": "technique hidden",
   "Ошибки {n}/{limit}": "Mistakes {n}/{limit}",
@@ -229,7 +229,7 @@ export default {
   "Не удалось сохранить итог: {error}": "Could not save the result: {error}",
   "Ходы пока не отправлены: {error}. Повторю.": "Moves not sent yet: {error}. Retrying.",
   "Нужно ровно 81 клетку (цифры, 0 или . — пусто)": "Exactly 81 cells needed (digits, 0 or . for empty)",
-  "Партия не начата — нажми «Новая партия» или Enter.": "No game started — press “New game” or Enter.",
+  "Партия не начата — нажми «▶ Играть» или Enter.": "No game started — press “▶ Play” or Enter.",
 
   // own grid editor
   "Ввести задачу самому (например, с usdoku) и решить её как обычную партию": "Enter a puzzle yourself (from usdoku, say) and solve it as a normal game",
@@ -338,22 +338,14 @@ export default {
   "Тренировать": "Practise",
   "уровень {n}": "level {n}",
 
-  // today
-  "План на сегодня": "Today's plan",
-  "Разминка: 5 минут упражнений": "Warm-up: 5 minutes of drills",
-  "Адаптивный режим сам выберет самую медленную технику. Быстро, без заметок — как в партии.":
-    "Adaptive mode picks your slowest technique. Fast and without notes — as in a game.",
-  "Начать разминку": "Start the warm-up",
-  "2 партии: средний, hardcore": "2 games: medium, hardcore",
-  "Сегодня сыграно: {n}/2. Без подсветки ошибок — ошибки увидишь только в итогах.":
-    "Played today: {n}/2. No mistake highlighting — you see mistakes only in the results.",
-  "Начать партию": "Start a game",
-  "Разбор последней партии": "Review the last game",
-  "Партия #{id}": "Game #{id}",
-  "Сыграй партию — здесь появится ссылка на разбор её пауз.": "Play a game — a link to its pause review will appear here.",
-  "Открыть разбор": "Open the review",
-  "Счётчики": "Counters",
-  "День": "Day",
-  "Вчера": "Yesterday",
-  "Считаются законченные партии (решённые и проваленные).": "Finished games count (solved and failed).",
+  // today's line on #/play, the play button, the record line
+  "разминка →": "warm-up →",
+  "разбор #{id} →": "review #{id} →",
+  "План дня: разминка, 2 партии medium hardcore, разбор последней": "Today's plan: warm-up, 2 medium hardcore games, review of the last one",
+  "▶ Играть": "▶ Play",
+  "техника {g}": "technique {g}",
+  "лимит {n}": "limit {n}",
+  "⚙ Настройки": "⚙ Settings",
+  "Рекорд {what}: ": "Record {what}: ",
+  "Рекорда {what} пока нет": "No {what} record yet",
 };
