@@ -1,5 +1,6 @@
 """Game analytics: replay, metrics from moves, pause review and overall statistics."""
 
+import hashlib
 import statistics
 from datetime import date, timedelta
 
@@ -253,12 +254,77 @@ def stats(conn) -> dict:
     return {"by_level_mode": by_lm, "daily": daily, "techniques": techniques}
 
 
+def local_today(conn) -> str:
+    """Today's local date, the one games and drill attempts are grouped by."""
+    return conn.execute("SELECT date('now', 'localtime')").fetchone()[0]
+
+
+DAILY_POOL = "level = 'medium' AND bank_id NOT LIKE 'custom-%'"
+
+
+def daily_puzzle_id(conn, day: str) -> int | None:
+    """The daily puzzle of a local date: a bank medium puzzle picked by the date's hash among those not played before
+    that day (all bank medium ones once every one was played). Games of the day itself don't move the pick."""
+    ids = [
+        r[0]
+        for r in conn.execute(
+            f"SELECT id FROM puzzles WHERE {DAILY_POOL} AND id NOT IN"
+            " (SELECT puzzle_id FROM games WHERE date(started_at, 'localtime') < ?) ORDER BY id",
+            (day,),
+        )
+    ] or [r[0] for r in conn.execute(f"SELECT id FROM puzzles WHERE {DAILY_POOL} ORDER BY id")]
+    if not ids:
+        return None
+    return ids[int(hashlib.sha256(day.encode()).hexdigest(), 16) % len(ids)]
+
+
+def _daily_days(conn, day: str | None = None) -> dict:
+    """day → {game_id, time_ms, tech_grade, attempts (up to and with the first solve), total} over games started as
+    a daily puzzle; game_id is None while the day has no solve."""
+    out = {}
+    for gid, d, status, ms, tg in conn.execute(
+        "SELECT g.id, g.daily, g.status, g.time_ms, p.tech_grade FROM games g JOIN puzzles p ON p.id = g.puzzle_id"
+        " WHERE g.daily IS NOT NULL AND (? IS NULL OR g.daily = ?) ORDER BY g.id",
+        (day, day),
+    ):
+        rec = out.setdefault(d, {"game_id": None, "time_ms": None, "tech_grade": tg, "attempts": 0, "total": 0})
+        rec["total"] += 1
+        if rec["game_id"] is None:
+            rec["attempts"] += 1
+            if status == "solved":
+                rec["game_id"], rec["time_ms"] = gid, ms
+    return out
+
+
+def daily_today(conn, day: str) -> dict:
+    """The day's result (its first solved daily game) and how many times it was started."""
+    rec = _daily_days(conn, day).get(day)
+    if rec is None:
+        return {"result": None, "attempts": 0}
+    result = {"game_id": rec["game_id"], "time_ms": rec["time_ms"]} if rec["game_id"] else None
+    return {"result": result, "attempts": rec["total"]}
+
+
+def daily_history(conn, limit: int = 60) -> dict:
+    """Solved daily puzzles, newest first (at most limit), best time overall and the median of the latest 30."""
+    solved = sorted(((d, r) for d, r in _daily_days(conn).items() if r["game_id"]), reverse=True)
+    times = [r["time_ms"] for _, r in solved if r["time_ms"] is not None]
+    return {
+        "days": [
+            {"day": d, **{k: r[k] for k in ("game_id", "time_ms", "attempts", "tech_grade")}} for d, r in solved[:limit]
+        ],
+        "solved": len(solved),
+        "best_ms": min(times) if times else None,
+        "median_ms": _median(times[:30]),
+    }
+
+
 def activity(conn, today: str | None = None) -> dict:
     """GitHub-style calendar: points per local day (solved games + correct drill attempts), streaks, yearly totals.
 
     The window is 53 weeks, Monday-first, ending with today's week. The current streak ends today or, while today is
     still empty, yesterday — it is not broken until the day is over."""
-    today = today or conn.execute("SELECT date('now', 'localtime')").fetchone()[0]
+    today = today or local_today(conn)
     per_day = {}
     for day, n in conn.execute(
         "SELECT date(started_at, 'localtime'), COUNT(*) FROM games WHERE status = 'solved' GROUP BY 1"
