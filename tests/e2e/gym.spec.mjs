@@ -342,6 +342,8 @@ try {
   // «＋ новая» and zen sit next to the timer; mid-game the first click only asks
   ok(await page.$eval("#newGameTop", e => e.closest(".bar").contains(document.querySelector("#timer"))), "new game + zen next to the timer");
   ok(await page.$$eval(".main-col .bar .zen-btn", els => els.length === 1), "zen toggle above the board, not below");
+  ok(await page.$$eval("#keysHelp .key-row", rows => rows.length === 14
+    && rows.some(r => r.textContent === "Pпауза" && /время стоит/.test(r.title))), "«Клавиши»: 14 rows, the details in tooltips");
   await page.click("#newGameTop");
   ok((await page.textContent("#newGameTop")).includes("Бросить"), "«＋ новая» mid-game asks first");
   await page.waitForTimeout(3200);

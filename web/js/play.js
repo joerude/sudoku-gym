@@ -234,14 +234,7 @@ export function mount(el, params, query) {
       ui.msg, ui.hintBox),
     setup.box, ui.editor.box,
     h("div", {}, ui.results, ui.records.el,
-      h("details", { class: "fold zen-hide", id: "keysHelp" }, h("summary", {}, tr("Клавиши")), h("p", { class: "hint", style: "margin:0", html:
-        tr("<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
-        "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
-        "<kbd>Ctrl+Y</kbd> — вернуть, " +
-        "<kbd>H</kbd> — подсказка (каждое нажатие — ступень глубже), <kbd>P</kbd> — пауза (доска скрыта, время стоит), " +
-        "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением), " +
-        "<kbd>Enter</kbd> — новая партия, когда партия не идёт. " +
-        "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».") }))));
+      h("details", { class: "fold zen-hide", id: "keysHelp" }, h("summary", {}, tr("Клавиши")), keysHelp())));
   setup.box.classList.add("zen-hide-playing");  // in zen the setup comes back once the game is over
   el.append(ui.root);
   markRecord();
@@ -277,6 +270,30 @@ export function mount(el, params, query) {
   if (G?.S.result && !edit) showResults();
   return () => { asking?.(); closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick);
     document.removeEventListener("visibilitychange", onVisibility); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
+}
+
+/** Keys of the game, three groups of «key — action»; the fine print sits in each row's tooltip. */
+function keysHelp() {
+  const row = (keys, what, more) => h("div", { class: "key-row", title: more },
+    h("span", {}, keys.map(k => h("kbd", {}, k))), h("span", {}, what));
+  return h("div", { class: "keys" },
+    h("div", {},
+      row(["1–9"], tr("цифра")),
+      row(["Shift+1–9"], tr("заметка")),
+      row(["N", tr("пробел")], tr("режим заметок"), tr("или Т в русской раскладке")),
+      row(["0", "⌫"], tr("стереть"), tr("Backspace или Delete")),
+      row(["← ↑ ↓ →"], tr("перемещение"))),
+    h("div", {},
+      row(["Ctrl+Z"], tr("отменить")),
+      row(["Ctrl+Y"], tr("вернуть"), tr("или Ctrl+Shift+Z")),
+      row(["H"], tr("подсказка"), tr("каждое нажатие — ступень глубже")),
+      row(["P"], tr("пауза"), tr("доска скрыта, время стоит")),
+      row(["F"], tr("в избранное"))),
+    h("div", {},
+      row(["Z"], tr("zen-режим"), tr("Esc — выйти")),
+      row(["Esc"], tr("бросить партию"), tr("с подтверждением")),
+      row(["Enter"], tr("новая партия"), tr("когда партия не идёт")),
+      row(["Ctrl+V"], tr("вставить сетку"), tr("81 цифра, 0 или . — пусто, можно с | и -; откроется в «Своей сетке»"))));
 }
 
 /** Highlight the record for the level and mode being played (or chosen for the next game). */

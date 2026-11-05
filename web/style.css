@@ -290,6 +290,14 @@ details.fold > summary { cursor: pointer; width: max-content; font-size: 12px; f
   letter-spacing: .08em; color: var(--muted); }
 details.fold > summary:hover { color: var(--accent); }
 details.fold[open] > summary { margin-bottom: 10px; }
+/* «Клавиши»: three quiet columns of «key — action»; the fine print is in each row's tooltip */
+.keys { display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 12px; color: var(--muted); }
+.keys > div { display: grid; grid-template-columns: max-content max-content; gap: 4px 10px; align-content: start; }
+.key-row { display: contents; }
+.key-row > span:last-child { white-space: nowrap; }
+.key-row[title] > span { cursor: help; }
+.key-row > span:first-child { display: flex; flex-wrap: wrap; gap: 3px; }
+.keys kbd { border: 0; background: var(--surface); color: var(--ink); padding: 1px 5px; }
 #setupMore { margin-top: 12px; }
 .record-line { margin: 0 0 16px; }
 
