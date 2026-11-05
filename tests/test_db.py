@@ -91,7 +91,7 @@ class DbTest(unittest.TestCase):
             conn = connect(path)
             cols = {r[1] for r in conn.execute("PRAGMA table_info(games)")}
             self.assertIn("hints", cols)
-            self.assertEqual(conn.execute("SELECT hints FROM games").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT hints, pauses FROM games").fetchone()[:], (0, 0))
             self.assertIsNotNone(
                 conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'game_hints'").fetchone()
             )

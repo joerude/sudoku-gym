@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS games (
     max_pause_ms INTEGER,
     long_pauses INTEGER,
     hints INTEGER NOT NULL DEFAULT 0,  -- hint ladder requests (game_hints rows): such a game is no record
+    pauses INTEGER NOT NULL DEFAULT 0,  -- times the clock was paused (the board hidden); paused time is not in time_ms
     daily TEXT  -- local date of the daily puzzle this game was started as; NULL for other games
 );
 CREATE INDEX IF NOT EXISTS games_puzzle ON games(puzzle_id);
@@ -130,6 +131,7 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
     for table, column, ddl in (
         ("games", "hints", "INTEGER NOT NULL DEFAULT 0"),
         ("games", "daily", "TEXT"),
+        ("games", "pauses", "INTEGER NOT NULL DEFAULT 0"),
         ("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
         ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),
         ("drill_attempts", "hint", "INTEGER NOT NULL DEFAULT 0"),
