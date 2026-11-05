@@ -1,4 +1,5 @@
 // One game in progress: grid state, notes, undo, mistakes, move log (seq + t_ms) → buffered queue.
+// A pause stops the clock: its time is left out of every t_ms, so it is no «long pause» in the analysis.
 import { tr } from "./i18n.js";
 import { createMoveQueue, finishGame } from "./api.js";
 import { PEERS, stepCell, toDigits } from "./board.js";
@@ -15,13 +16,22 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     notes: Array(81).fill(0), sel: givens.indexOf(0), notesMode: false, autoNotes: true,
     undo: [], redo: [], showBad: new Set(), mistakes: 0, seq: 0, hints: 0,
     start: performance.now(), end: null, status: "active", msg: null, result: null,
+    pausedAt: null, pausedMs: 0, pauses: 0,
   };
   const queue = createMoveQueue(gameId, { onError: onQueueError });
-  const elapsed = () => (S.end ?? performance.now()) - S.start;
-  const locked = () => S.status !== "active";
+  /** Game time at the wall-clock moment t: time since the start less the pauses (a running one up to t). */
+  const clock = t => t - S.start - S.pausedMs - (S.pausedAt === null ? 0 : t - S.pausedAt);
+  const elapsed = () => clock(S.end ?? performance.now());
+  const locked = () => S.status !== "active" || S.pausedAt !== null;
+  /** End a running pause: its length goes into pausedMs. */
+  function unpause() {
+    if (S.pausedAt === null) return;
+    S.pausedMs += performance.now() - S.pausedAt;
+    S.pausedAt = null;
+  }
 
   function log(kind, cell, value) {
-    const m = { seq: ++S.seq, t_ms: Math.round(performance.now() - S.start), kind };
+    const m = { seq: ++S.seq, t_ms: Math.round(clock(performance.now())), kind };
     if (cell !== undefined) m.cell = cell;
     if (value !== undefined) m.value = value;
     queue.push(m);
@@ -29,6 +39,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
   const say = (text, cls = "") => { S.msg = text ? { text, cls } : null; };
 
   function stop(status) {
+    unpause();
     S.end = performance.now();
     S.status = status;
     onEnd?.(status);
@@ -135,13 +146,24 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       say(n ? tr("Неверных клеток: {n} (подсвечены)", { n }) : tr("Ошибок нет"), n ? "bad" : "ok");
       onChange();
     },
+    /** Stop the clock; nothing can be entered until resume(). */
+    pause() {
+      if (locked()) return;
+      S.pausedAt = performance.now(); S.pauses++;
+      onChange();
+    },
+    resume() {
+      if (S.pausedAt === null || S.status !== "active") return;
+      unpause();
+      onChange();
+    },
     isWrong(i) { return !!S.vals[i] && !S.given[i] && S.vals[i] !== S.sol[i]; },
     /** Stop the clock (if still running), send every move, then POST finish. Resolves to the server result. */
     async finish(status) {
-      if (S.status === "active") { S.end = performance.now(); S.status = status; }
+      if (S.status === "active") { unpause(); S.end = performance.now(); S.status = status; }
       queue.close();
       await queue.flush();
-      S.result = await finishGame(gameId, S.status, S.end - S.start);
+      S.result = await finishGame(gameId, S.status, elapsed(), S.pauses);
       S.status = S.result.status;
       return S.result;
     },

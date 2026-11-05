@@ -190,6 +190,7 @@ class ServerTest(unittest.TestCase):
                 "note_actions": 1,
             },
         )
+        self.assertEqual(fin["pauses"], 0)  # no pauses sent: none
         g = self.api("GET", f"/api/games/{gid}")
         self.assertEqual((g["status"], g["time_ms"], g["long_pauses"]), ("solved", 90000, 1))
         self.assertIsNotNone(g["finished_at"])
@@ -310,6 +311,12 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.api("GET", f"/api/games/{gid}")["hints"], 3)
         self.assertEqual(next(g for g in self.api("GET", "/api/games?limit=200") if g["id"] == gid)["hints"], 3)
         self.api("POST", f"/api/games/{gid}/hint", {"board": P, "t_ms": 6000, "level": 1}, status=400)  # game over
+
+    def test_finish_stores_pauses(self):
+        gid = self.new_game(self.hard[1], "hardcore")
+        fin = self.api("POST", f"/api/games/{gid}/finish", {"status": "abandoned", "t_ms": 5000, "pauses": 2})
+        self.assertEqual((fin["pauses"], fin["time_ms"]), (2, 5000))
+        self.assertEqual(self.api("GET", f"/api/games/{gid}")["pauses"], 2)
 
     def test_analysis(self):
         _, P, S = L1[0]
@@ -659,6 +666,7 @@ class ServerTest(unittest.TestCase):
         gid = self.new_game(self.hard[1], "hardcore")
         self.api("POST", f"/api/games/{gid}/finish", {"status": "won", "t_ms": 1}, status=400)
         self.api("POST", f"/api/games/{gid}/finish", {"status": "solved"}, status=400)
+        self.api("POST", f"/api/games/{gid}/finish", {"status": "solved", "t_ms": 1, "pauses": -1}, status=400)
         self.api(
             "POST",
             f"/api/games/{gid}/moves",

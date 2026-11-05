@@ -327,10 +327,11 @@ def api_finish(conn, m, q, body):
     status = body.get("status")
     if status not in FINISH_STATUSES:
         raise ApiError(400, tr("status должен быть solved, failed или abandoned"))
-    return _close_game(conn, game, status, _int(body, "t_ms", lo=0))
+    pauses = _int(body, "pauses", lo=0, required=False, default=0)
+    return _close_game(conn, game, status, _int(body, "t_ms", lo=0), pauses=pauses)
 
 
-def _close_game(conn, game, status, t_ms, moves=None):
+def _close_game(conn, game, status, t_ms, moves=None, pauses=0):
     gid = game["id"]
     metrics = analysis.compute_metrics(analysis.load_moves(conn, gid) if moves is None else moves, t_ms)
     limit = game["mistake_limit"]
@@ -341,7 +342,8 @@ def _close_game(conn, game, status, t_ms, moves=None):
     with conn:
         conn.execute(
             "UPDATE games SET status = ?, finished_at = ?, time_ms = ?, mistakes = ?, corrections = ?, checks = ?,"
-            " note_actions = ?, first_move_ms = ?, max_pause_ms = ?, long_pauses = ?, hints = ? WHERE id = ?",
+            " note_actions = ?, first_move_ms = ?, max_pause_ms = ?, long_pauses = ?, hints = ?, pauses = ?"
+            " WHERE id = ?",
             (
                 status,
                 finished_at,
@@ -354,6 +356,7 @@ def _close_game(conn, game, status, t_ms, moves=None):
                 metrics["max_pause_ms"],
                 metrics["long_pauses"],
                 n_hints,
+                pauses,
                 gid,
             ),
         )
@@ -364,6 +367,7 @@ def _close_game(conn, game, status, t_ms, moves=None):
         "mode": game["mode"],
         "mistake_limit": limit,
         "hints": n_hints,
+        "pauses": pauses,
         **metrics,
     }
 

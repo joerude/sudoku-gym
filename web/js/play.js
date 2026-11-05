@@ -191,6 +191,13 @@ export function mount(el, params, query) {
       disarmNew();
       newGame(false);
     } }, tr("＋ новая"));
+  // pause: the board hides under a gate and the clock stops; a click on the gate (or P) goes on
+  const pauseBtn = h("button", { type: "button", class: "mini", id: "pauseBtn", title: tr("Пауза (P): доска скрыта, время не идёт"),
+    onclick: () => togglePause() }, tr("⏸ пауза"));
+  const pauseGate = h("div", { class: "gate", id: "pauseGate", hidden: true, onclick: () => G?.resume() },
+    h("b", {}, tr("Пауза — время не идёт")),
+    h("button", { type: "button", class: "primary", id: "resumeBtn" }, tr("▶ Продолжить")),
+    h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "P")));
   const disarmNew = () => { clearTimeout(armedNew); armedNew = null; newTop.textContent = tr("＋ новая"); newTop.classList.remove("danger"); };
   const disarm = () => { clearTimeout(armed); armed = null; giveUpBtn.textContent = tr("Сдаться"); giveUpBtn.classList.remove("danger"); };
   const setup = setupSection();
@@ -201,7 +208,7 @@ export function mount(el, params, query) {
   ui = {
     fav, badge: h("span", { class: "badge", id: "badge" }), errs: h("span", { class: "counter", id: "errors" }),
     timer: h("span", { class: "timer", id: "timer" }, "0:00.0"), msg: h("div", { class: "msg", id: "msg", role: "status" }),
-    results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, setup,
+    results: h("div", { id: "results" }), autoBox, notesBtn, clearBtn, giveUpBtn, pauseBtn, pauseGate, setup,
     hintBtn, hintBox: h("div", { id: "hintBox", class: "hint-box" }),
   };
   ui.records = recordLine();
@@ -215,8 +222,8 @@ export function mount(el, params, query) {
   ui.root = h("div", { class: "layout" },
     h("div", { class: "main-col" },
       // zen and «new game» sit next to the timer: reachable without scrolling, and in zen where the side panel is hidden
-      h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer,
-        notesBtn, newTop, zenButton("mini")), boardEl, notesLabel, padEl,
+      h("div", { class: "bar" }, ui.badge, fav.el, ui.errs, ui.timer, pauseBtn,
+        notesBtn, newTop, zenButton("mini")), h("div", { class: "board-wrap" }, boardEl, pauseGate), notesLabel, padEl,
       h("div", { class: "bar", style: "margin-top:10px" },
         h("button", { type: "button", id: "undoBtn", title: tr("Отменить (Ctrl+Z)"), onclick: () => G?.undoLast() }, tr("↶ отменить")),
         h("button", { type: "button", id: "redoBtn", title: tr("Вернуть отменённое (Ctrl+Y или Ctrl+Shift+Z)"), onclick: () => G?.redoLast() }, tr("↷ вернуть")),
@@ -231,7 +238,7 @@ export function mount(el, params, query) {
         tr("<kbd>1–9</kbd> цифра, <kbd>Shift</kbd>+цифра — заметка, <kbd>N</kbd>/<kbd>Т</kbd>/<kbd>пробел</kbd> — режим заметок, " +
         "<kbd>0</kbd>/<kbd>Backspace</kbd>/<kbd>Delete</kbd> — стереть, стрелки — перемещение, <kbd>Ctrl+Z</kbd> — отменить, " +
         "<kbd>Ctrl+Y</kbd> — вернуть, " +
-        "<kbd>H</kbd> — подсказка (каждое нажатие — ступень глубже), " +
+        "<kbd>H</kbd> — подсказка (каждое нажатие — ступень глубже), <kbd>P</kbd> — пауза (доска скрыта, время стоит), " +
         "<kbd>F</kbd> — в избранное, <kbd>Z</kbd> — zen-режим (<kbd>Esc</kbd> — выйти), <kbd>Esc</kbd> — бросить партию (с подтверждением), " +
         "<kbd>Enter</kbd> — новая партия, когда партия не идёт. " +
         "<kbd>Ctrl+V</kbd> сетки (81 цифра, 0 или . — пусто, можно с <kbd>|</kbd> и <kbd>-</kbd>) открывает её в «Своей сетке».") }))));
@@ -245,6 +252,9 @@ export function mount(el, params, query) {
   const onKey = e => handleKey(e);
   window.addEventListener("keydown", onKey, true);  // capture: before extensions or page handlers can swallow it
   keyTrace.page = tr("играть");
+  // a hidden tab is no playing time: the game pauses and waits for «Продолжить»
+  const onVisibility = () => { if (document.hidden && !edit) G?.pause(); };
+  document.addEventListener("visibilitychange", onVisibility);
   const tick = setInterval(() => { if (G && ui && !edit) ui.timer.textContent = fmtTime(G.elapsed()); }, 100);
 
   const ready = options ? Promise.resolve(options) : getOptions().then(o => { options = o; });
@@ -265,7 +275,8 @@ export function mount(el, params, query) {
   getFavorites().then(c => { favCount = c.puzzle; setup.syncFav(); }).catch(() => {});
   refresh();
   if (G?.S.result && !edit) showResults();
-  return () => { asking?.(); closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
+  return () => { asking?.(); closeReward(); unalign(); window.removeEventListener("keydown", onKey, true); keyTrace.page = null; clearInterval(tick);
+    document.removeEventListener("visibilitychange", onVisibility); clearTimeout(armed); clearTimeout(armedNew); ui = null; };
 }
 
 /** Highlight the record for the level and mode being played (or chosen for the next game). */
@@ -296,12 +307,13 @@ function refresh() {
     ui.root?.classList.remove("notes-on");
     ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
     ui.root.querySelector("#undoBtn").disabled = ui.root.querySelector("#redoBtn").disabled = true;
+    renderPause(null);
     renderHint(true);
     if (pendingMsg) { setMsg(pendingMsg.text, pendingMsg.cls); pendingMsg = null; }
     else if (!ui.msg.textContent) setMsg(tr("Нажми «▶ Играть» или Enter."));
     return;
   }
-  const S = G.S, over = S.status !== "active";
+  const S = G.S, over = S.status !== "active", paused = S.pausedAt !== null;
   if (hint && hint.sig !== posSig(S)) hint = null;  // any move, note, undo or clear: the ladder starts over
   const hv = hint && !over ? ladderView(hint.lad, hint.level) : null;
   const cands = hv?.elims.size ? computeCandidates(S.vals) : null;
@@ -325,13 +337,32 @@ function refresh() {
   ui.notesBtn.setAttribute("aria-pressed", !!S.notesMode);
   ui.notesBtn.textContent = S.notesMode ? tr("✎ заметки: вкл") : tr("✎ заметки");
   ui.root.classList.toggle("notes-on", !!S.notesMode && !over);
-  ui.clearBtn.disabled = ui.giveUpBtn.disabled = over;
-  ui.root.querySelector("#undoBtn").disabled = over || !S.undo.length;
-  ui.root.querySelector("#redoBtn").disabled = over || !S.redo.length;
+  ui.clearBtn.disabled = over || paused;
+  ui.giveUpBtn.disabled = over;
+  ui.root.querySelector("#undoBtn").disabled = over || paused || !S.undo.length;
+  ui.root.querySelector("#redoBtn").disabled = over || paused || !S.redo.length;
+  ui.root.querySelector("#checkBtn").disabled = paused;
+  renderPause(S);
   ui.autoBox.checked = S.autoNotes;
   if (S.msg) setMsg(S.msg.text, S.msg.cls);
   else if (!over) setMsg("");
-  renderHint(over);
+  renderHint(over || paused);
+}
+
+/** The pause button and the gate over the board; S null — no game. */
+function renderPause(S) {
+  const paused = !!S && S.pausedAt !== null;
+  ui.pauseBtn.disabled = !S || S.status !== "active";
+  ui.pauseBtn.textContent = paused ? tr("▶ продолжить") : tr("⏸ пауза");
+  ui.pauseBtn.setAttribute("aria-pressed", paused);
+  ui.pauseGate.hidden = !paused;
+  ui.root.classList.toggle("paused", paused);
+  ui.timer.classList.toggle("paused", paused);
+}
+
+function togglePause() {
+  if (!G) return;
+  if (G.S.pausedAt !== null) G.resume(); else G.pause();
 }
 
 /** The board as an editor of the grid being entered: its digits are the givens, repeats are red. */
@@ -349,6 +380,7 @@ function renderEditor() {
   ui.root.classList.remove("notes-on");
   ui.clearBtn.disabled = ui.giveUpBtn.disabled = true;
   ui.root.querySelector("#undoBtn").disabled = ui.root.querySelector("#redoBtn").disabled = true;
+  renderPause(null);
   ui.editor.sync(conf);
 }
 
@@ -524,7 +556,7 @@ const posSig = S => S.vals.join("") + "|" + S.notes.join(",");
 
 /** H: the next level of the hint ladder for the position as it is now (level 1 again after any move). */
 async function askHint() {
-  if (!G || G.S.status !== "active" || hinting) return;
+  if (!G || G.S.status !== "active" || G.S.pausedAt !== null || hinting) return;
   const S = G.S, sig = posSig(S), fresh = !hint || hint.sig !== sig;
   if (!fresh && hint.level >= hint.lad.max_level) return;
   hinting = true;
@@ -590,6 +622,11 @@ function handleKey(e) {
     }
     return;
   }
+  if (G.S.pausedAt !== null) {  // only P goes on; the board is hidden, nothing else can be entered
+    if (e.code === "KeyP" && !e.ctrlKey && !e.metaKey) { G.resume(); e.preventDefault(); }
+    else keyTrace.skip = tr("пауза (P — продолжить)");
+    return;
+  }
   const mod = e.ctrlKey || e.metaKey;
   if (mod && (e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey))) { G.redoLast(); e.preventDefault(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" || (e.ctrlKey && e.code === "KeyZ")) {
@@ -598,6 +635,7 @@ function handleKey(e) {
   if (e.ctrlKey || e.metaKey) return;
   if (e.code === "KeyF") { ui?.fav.toggle(); e.preventDefault(); return; }
   if (e.code === "KeyH") { askHint(); e.preventDefault(); return; }
+  if (e.code === "KeyP") { if (G.S.status === "active") G.pause(); e.preventDefault(); return; }
   const d = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
   if (d && d[1] !== "0") { press(+d[1], e.shiftKey || G.S.notesMode); e.preventDefault(); return; }
   if (e.key.startsWith("Arrow")) { digit = 0; G.move(e.key); e.preventDefault(); return; }

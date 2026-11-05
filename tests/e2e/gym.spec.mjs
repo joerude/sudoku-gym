@@ -469,6 +469,42 @@ try {
   ok(s4b.status === "abandoned" && s4b.moves.filter(m => m.kind === "erase").length === 6,
      "server: abandoned, each clear logged as erases", JSON.stringify([s4b.status, s4b.moves.map(m => m.kind)]));
 
+  // --- 4d. pause: the board hides, the clock stops, nothing can be entered; a hidden tab pauses too ---
+  const g4d = await startGame(page, { level: "easy", mode: "hardcore", grade: "" });
+  const e4d = [...g4d.givens].map((c, i) => (c === "0" ? i : -1)).filter(i => i >= 0);
+  await typeAt(page, e4d[0], g4d.solution[e4d[0]]);
+  await page.click("#pauseBtn");
+  ok(await page.isVisible("#pauseGate") && await page.$eval("#timer", e => e.classList.contains("paused")),
+     "pause: the gate hides the board, the timer is marked paused");
+  const frozen = (await page.textContent("#timer")).trim();
+  await shot(page, "play-paused");
+  await page.waitForTimeout(2500);
+  ok((await page.textContent("#timer")).trim() === frozen, "pause: the timer stands still", frozen);
+  await page.keyboard.press(`Digit${+g4d.solution[e4d[0]] % 9 + 1}`);
+  ok((await page.textContent(cellSel(e4d[0]))).trim() === g4d.solution[e4d[0]], "pause: a digit key changes nothing");
+  ok(await page.$eval(".pad", e => getComputedStyle(e).pointerEvents === "none") && await page.$eval("#undoBtn", e => e.disabled),
+     "pause: the pad and undo are off");
+  await page.keyboard.press("KeyP");
+  ok(!(await page.isVisible("#pauseGate")) && (await page.textContent("#pauseBtn")).includes("пауза"), "P resumes the game");
+  await typeAt(page, e4d[1], g4d.solution[e4d[1]]);
+  // a hidden tab pauses; back on the tab the game waits for «Продолжить»
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    delete document.hidden;
+  });
+  ok(await page.isVisible("#pauseGate"), "a hidden tab pauses the game");
+  await page.click("#resumeBtn");
+  ok(!(await page.isVisible("#pauseGate")), "«Продолжить» on the gate resumes");
+  await page.click("#giveUpBtn"); await page.click("#giveUpBtn");
+  await page.waitForSelector("#resultsCard");
+  ok(/Паузы ⏸\s*2|2\s*Паузы ⏸/.test(await page.textContent("#resultsCard")), "results: the pause count is shown",
+     await page.textContent("#resultsCard"));
+  const s4d = await api(`/api/games/${g4d.id}`);
+  const [p1, p2] = s4d.moves;
+  ok(s4d.pauses === 2 && p2.t_ms - p1.t_ms < 2000, "server: 2 pauses, the paused time is not in the move times",
+     JSON.stringify([s4d.pauses, p1.t_ms, p2.t_ms]));
+
   // --- 5. drills: place + eliminate ---------------------------------------------------------
   const drillResp = () => page.waitForResponse(r => r.url().includes("/api/drills/next"));
   const info = id => {

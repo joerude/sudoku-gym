@@ -100,6 +100,7 @@ export function metricsGrid(g) {
     [tr("Проверки"), g.checks ?? "—"],
   ];
   if (g.hints) items.push([tr("Подсказки"), g.hints]);
+  if (g.pauses) items.push([tr("Паузы ⏸"), g.pauses]);
   return h("div", { class: "metrics" }, items.map(([k, v]) => h("div", { class: "metric" }, h("b", {}, v), h("span", {}, k))));
 }
 
