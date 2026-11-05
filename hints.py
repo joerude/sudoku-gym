@@ -4,7 +4,7 @@ right digit and let eliminations the player already made count as done."""
 
 from drills import THEORY_SLUG, cells_text, explain_step, hint_step, in_unit, rc
 from i18n import tr
-from sudoku_core import BOX_OF, PEERS, TECH_TITLE, UNITS, Step, candidates, easiest_steps
+from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, Step, candidates, easiest_steps
 
 TIER1_ORDER = {"hidden_single_box": 0, "hidden_single_row": 1, "hidden_single_col": 2, "naked_single": 3}
 SOLUTION = "solution"  # a line step the core can't find by logic: the digit is taken from the solution
@@ -214,6 +214,8 @@ def _line_item(s, cands):
     return {
         "technique": s.technique,
         "title": title,
+        "tier": TECH_TIER.get(s.technique, 5),
+        "theory": THEORY_SLUG.get(s.technique),
         "cell": s.cell,
         "value": s.value,
         "unit": s.unit,

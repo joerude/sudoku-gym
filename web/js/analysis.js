@@ -65,7 +65,7 @@ export function analysisSection(game, moves, pauses) {
   const el = h("section", { id: "analysis" },
     h("h2", {}, tr("Анализ")),
     h("p", { class: "hint" }, tr("Листай ходы (← →), открывай подсказку к позиции (H) или играй дальше сам: верная цифра " +
-      "уходит в вариант, Пробел — ход решателя, Esc — назад к партии, C — кандидаты.")),
+      "уходит в вариант, Пробел — ход решателя, Esc — назад к партии, C — кандидаты, S — разбор решения с этого хода.")),
     h("div", { class: "an-grid" }, boardEl,
       h("div", { class: "an-side" },
         h("div", { class: "bar", style: "margin:0" },
@@ -114,6 +114,7 @@ export function analysisSection(game, moves, pauses) {
     const b = base();
     push(applyStep(b.board, b.cands, sel, v), `${cellName(sel)}=${v}`);
   }
+  const solveHref = () => `#/solve/${game.id}/${at}`;
   const deeper = () => { if (data && level < data.next.max_level) { level++; render(); } };
 
   function renderList() {
@@ -139,7 +140,8 @@ export function analysisSection(game, moves, pauses) {
     if (level) engine.append(...ladderText(lad, level));
     engine.append(h("div", { class: "bar", style: "margin:0" },
       level < lad.max_level ? h("button", { type: "button", id: "anHint", onclick: deeper }, level ? tr("💡 Глубже (H)") : tr("💡 Подсказка (H)")) : null,
-      n ? h("button", { type: "button", id: "anPlay", onclick: play }, tr("Сделать ход (Пробел)")) : null));
+      n ? h("button", { type: "button", id: "anPlay", onclick: play }, tr("Сделать ход (Пробел)")) : null,
+      n && !branch.length ? h("a", { class: "btn", id: "anSolve", href: solveHref() }, tr("🧩 Разбор решения отсюда (S)")) : null));
   }
 
   function render() {
@@ -170,6 +172,7 @@ export function analysisSection(game, moves, pauses) {
     else if (e.code === "KeyH") deeper();
     else if (e.code === "Space") play();
     else if (e.code === "KeyC") { showCands = !showCands; render(); }
+    else if (e.code === "KeyS" && game.status !== "active" && !branch.length) location.hash = solveHref();  // a branch is not thrown away
     else if (e.key === "Escape" && branch.length) { branch = []; bat = -1; moved(); e.stopPropagation(); }  // not app.js's Esc
     else return;
     e.preventDefault();

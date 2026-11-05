@@ -5,6 +5,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from drills import THEORY_SLUG
 from fixtures import L1, L2, L3
 from hints import SOLUTION, _step_levels, masks, next_ladder, position_issues, solve_line
 from sudoku_core import BOX_OF, TECH_TIER, UNITS, candidates, easiest_steps, find_steps, parse, solve, to_str
@@ -199,6 +200,17 @@ class LineTest(unittest.TestCase):
         self.assertTrue(line["solved"])
         self.assertEqual(replay_line(parse(INKALA), line), INKALA_SOL)
         self.assertTrue([s for s in line["steps"] if s["technique"] == SOLUTION])
+
+    def test_steps_carry_tier_and_theory(self):
+        for name, gv, sol in L1 + L2 + L3 + [("inkala", INKALA, INKALA_SOL)]:
+            steps = solve_line(gv, sol, parse(gv))["steps"]
+            self.assertTrue(steps, name)
+            for s in steps:
+                t = s["technique"]
+                self.assertEqual(s["tier"], 5 if t == SOLUTION else TECH_TIER[t], (name, t))
+                self.assertEqual(s["theory"], THEORY_SLUG.get(t), (name, t))
+        inkala = solve_line(INKALA, INKALA_SOL, parse(INKALA))["steps"]
+        self.assertTrue([s for s in inkala if s["technique"] == SOLUTION and s["tier"] == 5 and s["theory"] is None])
 
     def test_wrong_digits_taken_off_first(self):
         _, gv, sol = L1[0]

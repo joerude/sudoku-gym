@@ -75,6 +75,7 @@ export function mount(el, [id]) {
         metricsGrid(g),
         full.moves.length ? speedChart(full.moves, g.time_ms) : null,
         h("div", { class: "bar", style: "margin:0" },
+          h("a", { class: "btn primary", href: `#/solve/${g.id}`, id: "solveLink" }, tr("🧩 Разбор решения")),
           h("a", { class: "btn", href: "#/play" }, tr("Играть дальше")), h("a", { class: "btn", href: "#/stats" }, tr("Статистика")),
           fav.el)));
     an = analysisSection(g, full.moves, rv.pauses);

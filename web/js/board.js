@@ -26,6 +26,7 @@ export const stepCell = (i, key) => {
            ArrowLeft: r * 9 + (k + 8) % 9, ArrowRight: r * 9 + (k + 1) % 9 }[key];
 };
 export const toDigits = s => [...s].map(Number);
+let boardCount = 0;  // a unique arrowhead id per board
 
 /** Candidates from placed digits only: 81 arrays (empty for filled cells). */
 export function computeCandidates(values) {
@@ -49,7 +50,8 @@ export function parseGrid(text) {
  *   notes?: (i) => number[] | null  — small digits in empty cells,
  *   notesBig?: boolean, pickable?: boolean (candidates clickable → onCandidate(i, v)),
  *   cellClass?: (i) => string[], candClass?: (i, v) => string, ghost?: Map<cell, digit>, locked?: boolean,
- *   digit?: number — highlight this digit everywhere (cells and notes); default: the selected cell's value }
+ *   digit?: number — highlight this digit everywhere (cells and notes); default: the selected cell's value,
+ *   links?: [{from, to, on?}] — arrows from cell to cell over the grid (on: the emphasised one, the rest fade) }
  * Row (1-9, left) and column (1-9, top) numbers frame the grid, matching cellName's r#c#.
  * Each kind of highlight (peers, same digit in cells / notes, row and column number) can be off in «Вид» (hintPrefs).
  */
@@ -87,6 +89,35 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
   }
   frame.appendChild(grid);
   el.appendChild(frame);
+  let svg = null;
+  const SVG = "http://www.w3.org/2000/svg", arrowId = `arrow${++boardCount}`;
+
+  function drawLinks(links) {
+    if (!links?.length) { svg?.remove(); svg = null; return; }
+    if (!svg) {
+      svg = document.createElementNS(SVG, "svg");
+      svg.setAttribute("class", "links");
+      svg.setAttribute("viewBox", "0 0 9 9");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("aria-hidden", "true");
+      svg.innerHTML = `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.5" markerHeight="4.5" ` +
+        `orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker></defs>`;
+    }
+    grid.appendChild(svg);  // after the cells: drawn on top
+    for (const old of svg.querySelectorAll("line")) old.remove();
+    svg.classList.toggle("focus", links.some(l => l.on));
+    for (const { from, to, on } of links) {
+      const x1 = COL(from) + 0.5, y1 = ROW(from) + 0.5, x2 = COL(to) + 0.5, y2 = ROW(to) + 0.5;
+      const d = Math.hypot(x2 - x1, y2 - y1) || 1, ux = (x2 - x1) / d, uy = (y2 - y1) / d;
+      const ln = document.createElementNS(SVG, "line");
+      // start at the digit's edge, stop short of the target so the arrowhead does not cover its candidates
+      ln.setAttribute("x1", x1 + ux * 0.3); ln.setAttribute("y1", y1 + uy * 0.3);
+      ln.setAttribute("x2", x2 - ux * 0.36); ln.setAttribute("y2", y2 - uy * 0.36);
+      ln.setAttribute("marker-end", `url(#${arrowId})`);
+      if (on) ln.setAttribute("class", "on");
+      svg.appendChild(ln);
+    }
+  }
 
   function render(view) {
     const { values, given, sel = -1, highlight = false } = view;
@@ -125,6 +156,7 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
       }
       c.appendChild(box);
     }
+    drawLinks(view.links);
   }
   return { el: grid, render, cell: i => cells[i].el };
 }

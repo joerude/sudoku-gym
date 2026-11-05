@@ -210,6 +210,154 @@ try {
   await page.waitForFunction(() => !document.querySelector("#anMoves .an-branch"));
   await shot(page, "review-analysis");
   await shot(page, "review");
+  // solver: #/solve/{id}[/{at}]?step=N — the solution of the game's position step by step (same finished game)
+  const svCount = async () => (await page.textContent("#svCount")).trim();
+  const svK = () => page.$eval("#svSteps button.on", b => +b.dataset.k);
+  const svWait = (n, total) => page.waitForFunction(([n, total]) => document.querySelector("#svCount")?.textContent.trim() === `${n} / ${total}`, [n, total]);
+  const svBlur = () => page.evaluate(() => document.activeElement?.blur());
+  const cname = c => `r${Math.floor(c / 9) + 1}c${c % 9 + 1}`;
+  ok(!!(await page.$("#solveLink")), "solver: the review page links to it (#solveLink)");
+  await page.click("#solveLink");
+  await page.waitForSelector("#solver #svSteps li button[data-k]");
+  await page.waitForFunction(() => /^1 \/ \d+$/.test(document.querySelector("#svCount")?.textContent.trim()));
+  const svN = +/^1 \/ (\d+)$/.exec(await svCount())[1];
+  ok(svN > 0 && await page.$$eval("#svSteps li button[data-k]", els => els.length) === svN + 1, "solver: N > 0 steps, plus the «Решено» row", String(svN));
+  ok(await page.$$eval("#svTimeline [data-k]", els => els.length) === svN, "solver: the timeline has a span per step");
+  ok(page.url().includes(`#/solve/${gp}/3`), "solver: opens at the game's last move (URL keeps /{at})", page.url());
+  ok(new RegExp(`Шаг 1 / ${svN}`).test(await page.textContent("#svCard")) && (await svK()) === 0, "solver: the card shows step 1");
+  ok(/\S/.test(await page.textContent("#svMove")) && /\S/.test(await page.textContent("#svExpl")), "solver: step 1 has a move and an explanation");
+  ok(await page.$$eval("#svBoard .cell", els => els.length) === 81, "solver: the board has 81 cells");
+  ok(/\S/.test(await page.textContent("#svMoment")), "solver: the game moment is shown");
+  ok(await page.$$eval("#svSummary button.tag", els => els.length) > 0, "solver: technique chips");
+  await shot(page, "solver");
+  await page.waitForFunction(() => !!document.querySelector("#svWhy"));
+  // the reasons: some step among the first ones carries at least one «why» item
+  let whyItems = 0;
+  for (let n = 0; n < Math.min(svN, 12) && !whyItems; n++) {
+    whyItems = await page.$$eval("#svWhy details li", els => els.length);
+    if (!whyItems) { await svBlur(); await page.keyboard.press("ArrowRight"); await svWait(n + 2, svN); }
+  }
+  ok(whyItems > 0, "solver: #svWhy lists at least one reason");
+  await svBlur(); await page.keyboard.press("Home"); await svWait(1, svN);
+  if (svN >= 2) {
+    await page.keyboard.press("ArrowRight");
+    await svWait(2, svN);
+    ok(page.url().endsWith("?step=2") && (await svK()) === 1, "solver: → goes to step 2, the URL gets ?step=2", page.url());
+    await page.keyboard.press("ArrowLeft");
+    await svWait(1, svN);
+  }
+  await page.keyboard.press("End");
+  await svWait(svN, svN);
+  ok(/Доска решена/.test(await page.textContent("#svCard")) && (await svK()) === svN && page.url().endsWith(`?step=${svN + 1}`), "solver: End shows the solved state", page.url());
+  ok(await page.$eval("#svNext", b => b.disabled) && await page.$eval("#svLast", b => b.disabled), "solver: next/last are off on the solved board");
+  await page.keyboard.press("Home");
+  await svWait(1, svN);
+  ok((await svK()) === 0 && new RegExp(`Шаг 1 / ${svN}`).test(await page.textContent("#svCard")), "solver: Home goes back to step 1");
+  await page.click("#svNext");
+  await svWait(2, svN);
+  ok((await svK()) === Math.min(1, svN), "solver: the → button works as the key does");
+  if (svN > 2) {
+    await page.click(`#svSteps button[data-k="2"]`);
+    await svWait(3, svN);
+    ok((await svK()) === 2 && page.url().endsWith("?step=3"), "solver: a click on the list jumps to that step", page.url());
+    await page.click(`#svTimeline [data-k="1"]`);
+    await svWait(2, svN);
+    ok((await svK()) === 1, "solver: a click on the timeline jumps to that step");
+  }
+  // a click on an empty cell of the start board jumps to the step that fills it (em[1] holds a wrong digit: empty here too)
+  await svBlur(); await page.keyboard.press("Home"); await svWait(1, svN);
+  ok((await page.textContent(`#svBoard .cell[data-cell="${em[1]}"]`)).trim() === "" || (await page.$(`#svBoard .cell[data-cell="${em[1]}"] .notes`)) !== null,
+    "solver: the wrong digit of the game is taken off the start board");
+  const svTarget = em[3];
+  await page.click(`#svBoard .cell[data-cell="${svTarget}"]`);
+  await page.waitForFunction(n => document.querySelector("#svCount").textContent.trim() !== `1 / ${n}`, svN);
+  ok((await page.textContent("#svMove")).includes(cname(svTarget)) && (await page.textContent("#svMove")).includes(pz.solution[svTarget]),
+    `solver: a click on empty ${cname(svTarget)} jumps to the step that fills it`, await page.textContent("#svMove"));
+  ok(page.url().includes("?step="), "solver: the cell jump is kept in the URL", page.url());
+  // Shift+→ lands on a key step (tier > 1), or on the solved board if the line has none
+  await svBlur(); await page.keyboard.press("Home"); await svWait(1, svN);
+  const hasKey = await page.$$eval("#svSteps li:not(.t0):not(.t1)", els => els.length) > 0;
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.waitForFunction(n => document.querySelector("#svCount").textContent.trim() !== `1 / ${n}` || n === 1, svN);
+  const kk = await svK();
+  const landed = await page.$eval("#svSteps button.on", b => b.closest("li").className);
+  ok(hasKey ? !/\bt1\b/.test(landed) && !/\bt0\b/.test(landed) && kk < svN : kk === svN, "solver: Shift+→ lands on a key step (tier > 1) or the solved board", `k=${kk} li="${landed}" hasKey=${hasKey}`);
+  if (hasKey) {
+    await page.keyboard.press("Shift+ArrowLeft");
+    await page.waitForFunction(k0 => document.querySelector("#svSteps button.on")?.dataset.k !== String(k0), kk);
+    const back = await svK();
+    ok(back < kk && (back === 0 || !/\bt1\b/.test(await page.$eval("#svSteps button.on", b => b.closest("li").className))), "solver: Shift+← goes back to a key step or the first step");
+  }
+  // K: only key steps in the list
+  ok(!(await page.$eval("#svSteps", e => e.classList.contains("keys"))), "solver: the list shows every step at first");
+  await page.keyboard.press("k");
+  await page.waitForFunction(() => document.querySelector("#svSteps").classList.contains("keys"));
+  ok(await page.$eval("#svKeys", e => e.checked), "solver: K ticks «Только ключевые»");
+  await page.keyboard.press("k");
+  await page.waitForFunction(() => !document.querySelector("#svSteps").classList.contains("keys"));
+  // F: only the digits of the step stay as notes
+  await svBlur(); await page.keyboard.press("Home"); await svWait(1, svN);
+  const notesN = () => page.$$eval("#svBoard .notes span[data-v]", els => els.length);
+  const allNotes = await notesN();
+  await page.keyboard.press("f");
+  await page.waitForFunction(() => document.querySelector("#svFocus").checked);
+  const focusNotes = await notesN();
+  ok(allNotes > 0 && focusNotes < allNotes, "solver: F shows fewer notes (only the step's digits)", `${allNotes} -> ${focusNotes}`);
+  await page.keyboard.press("f");
+  await page.waitForFunction(() => !document.querySelector("#svFocus").checked);
+  ok(await notesN() === allNotes, "solver: F again brings all the notes back");
+  // L: the reason arrows
+  await page.keyboard.press("l");
+  await page.waitForFunction(() => !document.querySelector("#svArrows").checked);
+  await page.keyboard.press("l");
+  await page.waitForFunction(() => document.querySelector("#svArrows").checked);
+  // Space plays the line, Space again stops it
+  await svBlur(); await page.keyboard.press("Home"); await svWait(1, svN);
+  if (svN >= 2) {
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => document.querySelector("#svAuto").textContent === "⏸");
+    await svWait(2, svN);
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => document.querySelector("#svAuto").textContent === "▶");
+    ok(true, "solver: Space plays the steps and stops");
+  }
+  // [ and ] move the game moment: the URL's /{at} changes, the line is rebuilt
+  await svBlur();
+  await page.keyboard.press("[");
+  await page.waitForFunction(id => location.hash.startsWith(`#/solve/${id}/2`), gp);
+  ok(/после хода 2 из 3/.test(await page.textContent("#svMoment")), "solver: [ steps the game moment back (URL /2)", await page.textContent("#svMoment"));
+  ok(/\S/.test(await page.textContent("#svNextMove")), "solver: the next game move is shown for an earlier moment", await page.textContent("#svNextMove"));
+  await page.waitForFunction(() => /^1 \/ \d+$/.test(document.querySelector("#svCount").textContent.trim()) && !document.querySelector("#solver.loading"));
+  ok(new RegExp(`^1 / \\d+$`).test(await svCount()) && +(await page.$eval("#svMomentRange", e => e.value)) === 2, "solver: the line is rebuilt for the earlier moment, the slider follows");
+  await page.keyboard.press("]");
+  await page.waitForFunction(id => location.hash.startsWith(`#/solve/${id}/3`), gp);
+  ok(/после хода 3 из 3/.test(await page.textContent("#svMoment")), "solver: ] steps the game moment forward (URL /3)");
+  // a deep link: moment 1, step 3
+  await page.goto(`${BASE}/#/solve/${gp}/1?step=3`);
+  await page.waitForFunction(() => /^3 \/ \d+$/.test(document.querySelector("#svCount")?.textContent.trim() || ""));
+  ok(+(await page.$eval("#svMomentRange", e => e.value)) === 1 && (await svK()) === 2 && /после хода 1 из 3/.test(await page.textContent("#svMoment")),
+    "solver: #/solve/{id}/1?step=3 opens at game move 1, step 3", page.url());
+  // Esc goes back to the review of the game
+  await svBlur();
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(id => location.hash === `#/review/${id}`, gp);
+  ok(page.url().endsWith(`#/review/${gp}`), "solver: Esc returns to #/review/{id}");
+  await page.waitForSelector("#analysis #anLine");
+  // the analysis section links to the solver from its own moment, and S is its key
+  ok(await page.$eval("#anSolve", a => /^#\/solve\/\d+\/\d+$/.test(a.getAttribute("href"))), "solver: #anSolve links to #/solve/{id}/{at}");
+  await svBlur();
+  await page.keyboard.press("s");
+  await page.waitForFunction(id => location.hash.startsWith(`#/solve/${id}/`), gp);
+  await page.waitForSelector("#solver #svSteps li button[data-k]");
+  ok(true, "solver: S on the review page opens the solver");
+  // an unfinished game has no walkthrough yet
+  const { id: gAct } = await post("/api/games", { puzzle_id: pz.id, mode: "original" });
+  await page.goto(`${BASE}/#/solve/${gAct}`);
+  await page.waitForSelector("#solveActive");
+  ok(/ещё идёт/.test(await page.textContent("#solveActive")) && !(await page.$("#solver")), "solver: an active game shows #solveActive, no walkthrough");
+  await post(`/api/games/${gAct}/finish`, { status: "abandoned", t_ms: 1000 });
+  await page.goto(`${BASE}/#/review/${gp}`);
+  await page.waitForSelector(".pause-item");
   await page.goto(`${BASE}/#/review/1`);
   await page.waitForSelector("#noMoves");
   ok(/Ходов нет/.test(await page.textContent("#noMoves")), "review of migrated game 1: «ходов нет»");

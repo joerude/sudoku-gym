@@ -4,6 +4,7 @@ import { initAppearance } from "./appearance.js";
 import { parseGrid } from "./board.js";
 import * as play from "./play.js";
 import * as review from "./review.js";
+import * as solver from "./solver.js";
 import * as settings from "./settings.js";
 import * as drills from "./drills.js";
 import * as stats from "./stats.js";
@@ -13,6 +14,7 @@ import { errorBox, initZen, isZen, keyTrace, setZen, themeButton, typingInto } f
 const ROUTES = [
   [/^play$/, play.mount, "play"],
   [/^review\/(\d+)$/, review.mount, "stats"],
+  [/^solve\/(\d+)(?:\/(\d+))?$/, solver.mount, "stats"],
   [/^drills$/, drills.mount, "drills"],
   [/^stats$/, stats.mount, "stats"],
   [/^theory$/, theory.mountList, "theory"],
