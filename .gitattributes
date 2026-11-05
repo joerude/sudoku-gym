@@ -1,0 +1,4 @@
+# Windows checkouts: shell scripts keep LF (the container's /bin/sh rejects CRLF), batch files get CRLF
+*.sh text eol=lf
+gym text eol=lf
+*.cmd text eol=crlf

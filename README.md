@@ -30,6 +30,17 @@ The first start downloads the puzzle bank ([grantm/sudoku-exchange-puzzle-bank](
 
 Keyboard not reacting in Firefox? Keyboard extensions such as Vimium take the digit keys before the page sees them: exclude `http://127.0.0.1:8765/*` in their settings. `http://127.0.0.1:8765/?debug` shows where each key press goes.
 
+### Windows
+
+No Docker needed: the trainer is plain Python.
+
+1. Get the code: `git clone https://github.com/joerude/sudoku-gym.git`, or Code → Download ZIP on GitHub and unpack it.
+2. Double-click `gym.cmd`. If Python 3.12+ is missing, it offers to install it through winget (or download it from [python.org](https://www.python.org/downloads/) and tick "Add python.exe to PATH"), then run `gym.cmd` again.
+
+The first start downloads the puzzle bank (a couple of minutes), then the browser opens http://127.0.0.1:8765. Keep the black window open while you play; closing it or Ctrl+C stops the server. Next time just double-click `gym.cmd` again; if the trainer is already running, it only opens the browser. For a desktop icon: right-click `gym.cmd` → Send to → Desktop (create shortcut).
+
+Progress lives in `data\sudoku.db`, and each start puts a copy into `data\backups\` (newest 20 kept; `gym.cmd backup` makes one by hand). Another port: `set PORT=8766` and then `gym.cmd` in the same console. With Docker Desktop instead: `docker compose up -d --build` in the project folder, or `./gym start` inside WSL.
+
 ## Develop
 
 Python 3.12+, stdlib only. Style and lint rules live in `pyproject.toml` (ruff, line length 120); `./gym setup` once installs the pre-commit hooks, which run ruff, the unit tests and reject AI trailers in commit messages.
