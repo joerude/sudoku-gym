@@ -1,66 +1,58 @@
 # Sudoku Gym
 
-A local trainer for speed sudoku, in Russian or English (RU/EN in the header; the first visit follows the browser language). It has 20,000 puzzles filterable by technique, original and hardcore modes as on usdoku (original with your own mistake limit), your own grids (type one in or paste it, e.g. a puzzle from usdoku, and play it under a level of your choice), a daily puzzle (one medium grid a day, always hardcore; the first solve counts, history and best time on the stats page), a review of your pauses after each game, a step-by-step hint when you are stuck (technique → where to look → pattern → the move; such a game is marked and is no record), an analysis board after each game (the moves with `??` and `?!`, a hint for any position, play on from where you stopped), a solution walkthrough from any moment of a game (`#/solve/{id}`, as on sudoku.coach: every solver step on a board of full candidates with its group, pattern and struck candidates, "why" for each step — arrows from the digits that shut the other cells, links to the earlier step that took a candidate out and to the step an elimination is used in; ← → steps, Shift+← → key steps, [ ] game moves, a click on a cell opens the step that solves it), "find the move" drills for 10 techniques with explanations, a lichess-style drill rating (Elo by speed against your own frozen per-technique norm, where 1500 means answering at the norm without mistakes; +N after each answer), theory pages (cards with a diagram, the technique in one line and its drills with your progress; boards drawn from ```` ```sudoku ```` blocks of `theory/*.md` — format in `web/js/diagram.js`, checked by `tests/test_theory.py`; a worked example from the drill bank under each article, step by step) and stats with a GitHub-style activity calendar (a point per solved game or correct drill) and a day streak; the look and favourites export to a JSON file and import on another machine. Claude Code coaches through the `sudoku-speed-coach` skill (`.claude/skills/`) and reads progress straight from the database.
+**English** · [Русский](README.ru.md)
 
-Inspired by [Monkeytype](https://monkeytype.com) (themes, fonts, minimal look) and [lichess](https://lichess.org) (zen mode, puzzle-style drills).
+A local trainer for speed sudoku, in English or Russian. Inspired by [Monkeytype](https://monkeytype.com) (themes, fonts, minimal look) and [lichess](https://lichess.org) (zen mode, puzzle drills).
+
+- **Play**: 20,000 puzzles filtered by technique, original and hardcore modes as on usdoku, your own grids (paste one from usdoku), a daily puzzle.
+- **Learn from each game**: a review of your pauses, a step-by-step hint when stuck (technique → where → pattern → move), an analysis board, and a solver walkthrough from any moment (`#/solve/{id}`).
+- **Drills**: "find the move" for 10 techniques with explanations and a lichess-style rating against your own per-technique norm.
+- **Theory**: a page per technique with diagrams, a worked example and your drill progress.
+- **Stats**: an activity calendar, a day streak and records. Look and favourites export to JSON.
+- **Coach**: Claude Code coaches through the `sudoku-speed-coach` skill (`.claude/skills/`) and reads progress straight from the database.
 
 ## Run
 
 ```bash
-./gym start    # build and start the container, wait for the server, open http://127.0.0.1:8765
+./gym start    # build the Docker container, wait for the server, open http://127.0.0.1:8765
 ```
 
-The first start downloads the puzzle bank ([grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank), public domain) and generates the drills, which takes a couple of minutes. After that the container comes back by itself whenever Docker starts (`restart: unless-stopped`), so after a reboot `./gym open` is enough. Progress lives in `data/sudoku.db` (bind-mounted, not in git). Theory comes from `theory/*.md` and is reloaded on every start.
+The first start downloads the puzzle bank ([grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank), public domain) and builds the drills, which takes a couple of minutes. Later the container comes back with Docker, so `./gym open` is enough. Progress lives in `data/sudoku.db` (not in git), and every start backs it up to `data/backups/`.
+
+No Docker? `./gym dev` runs from the working tree on Python 3.14+. If it finds no such Python but finds [uv](https://docs.astral.sh/uv/), it installs one through uv.
+
+**Windows**: clone or download the repo and double-click `gym.cmd`. If Python 3.14+ is missing, it offers to install it via winget. Keep the black window open while you play.
 
 | Command | What it does |
 |---|---|
-| `./gym start` | build and start the container, wait until it answers, open the browser |
-| `./gym stop` | stop the container (progress in `data/` stays) |
-| `./gym restart` | rebuild and restart, e.g. after code changes |
-| `./gym status` | is the server up, how many puzzles are loaded |
-| `./gym logs [N]` | follow the container logs |
-| `./gym open` | open the trainer in the browser |
-| `./gym dev` | run without Docker from the working tree (`PORT=8766 ./gym dev` for another port) |
-| `./gym test` | unit tests, then e2e if node and playwright-core are found (`BROWSER=firefox` for Firefox) |
-| `./gym backup` | consistent copy of `data/sudoku.db` into `data/backups/`, newest 20 kept; also runs before `start`, `restart`, `dev` |
-| `./gym setup` | install the git hooks (pre-commit) |
-| `./gym check` | run the hooks on every file: ruff lint and format, file hygiene, unit tests |
+| `./gym start` · `stop` · `restart` | run, stop, rebuild the container (progress in `data/` stays) |
+| `./gym open` · `status` · `logs [N]` | open the browser, check the server, follow the logs |
+| `./gym dev` | run without Docker (`PORT=8766 ./gym dev` for another port) |
+| `./gym backup` | copy `data/sudoku.db` into `data/backups/`, newest 20 kept |
 
-`NO_OPEN=1` skips opening the browser; `BACKUP_DIR` and `KEEP` move or resize the backup set (point `BACKUP_DIR` at a synced folder to survive a lost disk). The plain equivalents: `docker compose up -d --build`, or without Docker `python3 tools/import_bank.py --if-empty && python3 server.py`.
+Env: `NO_OPEN=1` skips the browser, `BACKUP_DIR` and `KEEP` move or resize the backup set.
 
-Keyboard not reacting in Firefox? Keyboard extensions such as Vimium take the digit keys before the page sees them: exclude `http://127.0.0.1:8765/*` in their settings. `http://127.0.0.1:8765/?debug` shows where each key press goes.
-
-### Windows
-
-No Docker needed: the trainer is plain Python.
-
-1. Get the code: `git clone https://github.com/joerude/sudoku-gym.git`, or Code → Download ZIP on GitHub and unpack it.
-2. Double-click `gym.cmd`. If Python 3.12+ is missing, it offers to install it through winget (or download it from [python.org](https://www.python.org/downloads/) and tick "Add python.exe to PATH"), then run `gym.cmd` again.
-
-The first start downloads the puzzle bank (a couple of minutes), then the browser opens http://127.0.0.1:8765. Keep the black window open while you play; closing it or Ctrl+C stops the server. Next time just double-click `gym.cmd` again; if the trainer is already running, it only opens the browser. For a desktop icon: right-click `gym.cmd` → Send to → Desktop (create shortcut).
-
-Progress lives in `data\sudoku.db`, and each start puts a copy into `data\backups\` (newest 20 kept; `gym.cmd backup` makes one by hand). Another port: `set PORT=8766` and then `gym.cmd` in the same console. With Docker Desktop instead: `docker compose up -d --build` in the project folder, or `./gym start` inside WSL.
+Keys not reacting in Firefox? Extensions like Vimium take the digit keys: exclude `http://127.0.0.1:8765/*` there. `http://127.0.0.1:8765/?debug` shows where each key press goes.
 
 ## Develop
 
-Python 3.12+, stdlib only. Style and lint rules live in `pyproject.toml` (ruff, line length 120); `./gym setup` once installs the pre-commit hooks, which run ruff, the unit tests and reject AI trailers in commit messages.
+Python 3.14+, stdlib only; the UI is vanilla JS in `web/`. Dev tools (ruff, pre-commit) run through `uvx`, so there is nothing to install.
 
 ```bash
-./gym setup                              # once: git hooks
-./gym check                              # all hooks on all files
-./gym test                               # both suites below
-python3 -m unittest discover -s tests   # unit tests
-node tests/e2e/gym.spec.mjs [shots-dir]  # e2e, needs playwright-core (PLAYWRIGHT_CORE=<its node_modules>)
-python3 tools/regrade.py                 # recompute tech_grade after technique changes in the core
+./gym setup          # once: git hooks (ruff, unit tests, no AI trailers in commit messages)
+./gym test           # unit tests, then e2e if node and playwright-core are found
+./gym test unit      # unit only; ./gym test e2e for e2e only (BROWSER=firefox)
+./gym check          # all hooks on all files
+python3.14 tools/regrade.py   # recompute tech_grade after changing techniques in the core
 ```
 
 | Module | Role |
 |---|---|
 | `sudoku_core.py` | candidates, technique-labelled steps, solver, grade 1–5 |
-| `db.py` | SQLite schema and connection, timestamps |
-| `analysis.py` | game metrics, pause review, stats, activity calendar and streaks, daily puzzle |
+| `db.py` | SQLite schema, connection and migrations |
+| `analysis.py` | game metrics, pause review, stats, calendar and streaks, daily puzzle |
 | `drills.py` | drill generation, adaptive pick, technique unlocks, explanations |
-| `hints.py` | board and notes errors, the 4-level hint ladder, the solve line from any position |
-| `rating.py` | drill rating: per-technique norms, Elo replayed from the attempts |
-| `server.py` | HTTP API and static files from `web/` |
-| `web/` | UI (vanilla JS) |
+| `hints.py` | board and notes errors, the 4-level hint ladder, the solve line |
+| `rating.py` | drill rating: per-technique norms, Elo replayed from attempts |
+| `server.py` | HTTP API and static files |
+| `theory/*.md` | theory articles; ```` ```sudoku ```` blocks are drawn as boards (format in `web/js/diagram.js`, checked by `tests/test_theory.py`) |
