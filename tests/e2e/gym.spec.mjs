@@ -37,6 +37,8 @@ const py = (code, ...args) => execFileSync("python3", ["-c", code, ...args], { c
 py(`import sqlite3, sys
 src = sqlite3.connect("file:data/sudoku.db?mode=ro", uri=True); dst = sqlite3.connect(sys.argv[1])
 src.backup(dst)
+# drill checks start from no history (rating «1500?», calibration): the owner's own attempts must not leak in
+dst.execute("DELETE FROM drill_attempts")
 # a few finished games on earlier days so the daily chart has >= 2 days
 pid = dst.execute("SELECT id FROM puzzles WHERE level='medium' LIMIT 1").fetchone()[0]
 for day, mode, ms in [("2026-10-25", "hardcore", 470000), ("2026-10-26", "hardcore", 430000), ("2026-10-27", "hardcore", 400000),
