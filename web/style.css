@@ -108,6 +108,7 @@ label.check { font-size: 13px; color: var(--muted); display: inline-flex; gap: 4
 .msg { min-height: 22px; margin-top: 10px; font-weight: 600; }
 .hint-box p { margin: 4px 0; } .hint-box button { margin-top: 4px; }
 .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); } .msg.other { color: var(--other); }
+#msgReview { font-weight: 400; color: var(--accent); }
 /* instant press feedback */
 button:active:not(:disabled) { transform: translateY(1px); filter: brightness(.94); }
 .cell { transition: background-color .08s ease-out, color .08s ease-out; }

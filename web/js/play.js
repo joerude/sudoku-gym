@@ -363,6 +363,9 @@ function refresh() {
   ui.autoBox.checked = S.autoNotes;
   if (S.msg) setMsg(S.msg.text, S.msg.cls);
   else if (!over) setMsg("");
+  // the review right under the board: in zen the results card sits below the settings, out of sight
+  if (over && S.result && !ui.msg.querySelector("#msgReview"))
+    ui.msg.append(ui.msg.textContent ? " · " : "", h("a", { id: "msgReview", href: `#/review/${S.result.id}` }, tr("Разбор →")));
   renderHint(over || paused);
 }
 

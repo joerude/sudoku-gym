@@ -636,6 +636,8 @@ try {
   await page.click("#giveUpBtn");
   await page.waitForSelector("#resultsCard");
   ok(/брошена/.test(await page.textContent("#resultsCard")), "«Сдаться»: second click ends the game");
+  ok(await page.$eval("#msg #msgReview", (a, id) => a.getAttribute("href") === `#/review/${id}`, g4b.id),
+     "the line under the board links to the review");
   ok(await page.$eval("#giveUpBtn", e => e.disabled) && await page.$eval("#clearBtn", e => e.disabled),
      "clear / give up disabled after the game ends");
   const s4b = await api(`/api/games/${g4b.id}`);

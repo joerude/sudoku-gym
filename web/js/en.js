@@ -303,6 +303,7 @@ export default {
     "No simple moves (singles, intersections, pairs) in this position — it needed a harder technique.",
   "Разбор партии #{id}": "Game #{id} review",
   "Разбор": "Review",
+  "Разбор →": "Review →",
   "Анализ": "Analysis",
   "Листай ходы (← →), открывай подсказку к позиции (H) или играй дальше сам: верная цифра уходит в вариант, Пробел — ход решателя, Esc — назад к партии, C — кандидаты, S — разбор решения с этого хода.":
     "Step through the moves (← →), open a hint for the position (H) or play on yourself: a right digit goes into a variation, Space — the solver's move, Esc — back to the game, C — candidates, S — the solution walkthrough from this move.",
