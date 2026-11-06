@@ -665,7 +665,7 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length) if length else b""
         try:
             data = json.loads(raw.decode("utf-8")) if raw else {}
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except UnicodeDecodeError, json.JSONDecodeError:
             raise ApiError(400, tr("некорректный JSON")) from None
         if not isinstance(data, dict):
             raise ApiError(400, tr("тело запроса должно быть JSON-объектом"))

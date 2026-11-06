@@ -60,6 +60,7 @@ class ScoreTest(unittest.TestCase):
 class FreezeTest(unittest.TestCase):
     def test_freezes_on_the_tenth_correct_answer_and_never_again(self):
         conn, ids = conn_with_drills()
+        self.addCleanup(conn.close)
         d = ids["naked_single"]
         for t in range(1000, 1009):
             add(conn, d, t)
@@ -81,6 +82,7 @@ class FreezeTest(unittest.TestCase):
 
     def test_norm_is_the_median_of_the_last_ten(self):
         conn, ids = conn_with_drills()
+        self.addCleanup(conn.close)
         for t in [9000] * 5 + [1000] * 10:
             add(conn, ids["naked_single"], t)
         rating.freeze_norms(conn)
@@ -88,6 +90,7 @@ class FreezeTest(unittest.TestCase):
 
     def test_zero_times_freeze_a_norm_of_one(self):
         conn, ids = conn_with_drills()
+        self.addCleanup(conn.close)
         for _ in range(rating.NORM_MIN_CORRECT):
             add(conn, ids["naked_single"], 0)
         self.assertEqual(rating.freeze_norms(conn), ["naked_single"])
@@ -101,11 +104,13 @@ class FreezeTest(unittest.TestCase):
 class ReplayTest(unittest.TestCase):
     def test_nothing_rated_right_after_calibration(self):
         conn, _ = calibrated()
+        self.addCleanup(conn.close)
         self.assertEqual(rating.replay(conn), [])
         self.assertEqual(rating.current(conn)["rating"], rating.BASE)
 
     def test_answers_at_the_norm_keep_1500(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         for _ in range(20):
             add(conn, ids["naked_single"], 1000)
         pts = rating.replay(conn)
@@ -114,6 +119,7 @@ class ReplayTest(unittest.TestCase):
 
     def test_fast_raises_errors_lower(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         add(conn, ids["naked_single"], 500)
         pts = rating.replay(conn)
         self.assertAlmostEqual(pts[0]["delta"], 40 * (0.8 - 0.5))
@@ -124,6 +130,7 @@ class ReplayTest(unittest.TestCase):
 
     def test_neutral_unrated_and_uncalibrated_are_skipped(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         add(conn, ids["naked_single"], 500, hint=1)  # right after «где искать»
         add(conn, ids["naked_single"], 500, correct=0, valid_other=1)  # a true move by another technique
         add(conn, ids["naked_single"], 500, rated=0)  # «Избранное»
@@ -135,6 +142,7 @@ class ReplayTest(unittest.TestCase):
 
     def test_k_drops_after_the_provisional_attempts(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         for _ in range(rating.PROVISIONAL_N + 1):
             add(conn, ids["naked_single"], 500)
         pts = rating.replay(conn)
@@ -144,6 +152,7 @@ class ReplayTest(unittest.TestCase):
 
     def test_replay_by_technique(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         for _ in range(rating.NORM_MIN_CORRECT):
             add(conn, ids["pointing"], 2000)
         rating.freeze_norms(conn)
@@ -156,6 +165,7 @@ class ReplayTest(unittest.TestCase):
 class CurrentTest(unittest.TestCase):
     def test_current_and_by_technique(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         add(conn, ids["naked_single"], 500)
         cur = rating.current(conn)
         self.assertEqual((cur["rating"], cur["n"], cur["provisional"]), (1512, 1, True))
@@ -164,6 +174,7 @@ class CurrentTest(unittest.TestCase):
 
     def test_outcome(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         a = add(conn, ids["naked_single"], 500)
         self.assertEqual(
             rating.outcome(conn, a, "naked_single"),
@@ -176,6 +187,7 @@ class CurrentTest(unittest.TestCase):
 
     def test_history_is_the_last_rating_of_each_day(self):
         conn, ids = calibrated(1000)
+        self.addCleanup(conn.close)
         add(conn, ids["naked_single"], 500, at=DAY1)
         add(conn, ids["naked_single"], 500, at=DAY1)
         add(conn, ids["naked_single"], 2000, at=DAY2)

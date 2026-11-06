@@ -86,6 +86,7 @@ class TestI18n(unittest.TestCase):
 
     def test_drills_in_english_have_no_russian(self):
         conn, _ = seeded_conn()
+        self.addCleanup(conn.close)
         make_drills(conn, per_technique=3, seed=5)
         set_lang("en")
         rows = conn.execute("SELECT id, technique, board, answers FROM drills").fetchall()

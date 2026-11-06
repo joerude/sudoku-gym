@@ -19,6 +19,7 @@ LINES = [
 class DbTest(unittest.TestCase):
     def test_schema(self):
         conn = connect(":memory:")
+        self.addCleanup(conn.close)
         names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertEqual(
             names,
@@ -100,6 +101,7 @@ class DbTest(unittest.TestCase):
 
     def test_import_is_idempotent_and_skips_non_unique(self):
         conn = connect(":memory:")
+        self.addCleanup(conn.close)
         self.assertEqual(import_lines(conn, LINES, "medium"), 2)
         self.assertEqual(import_lines(conn, LINES, "medium"), 0)
         row = conn.execute("SELECT * FROM puzzles WHERE bank_id='0000847b216e'").fetchone()
@@ -116,6 +118,7 @@ class DbTest(unittest.TestCase):
             with open(os.path.join(d, "a.md"), "w", encoding="utf-8") as f:
                 f.write("---\nslug: a\ntitle: Т\nlevel: 1\norder: 2\ndrill: naked_single\n---\n# H")
             conn = connect(":memory:")
+            self.addCleanup(conn.close)
             self.assertEqual(seed_theory(conn, d), 1)
             self.assertEqual(conn.execute("SELECT drill FROM techniques").fetchone()[0], "naked_single")
 

@@ -1,4 +1,4 @@
-"""No-Docker launcher, the Windows twin of ./gym dev: gym.cmd runs it, any OS with Python 3.12+ can too.
+"""No-Docker launcher, the Windows twin of ./gym dev: gym.cmd runs it, any OS with Python 3.14+ can too.
 
 Usage: python tools/launch.py [start|backup]   (start is the default)
 start: backup the progress DB, download the puzzle bank on the first run, serve, open the browser.

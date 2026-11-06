@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import unittest
+from contextlib import closing
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -83,6 +84,7 @@ class MakeDrillsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.conn, cls.levels = seeded_conn()
+        cls.addClassCleanup(cls.conn.close)
         cls.made = make_drills(cls.conn, per_technique=5, seed=1)
         cls.rows = cls.conn.execute(
             "SELECT d.*, p.givens, p.solution FROM drills d JOIN puzzles p ON p.id = d.puzzle_id"
@@ -155,6 +157,7 @@ class MakeDrillsTest(unittest.TestCase):
 
     def test_deterministic(self):
         conn2, _ = seeded_conn()
+        self.addCleanup(conn2.close)
         make_drills(conn2, per_technique=5, seed=1)
         a = [(r["technique"], r["board"], r["answers"]) for r in self.conn.execute("SELECT * FROM drills ORDER BY id")]
         b = [(r["technique"], r["board"], r["answers"]) for r in conn2.execute("SELECT * FROM drills ORDER BY id")]
@@ -162,6 +165,7 @@ class MakeDrillsTest(unittest.TestCase):
 
     def test_tops_up_only_missing(self):
         conn2, _ = seeded_conn()
+        self.addCleanup(conn2.close)
         first = make_drills(conn2, per_technique=2, seed=1)
         n = conn2.execute("SELECT COUNT(*) FROM drills").fetchone()[0]
         self.assertEqual(first, n)
@@ -189,13 +193,15 @@ class MakeDrillsTest(unittest.TestCase):
             },
         )
         self.assertEqual(next(x for x in lst if x["technique"] == "pointing")["kind"], "eliminate")
-        self.assertEqual(technique_list(connect(":memory:"))[0]["n"], 0)
+        with closing(connect(":memory:")) as conn:
+            self.assertEqual(technique_list(conn)[0]["n"], 0)
 
 
 class AttemptTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.conn, _ = seeded_conn()
+        cls.addClassCleanup(cls.conn.close)
         make_drills(cls.conn, per_technique=3, seed=1)
 
     def setUp(self):
@@ -210,6 +216,7 @@ class AttemptTest(unittest.TestCase):
 
     def test_attempt_and_reveal_store_rated_and_return_attempt_id(self):
         conn, _ = seeded_conn()
+        self.addCleanup(conn.close)
         make_drills(conn, per_technique=2, seed=1)
         drill_id, answers = conn.execute(
             "SELECT id, answers FROM drills WHERE technique='naked_single' LIMIT 1"
@@ -290,14 +297,16 @@ class NextDrillTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.conn, _ = seeded_conn()
+        cls.addClassCleanup(cls.conn.close)
         make_drills(cls.conn, per_technique=3, seed=1)
 
     def setUp(self):
         self.conn.execute("DELETE FROM drill_attempts")
 
     def test_empty_db(self):
-        self.assertIsNone(next_drill(connect(":memory:")))
-        self.assertIsNone(next_drill(connect(":memory:"), "random"))
+        with closing(connect(":memory:")) as conn:
+            self.assertIsNone(next_drill(conn))
+            self.assertIsNone(next_drill(conn, "random"))
 
     def test_explicit_technique(self):
         d = next_drill(self.conn, "hidden_single_col")
@@ -408,6 +417,7 @@ class ExplainTest(unittest.TestCase):
 
     def test_every_technique_explains(self):
         conn, _ = seeded_conn()
+        self.addCleanup(conn.close)
         make_drills(conn, per_technique=3, seed=5)
         for t, board, answers in conn.execute("SELECT technique, board, answers FROM drills"):
             e = explain(board, t, json.loads(answers))
@@ -416,6 +426,7 @@ class ExplainTest(unittest.TestCase):
 
     def test_attempt_returns_explanation(self):
         conn, _ = seeded_conn()
+        self.addCleanup(conn.close)
         make_drills(conn, per_technique=2, seed=5)
         did, answers = conn.execute("SELECT id, answers FROM drills WHERE technique='pointing'").fetchone()
         c, v = json.loads(answers)[0]
@@ -429,6 +440,7 @@ class HintTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.conn, _ = seeded_conn()
+        cls.addClassCleanup(cls.conn.close)
         make_drills(cls.conn, per_technique=3, seed=5)
 
     def setUp(self):
