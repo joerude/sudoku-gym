@@ -387,6 +387,29 @@ try {
   await page.waitForSelector("#resultsCard");
   ok(/Подсказки/.test(await page.textContent("#resultsCard")), "hint: results show the hints");
   ok((await api(`/api/games/${gh.id}`)).hints === 4, "server: 4 hints stored");
+  // a notes error: two levels, no «null», «Вернуть заметку» puts the struck digit back and the hint starts over
+  const gn = await startGame(page, { level: "easy", mode: "original", limit: "none", grade: "" });
+  const nBox = i => Math.floor(i / 27) * 3 + Math.floor(i % 9 / 3);
+  const emp = [...gn.givens].map((c, i) => (c === "0" ? i : -1)).filter(i => i >= 0);
+  const nc = emp.find(i => emp.some(j => j !== i && nBox(j) === nBox(i))), nMate = emp.find(j => j !== nc && nBox(j) === nBox(nc));
+  const nRight = gn.solution[nc], wrongNote = +nRight % 9 + 1;
+  await page.click(cellSel(nc)); await page.keyboard.press(`Shift+Digit${wrongNote}`);
+  await page.click(cellSel(nMate)); await page.keyboard.press(`Shift+Digit${nRight}`);
+  if (gn.solution[nMate] !== nRight) await page.keyboard.press(`Shift+Digit${gn.solution[nMate]}`);
+  for (let n = 1; n <= 2; n++) {
+    await page.keyboard.press("h");
+    await page.waitForFunction(n => document.querySelectorAll("#hintBox .ladder-step").length === n, n);
+  }
+  const nbox = await page.textContent("#hintBox");
+  ok(/нет заметки/.test(nbox) && !/null|undefined/.test(nbox), "notes hint: names the missing note, no «null»", nbox);
+  ok(await page.isVisible("#hintAddNotes") && await page.isVisible("#hintNext") && await page.$eval("#hintBtn", b => b.disabled
+    && /после хода/.test(b.title)), "notes hint: last level offers «Вернуть заметку» and says what comes next");
+  await shot(page, "play-hint-notes");
+  await page.click("#hintAddNotes");
+  ok((await page.textContent(`${cellSel(nc)} .notes`)).includes(nRight) && !(await page.$eval("#hintBtn", b => b.disabled))
+    && await page.$$eval("#hintBox .ladder-step", els => els.length) === 0, "«Вернуть заметку»: the note is back, the hint starts over");
+  await page.click("#giveUpBtn"); await page.click("#giveUpBtn");
+  await page.waitForSelector("#resultsCard");
 
   // --- 2. original, limit 3: three mistakes → failed + locked -------------------------------
   await page.goto(`${BASE}/#/play`);

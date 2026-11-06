@@ -590,24 +590,32 @@ async function askHint() {
   }
 }
 
-/** «Убрать в заметках»: the ladder's eliminations as note toggles (each one undoable). */
-function strikeNotes(elims) {
+/** «Убрать в заметках» / «Вернуть заметку»: [cell, digit] pairs as note toggles (each one undoable). */
+function flipNotes(pairs) {
   const sel = G.S.sel;
-  for (const [c, v] of elims) { G.select(c); G.input(v, true); }
+  for (const [c, v] of pairs) { G.select(c); G.input(v, true); }
   G.select(sel);
 }
 
 function renderHint(over) {
   ui.hintBox.textContent = "";
-  ui.hintBtn.disabled = over || !G || (hint && hint.level >= hint.lad.max_level);  // the last level: next one after a move
+  const last = !!hint && hint.level >= hint.lad.max_level;  // the last level: the next hint comes after a move
+  ui.hintBtn.disabled = over || !G || last;
   ui.hintBtn.textContent = tr("💡 Подсказка");
+  ui.hintBtn.title = last ? tr("Это последняя ступень: после хода подсказка начнётся заново")
+    : tr("Подсказка (H): каждое нажатие — ступень глубже");
   if (!hint || over) return;
   const { lad, level } = hint;
   ui.hintBox.append(...ladderText(lad, level));
   if (level < lad.max_level) ui.hintBtn.textContent = tr("💡 Глубже ({n}/{max})", { n: level + 1, max: lad.max_level });
   const strike = level === 4 ? lad.levels[3].elims.filter(([c, v]) => G.S.notes[c] & (1 << v)) : [];
-  if (strike.length) ui.hintBox.append(h("button", { type: "button", id: "hintStrike", onclick: () => strikeNotes(strike) },
+  if (strike.length) ui.hintBox.append(h("button", { type: "button", id: "hintStrike", onclick: () => flipNotes(strike) },
     tr("Убрать в заметках")));
+  const restore = last ? (lad.levels[level - 1].add_notes || []).filter(([c, v]) => !G.S.vals[c] && !(G.S.notes[c] & (1 << v))) : [];
+  if (restore.length) ui.hintBox.append(h("button", { type: "button", id: "hintAddNotes", onclick: () => flipNotes(restore) },
+    restore.length === 1 ? tr("Вернуть заметку") : tr("Вернуть заметки")));
+  if (last && (lad.kind === "error" || lad.kind === "notes")) ui.hintBox.append(h("p", { class: "hint", id: "hintNext" },
+    tr("Исправь это — и «Подсказка» покажет следующий ход.")));
 }
 
 /** Esc on «Играть» (app.js): a game in progress is thrown away only after a yes in the dialog. */

@@ -114,6 +114,8 @@ class LadderTest(unittest.TestCase):
         lad = next_ladder(gv, sol, parse(gv), notes)
         self.assertEqual((lad["kind"], lad["max_level"]), ("notes", 2))
         self.assertEqual(lad["levels"][1]["cells"], [e[1]])
+        self.assertEqual(lad["levels"][1]["add_notes"], [[e[1], int(sol[e[1]])]])  # what «Вернуть заметки» puts back
+        self.assertEqual(lad["levels"][0]["add_notes"], [])
 
     def test_tier1_order_on_every_fixture(self):
         for name, gv, sol in L1 + L2 + L3:

@@ -7,7 +7,8 @@ import { h } from "./ui.js";
 export function ladderText(lad, n) {
   const steps = lad.levels.slice(0, n).map((l, k) =>
     h("p", { class: "ladder-step", "data-level": k + 1 }, h("b", {}, `${k + 1}. `), l.text));
-  return [...steps, lad.theory && n > 0 ? h("a", { class: "hint", href: `#/theory/${lad.theory}` }, tr("Как это работает?")) : null];
+  // no theory for a board or notes error: nothing goes after the steps (append() would print a null as «null»)
+  return lad.theory && n > 0 ? [...steps, h("a", { class: "hint", href: `#/theory/${lad.theory}` }, tr("Как это работает?"))] : steps;
 }
 
 /** Highlight of the deepest opened level: group (unit), pattern cells (pat; red for a board error), the move (ans + ghost

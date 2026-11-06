@@ -93,7 +93,8 @@ def _follow(g, cands, s):
     return None
 
 
-def _level(text, unit=None, digit=None, cells=(), place=None, elims=()):
+def _level(text, unit=None, digit=None, cells=(), place=None, elims=(), add_notes=()):
+    """One rung of the ladder; add_notes: [cell, digit] notes the player struck out by mistake, to put back."""
     return {
         "text": text,
         "unit": unit,
@@ -101,6 +102,7 @@ def _level(text, unit=None, digit=None, cells=(), place=None, elims=()):
         "cells": list(cells),
         "place": place,
         "elims": [list(e) for e in elims],
+        "add_notes": [list(n) for n in add_notes],
     }
 
 
@@ -182,6 +184,7 @@ def next_ladder(givens: str, solution: str, board: list, notes=None, cands=None)
                 _level(
                     ", ".join(tr("в {cell} нет заметки {v}", cell=rc(c), v=v) for c, v in bad),
                     cells=[c for c, _ in bad],
+                    add_notes=bad,
                 ),
             ],
             title=tr("Ошибка в заметках"),
