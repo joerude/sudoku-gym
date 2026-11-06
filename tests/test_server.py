@@ -38,7 +38,7 @@ class ServerTest(unittest.TestCase):
         )
         conn.execute(
             "INSERT INTO techniques (slug, title, level, ord, drill, body_md) VALUES"
-            " ('scanning', 'Сканирование', 1, 1, NULL, '# Скан')"
+            " ('scanning', 'Сканирование', 1, 1, 'hidden_single_box', '# Скан\n```sudoku\nсхема\n```\n')"
         )
         conn.commit()
         cls.drill_counts = dict(conn.execute("SELECT technique, COUNT(*) FROM drills GROUP BY technique").fetchall())
@@ -640,17 +640,47 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(tuple(row), (2000, last))
 
     def test_theory(self):
+        common = {"level": 1, "summary": None}
         self.assertEqual(
             self.api("GET", "/api/theory"),
             [
-                {"slug": "scanning", "title": "Сканирование", "level": 1, "ord": 1, "drill": None},
-                {"slug": "naked-single", "title": "Голая одиночка", "level": 1, "ord": 2, "drill": "naked_single"},
+                # no technique has scanning as its theory: its own drill; the first diagram is the thumbnail
+                {
+                    **common,
+                    "slug": "scanning",
+                    "title": "Сканирование",
+                    "ord": 1,
+                    "drill": "hidden_single_box",
+                    "drills": ["hidden_single_box"],
+                    "thumb": "схема\n",
+                },
+                {
+                    **common,
+                    "slug": "naked-single",
+                    "title": "Голая одиночка",
+                    "ord": 2,
+                    "drill": "naked_single",
+                    "drills": ["naked_single"],
+                    "thumb": None,
+                },
             ],
         )
         page = self.api("GET", "/api/theory/naked-single")
         self.assertEqual(page["body_md"], "# Голая одиночка\nтекст")
-        self.assertEqual(page["drill"], "naked_single")
+        self.assertEqual((page["drill"], page["drills"]), ("naked_single", ["naked_single"]))
         self.api("GET", "/api/theory/nope", status=404)
+
+    def test_theory_example(self):
+        ex = self.api("GET", "/api/theory/naked-single/example")
+        self.assertEqual(
+            (ex["kind"], ex["technique"], ex["max_level"], ex["count"], ex["n"]), ("step", "naked_single", 4, 2, 0)
+        )
+        self.assertEqual((len(ex["board"]), len(ex["cands"]), ex["tier"]), (81, 81, 1))
+        self.assertEqual(ex["levels"][3]["place"][0], ex["levels"][2]["cells"][0])  # the move is in the named cell
+        again = self.api("GET", "/api/theory/naked-single/example?technique=naked_single&n=3")
+        self.assertEqual(again["n"], 1)  # wraps round the 2 drills
+        self.api("GET", "/api/theory/naked-single/example?technique=x_wing", status=400)
+        self.api("GET", "/api/theory/nope/example", status=404)
 
     def test_errors(self):
         self.api("GET", "/api/games/9999", status=404)

@@ -63,6 +63,8 @@ export const exportFavorites = () => call("GET", "/api/favorites/export");
 export const importFavorites = favorites => call("POST", "/api/favorites/import", favorites);
 export const getTheory = () => call("GET", "/api/theory");
 export const getTheoryPage = slug => call("GET", `/api/theory/${encodeURIComponent(slug)}`);
+export const getTheoryExample = (slug, technique, n) =>
+  call("GET", `/api/theory/${encodeURIComponent(slug)}/example?technique=${encodeURIComponent(technique)}&n=${n}`);
 
 /** Buffered, ordered, retrying move sender for one game.
  *  push() is synchronous; moves go out in batches every `interval` ms. A failed batch stays at the

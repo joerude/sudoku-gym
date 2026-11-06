@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS techniques (
     level INTEGER NOT NULL,
     ord INTEGER NOT NULL,
     drill TEXT,
-    body_md TEXT NOT NULL
+    body_md TEXT NOT NULL,
+    summary TEXT  -- one line for the theory index (frontmatter «summary»)
 );
 
 CREATE TABLE IF NOT EXISTS drills (
@@ -132,6 +133,7 @@ def connect(path: str = DEFAULT_DB) -> sqlite3.Connection:
         ("games", "hints", "INTEGER NOT NULL DEFAULT 0"),
         ("games", "daily", "TEXT"),
         ("games", "pauses", "INTEGER NOT NULL DEFAULT 0"),
+        ("techniques", "summary", "TEXT"),
         ("drills", "kind", "TEXT NOT NULL DEFAULT 'place'"),
         ("drill_attempts", "valid_other", "INTEGER NOT NULL DEFAULT 0"),
         ("drill_attempts", "hint", "INTEGER NOT NULL DEFAULT 0"),

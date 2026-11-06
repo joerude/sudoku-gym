@@ -105,6 +105,8 @@ EN = {
     "в избранное можно добавить только: {kinds}": "only these can be favourites: {kinds}",
     "puzzles и drills должны быть списками объектов": "puzzles and drills must be lists of objects",
     "страница теории не найдена": "theory page not found",
+    "у этой страницы нет такого упражнения": "this page has no such drill",
+    "примеров пока нет": "no examples yet",
     "некорректный JSON": "invalid JSON",
     "тело запроса должно быть JSON-объектом": "the request body must be a JSON object",
     "нет такого маршрута: {method} {path}": "no such route: {method} {path}",

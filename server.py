@@ -547,28 +547,65 @@ def api_favorites_import(conn, m, q, body):
 
 
 def _theory_en(slug: str) -> dict:
-    """{title, body_md} from theory/en/<slug>.md for an English request; {} keeps the Russian page from the DB."""
+    """{title, summary, body_md} from theory/en/<slug>.md for an English request; {} keeps the Russian page."""
     path = os.path.join(THEORY_EN, slug + ".md")
     if get_lang() != "en" or not re.fullmatch(r"[a-z0-9-]+", slug) or not os.path.isfile(path):
         return {}
     with open(path, encoding="utf-8") as f:
         _, head, body = f.read().split("---", 2)
     meta = dict(line.split(":", 1) for line in head.strip().splitlines())
-    return {"title": meta.get("title", slug).strip(), "body_md": body.strip()}
+    return {
+        "title": meta.get("title", slug).strip(),
+        "summary": meta.get("summary", "").strip() or None,
+        "body_md": body.strip(),
+    }
+
+
+def _theory_drills(slug: str, drill) -> list:
+    """The drills of a page: every technique whose theory it is (hidden single: box, row, column), else its own."""
+    own = [t for t in drills.DRILL_TECHNIQUES if drills.THEORY_SLUG.get(t) == slug]
+    return own or ([drill] if drill else [])
+
+
+SUDOKU_BLOCK = re.compile(r"^```sudoku\n(.*?)^```", re.M | re.S)
+
+
+def _theory_row(row) -> dict:
+    """A techniques row in the request's language, with its drills and the first diagram as the index thumbnail."""
+    page = {**dict(row), **_theory_en(row["slug"])}
+    thumb = SUDOKU_BLOCK.search(page["body_md"])
+    return {**page, "drills": _theory_drills(page["slug"], page["drill"]), "thumb": thumb[1] if thumb else None}
 
 
 def api_theory_list(conn, m, q, body):
-    rows = conn.execute("SELECT slug, title, level, ord, drill FROM techniques ORDER BY ord, slug")
-    return [{**dict(r), **{k: v for k, v in _theory_en(r["slug"]).items() if k == "title"}} for r in rows]
+    rows = conn.execute("SELECT slug, title, level, ord, drill, summary, body_md FROM techniques ORDER BY ord, slug")
+    return [{k: v for k, v in _theory_row(r).items() if k != "body_md"} for r in rows]
 
 
-def api_theory_page(conn, m, q, body):
+def _theory(conn, slug: str):
     row = conn.execute(
-        "SELECT slug, title, level, ord, drill, body_md FROM techniques WHERE slug = ?", (unquote(m.group(1)),)
+        "SELECT slug, title, level, ord, drill, summary, body_md FROM techniques WHERE slug = ?", (slug,)
     ).fetchone()
     if row is None:
         raise ApiError(404, tr("страница теории не найдена"))
-    return {**dict(row), **_theory_en(row["slug"])}
+    return row
+
+
+def api_theory_page(conn, m, q, body):
+    return _theory_row(_theory(conn, unquote(m.group(1))))
+
+
+def api_theory_example(conn, m, q, body):
+    """A worked example from the page's drills: ?technique= (one of them; default the first) and ?n= (which one)."""
+    page = _theory_row(_theory(conn, unquote(m.group(1))))
+    technique = q.get("technique") or (page["drills"][0] if page["drills"] else None)
+    if technique not in page["drills"]:
+        raise ApiError(400, tr("у этой страницы нет такого упражнения"))
+    n = _int({"n": int(q["n"])} if q.get("n", "").isdigit() else {}, "n", lo=0, required=False, default=0)
+    ex = hints.drill_example(conn, technique, n)
+    if ex is None:
+        raise ApiError(404, tr("примеров пока нет"))
+    return ex
 
 
 ROUTES = [
@@ -602,6 +639,7 @@ ROUTES = [
     ("DELETE", r"/api/favorites/([a-z]+)/(\d+)", api_favorite_remove),
     ("GET", r"/api/theory", api_theory_list),
     ("GET", r"/api/theory/([^/]+)", api_theory_page),
+    ("GET", r"/api/theory/([^/]+)/example", api_theory_example),
 ]
 ROUTES = [(method, re.compile(pattern + "$"), fn) for method, pattern, fn in ROUTES]
 

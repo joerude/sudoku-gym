@@ -47,7 +47,12 @@ for day, mode, ms in [("2026-10-25", "hardcore", 470000), ("2026-10-26", "hardco
                 " corrections, checks, note_actions, first_move_ms, max_pause_ms, long_pauses)"
                 " VALUES (?, ?, NULL, ?, ?, 'solved', ?, 1, 0, 0, 0, 9000, 40000, 2)",
                 (pid, mode, day + "T10:00:00+00:00", day + "T10:08:00+00:00", ms))
-dst.commit(); dst.close(); src.close()`, DB);
+dst.commit(); dst.close(); src.close()
+# theory from the working tree (the DB copy holds what the last container start imported)
+sys.path[:0] = [".", "tools"]
+from db import connect
+from import_bank import seed_theory
+seed_theory(connect(sys.argv[1]))`, DB);
 
 const server = spawn("python3", ["server.py", "--port", "0", "--db", DB], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] });
 let serverErr = "";
@@ -834,16 +839,29 @@ try {
 
   // --- 7. theory ------------------------------------------------------------------------------
   await page.goto(`${BASE}/#/theory`);
-  await page.waitForSelector(".toc a");
-  ok(await page.$$eval(".toc li", l => l.length) === 10, "theory list: 10 articles");
+  await page.waitForSelector(".theory-card");
+  ok(await page.$$eval(".theory-card", l => l.length) === 10, "theory list: 10 cards");
+  ok(await page.$$eval(".theory-card:not(.no-thumb) .thumb .grid", l => l.length) >= 9
+     && await page.$$eval(".theory-card p", l => l.length) === 10, "theory cards: a diagram thumbnail and a one-line summary");
+  ok(await page.$$eval('.theory-card[data-slug="hidden-single"] .drill-links a', l => l.length) === 3,
+     "hidden single card: drills in a box, a row, a column");
   await shot(page, "theory-list");
-  await page.click('a[href="#/theory/pointing-claiming"]');
+  await page.click('.theory-card h3 a[href="#/theory/pointing-claiming"]');
   await page.waitForSelector("article.md h1");
-  ok(await page.$$eval("article.md h2", e => e.length >= 2) && await page.$("article.md pre") && await page.$("article.md ol li")
-     && await page.$("article.md code"), "theory page renders markdown (headings, pre, lists, code)");
-  ok(!(await page.textContent("article.md")).includes("**"), "no raw markdown left");
+  ok(await page.$$eval("article.md h2", e => e.length >= 2) && await page.$("article.md ol li")
+     && await page.$("article.md code"), "theory page renders markdown (headings, lists, code)");
+  ok(!(await page.textContent("article.md")).includes("**") && !(await page.$("figure.diagram pre")),
+     "no raw markdown left, every diagram parsed");
+  ok(await page.$$eval("article.md figure.diagram .grid", l => l.length) >= 2
+     && await page.$$eval("article.md figure.diagram .cell.pat, article.md figure.diagram .cell.unit", l => l.length) > 0,
+     "theory diagrams: boards with the pattern marked");
+  await page.waitForSelector("#exampleNext:not([disabled])");
+  ok(await page.$$eval("#exampleSteps .ladder-step", l => l.length) === 0, "example: the bare position first");
+  while (!(await page.$eval("#exampleNext", b => b.disabled))) await page.click("#exampleNext");
+  ok(await page.$$eval("#exampleSteps .ladder-step", l => l.length) === 3 && await page.$("#theoryExample .notes span.c-x"),
+     "example: three steps end with the struck candidates");
   await shot(page, "theory-page");
-  await page.click("#trainLink");
+  await page.click(".theory-bar .drill-links a.primary");
   await page.waitForFunction(() => location.hash === "#/drills?technique=pointing");
   await page.waitForSelector('#picker button[data-tech="pointing"].on');
   ok(true, "«Тренировать» opens the pointing drill");

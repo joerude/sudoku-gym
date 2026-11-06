@@ -2,9 +2,12 @@
 and the solve line from any position. Candidates come from the digits; the player's notes only flag a struck-out
 right digit and let eliminations the player already made count as done."""
 
+import json
+
 from drills import THEORY_SLUG, cells_text, explain_step, hint_step, in_unit, rc
+from drills import _steps as _drill_steps
 from i18n import tr
-from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, Step, candidates, easiest_steps
+from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, Step, candidates, easiest_steps, parse
 
 TIER1_ORDER = {"hidden_single_box": 0, "hidden_single_row": 1, "hidden_single_col": 2, "naked_single": 3}
 SOLUTION = "solution"  # a line step the core can't find by logic: the digit is taken from the solution
@@ -156,6 +159,31 @@ def _step_levels(s, cands, follow):
             expl += " " + tr("Это даёт: {cell} = {v}.", cell=rc(follow.cell), v=follow.value)
         fourth = _level(expl, digit=d, cells=s.pattern, elims=s.eliminations)
     return [first, second, third, fourth]
+
+
+def drill_example(conn, technique: str, n: int = 0) -> dict | None:
+    """A worked example for the theory page: the n-th drill of the technique (wrapping round) as a step ladder,
+    plus its board and candidates. Nothing is logged: it is reading, not an attempt."""
+    rows = conn.execute(
+        "SELECT id, board, answers FROM drills WHERE technique = ? ORDER BY id", (technique,)
+    ).fetchall()
+    for k in range(len(rows)):  # a drill whose step the core no longer finds is skipped
+        did, board, answers = rows[(n + k) % len(rows)]
+        steps, cands = _drill_steps(board, technique, json.loads(answers))
+        if not steps:
+            continue
+        s, g = steps[0], parse(board)
+        follow = _follow(g, cands, s) if s.cell is None else None
+        return {
+            **_ladder("step", _step_levels(s, cands, follow), technique=technique),
+            "id": did,
+            "n": (n + k) % len(rows),
+            "count": len(rows),
+            "board": board,
+            "cands": masks(cands),
+            "tier": TECH_TIER[technique],
+        }
+    return None
 
 
 def _stuck_cell(g, cands):

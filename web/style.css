@@ -382,6 +382,40 @@ td.num, th.num { text-align: right; }
 .md code { font: 13px var(--font-mono); background: var(--peer); border-radius: 4px; padding: 0 3px; }
 .md pre code { background: none; padding: 0; }
 .md li { margin: 3px 0; }
+/* theory diagrams (diagram.js): the trainer's board, small and static */
+.md figure.diagram { margin: 14px 0 18px; max-width: 340px; }
+.md figure.diagram figcaption { margin-top: 6px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.diagram-board .cell.closed::after { content: "×"; position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; color: var(--bad); opacity: .55; font-size: 1.1em; }
+.diagram-board .cell.ans { color: var(--ok); font-weight: 700; }
+.diagram-board .grid { position: relative; }  /* the arrows layer (.links) is placed over the grid */
+.diagram-board.small .board-frame { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
+.diagram-board.small .col-nums, .diagram-board.small .row-nums, .diagram-board.small .corner { display: none; }
+/* #/theory: a card per technique — thumbnail diagram, one line, its drills */
+.theory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 14px; }
+.theory-card { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 14px; align-items: start; padding: 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.theory-card.no-thumb { grid-template-columns: minmax(0, 1fr); }
+.theory-card .thumb { display: block; }
+.theory-card h3 { margin: 0 0 4px; font-size: 15px; }
+.theory-card h3 a { color: var(--ink); text-decoration: none; }
+.theory-card h3 a:hover { color: var(--accent); }
+.theory-card p { margin: 0 0 8px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.drill-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.drill-links a { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px;
+  background: var(--peer); color: var(--ink); text-decoration: none; }
+.drill-links a:hover { background: var(--same); }
+.drill-links a small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.drill-links.big a { padding: 7px 14px; font-size: 14px; }
+.drill-links.big a.primary { background: var(--accent); color: var(--accent-ink); }
+.drill-links.big a.primary small { color: inherit; opacity: .8; }
+.theory-bar { margin-bottom: 14px; }
+/* the worked example under an article */
+.example { max-width: 720px; margin-top: 20px; }
+.example .chips { margin-bottom: 12px; }
+.example-body { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 700px) { .example-body { grid-template-columns: minmax(0, 1fr); } }
+.example-steps p { margin: 0 0 8px; line-height: 1.5; }
 .toc { list-style: none; padding: 0; margin: 0; }
 .toc li { padding: 5px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
 .toc li:last-child { border-bottom: 0; }

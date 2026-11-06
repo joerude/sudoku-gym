@@ -4,6 +4,7 @@ title: Speed habits
 level: 1
 order: 10
 drill:
+summary: Fewer pauses and redoes: a fixed digit order, a second pass, a check before entry, notes on time.
 ---
 
 # Speed habits
@@ -17,6 +18,25 @@ Speed in sudoku is not quick eyes but the absence of empty pauses and redoing. T
 3. When a digit runs dry, take the next most common one. Don't go back to a digit you just checked until you have placed something new.
 4. In the second half of the game, when units are full, switch to naked singles and Full House: the last cells of rows and boxes.
 5. If you go by the number of empty cells: with 50 empty and a 4-minute goal, the budget is under 5 seconds a cell. A 20–30 second pause eats the budget of five moves.
+
+A sample start: the 5 stands six times and is missing from boxes 1, 5 and 9. One round over those boxes gives three moves at once.
+
+```sudoku
+. . . | . 5 . | . . .
+. . . | . . . | 5 . .
+. . . | . . . | . . .
+------+-------+------
+. . 5 | . . . | . . .
+. . . | . . . | . . 5
+. . . | . . . | . . .
+------+-------+------
+. 5 . | . . . | . . .
+. . . | . . 5 | . . .
+. . . | . . . | . . .
+unit: b1 b5 b9
+ans: r3c1=5 r6c4=5 r9c8=5
+caption: One digit, 5, stands six times; a single round over the boxes gives three moves: r3c1, r6c4, r9c8.
+```
 
 ## When to switch to notes
 

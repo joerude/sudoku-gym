@@ -1,5 +1,6 @@
 // Tiny markdown renderer: # ## ### headings, paragraphs, - and 1. lists (flat), **bold**, *italic*, `code`,
-// ``` fenced blocks. HTML is escaped first, so the output is safe to assign to innerHTML.
+// ``` fenced blocks; a ```sudoku block becomes <figure class="diagram" data-spec> for diagram.js to draw.
+// HTML is escaped first, so the output is safe to assign to innerHTML.
 import { esc } from "./ui.js";
 
 function inline(s) {
@@ -13,7 +14,9 @@ function inline(s) {
 export function renderMarkdown(src) {
   const lines = esc(String(src ?? "").replace(/\r\n?/g, "\n")).split("\n");
   const out = [];
-  let para = [], list = null, fence = null;
+  let para = [], list = null, fence = null, lang = "";
+  const flushFence = () => out.push(lang === "sudoku" ? `<figure class="diagram" data-spec="${fence.join("\n")}"></figure>`
+    : `<pre><code>${fence.join("\n")}</code></pre>`);
   const flushPara = () => { if (para.length) out.push(`<p>${inline(para.join(" "))}</p>`); para = []; };
   const flushList = () => {
     if (list) out.push(`<${list.tag}>${list.items.map(i => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`);
@@ -21,11 +24,11 @@ export function renderMarkdown(src) {
   };
   for (const line of lines) {
     if (fence !== null) {
-      if (/^```/.test(line.trim())) { out.push(`<pre><code>${fence.join("\n")}</code></pre>`); fence = null; }
+      if (/^```/.test(line.trim())) { flushFence(); fence = null; }
       else fence.push(line);
       continue;
     }
-    if (/^```/.test(line.trim())) { flushPara(); flushList(); fence = []; continue; }
+    if (/^```/.test(line.trim())) { flushPara(); flushList(); fence = []; lang = line.trim().slice(3).trim(); continue; }
     const hm = /^(#{1,3})\s+(.*)$/.exec(line);
     if (hm) { flushPara(); flushList(); out.push(`<h${hm[1].length}>${inline(hm[2])}</h${hm[1].length}>`); continue; }
     const ul = /^\s*[-*]\s+(.*)$/.exec(line), ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
@@ -41,7 +44,7 @@ export function renderMarkdown(src) {
     flushList();
     para.push(line.trim());
   }
-  if (fence !== null) out.push(`<pre><code>${fence.join("\n")}</code></pre>`);
+  if (fence !== null) flushFence();
   flushPara(); flushList();
   return out.join("\n");
 }

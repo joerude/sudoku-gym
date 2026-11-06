@@ -71,8 +71,17 @@ def seed_theory(conn, theory_dir: str = THEORY_DIR) -> int:
         with open(os.path.join(theory_dir, name), encoding="utf-8") as f:
             meta, body = parse_theory(f.read())
         conn.execute(
-            "INSERT OR REPLACE INTO techniques (slug, title, level, ord, drill, body_md) VALUES (?, ?, ?, ?, ?, ?)",
-            (meta["slug"], meta["title"], int(meta["level"]), int(meta["order"]), meta.get("drill") or None, body),
+            "INSERT OR REPLACE INTO techniques (slug, title, level, ord, drill, body_md, summary)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                meta["slug"],
+                meta["title"],
+                int(meta["level"]),
+                int(meta["order"]),
+                meta.get("drill") or None,
+                body,
+                meta.get("summary") or None,
+            ),
         )
         n += 1
     conn.commit()
