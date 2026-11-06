@@ -83,7 +83,9 @@ export function mount(el, params, query) {
   const elapsed = () => performance.now() - start - pausedMs;
   pad.update(null);
 
-  el.append(h("div", { class: "layout" },
+  // the answer line, the hint and «Почему» sit beside the board (level with its top) on a wide screen, zen included:
+  // they name cells, and reading them under the pad means looking up and down the whole board
+  el.append(h("div", { class: "layout drills-layout" },
     h("div", { class: "main-col" },
       h("div", { class: "bar head", style: "margin-bottom:4px" }, title, fav.el, theoryLink, timer, ratingEl, zenButton("mini")), prompt,
       h("p", { class: "hint zen-hide", id: "drillHow" }), boardWrap, padEl,
@@ -92,8 +94,8 @@ export function mount(el, params, query) {
         hintBtn, h("span", { class: "hint", style: "margin:0" }, h("kbd", {}, "H"))),
       h("div", { class: "bar", style: "margin-top:6px" },
         h("label", { class: "check zen-hide" }, autoBox, tr("Автопереход после верного")),
-        h("label", { class: "check zen-hide" }, candBox, tr("Показывать кандидатов"))),
-      msg, why, h("div", { class: "zen-hide" }, strip)),
+        h("label", { class: "check zen-hide" }, candBox, tr("Показывать кандидатов")))),
+    h("div", { class: "drill-note", id: "drillNote" }, msg, why, h("div", { class: "zen-hide" }, strip)),
     h("section", { class: "zen-hide" }, h("h2", {}, tr("Техника")), chips,
       h("p", { class: "hint", style: "margin:8px 0 0" }, h("kbd", {}, "F"), tr(" — в избранное, "), h("kbd", {}, "Z"),
         tr(" — zen-режим ("), h("kbd", {}, "Esc"), tr(" — выйти).")))));

@@ -133,6 +133,14 @@ section, .card { margin-bottom: 28px; }
   :root[data-side="left"] .layout { --side: 1; --side-align: end; }
 }
 .layout > .main-col + * { margin-top: var(--side-offset, 0px); }  /* set by alignSideToBoard */
+/* #/drills: the answer line, hint and «Почему» beside the board; under it on a narrow screen */
+.drill-note { margin-bottom: 24px; }
+.drill-note > .msg { margin-top: 0; }
+.drill-note > .msg:empty { display: none; }  /* beside the board an empty line would only push the hint off its top */
+.drill-note > .why { margin-top: 0; }
+.drill-note > .msg:not(:empty) + .why { margin-top: 8px; }
+.drill-note > .strip, .drill-note > div > .strip { margin-top: 10px; }
+@media (max-width: 820px) { .layout > .drill-note { margin-top: 12px; } }
 @media (max-width: 820px) {
   .layout > .first-mobile { order: -1; }
 }
@@ -444,6 +452,15 @@ body.zen.zen-page .zen-home:hover { color: var(--accent); }
 body.zen.zen-page .layout { grid-template-columns: var(--zen-w); grid-template-rows: none; justify-content: center;
   --board: auto; --side: auto; --side-align: stretch; --side-w: none; }
 body.zen.zen-page .layout > .main-col { grid-row: auto; }
+body.zen.zen-page .layout > .main-col + * { margin-top: 0; }  /* one column: what follows the board is under it, no offset */
+body.zen.zen-page .layout > .drill-note { margin-top: 12px; }
+/* zen on #/drills: the board stays centred, the hint gets the free space on its right */
+@media (min-width: 1180px) {
+  body.zen.zen-page .layout.drills-layout { grid-template-columns: minmax(0, 1fr) var(--zen-w) minmax(0, 1fr); gap: 0 32px; }
+  body.zen.zen-page .drills-layout > .main-col { grid-column: 2; grid-row: 1; }
+  body.zen.zen-page .drills-layout > .drill-note { grid-column: 3; grid-row: 1; justify-self: start; max-width: 380px;
+    margin-top: var(--side-offset, 0px); }
+}
 body.zen.zen-page .layout > .first-mobile { order: 0; }
 
 /* reward after a solved game: green page tint + a dialog that fades in */
