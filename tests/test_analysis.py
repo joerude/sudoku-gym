@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from contextlib import closing
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -125,6 +126,7 @@ def make_game(
 class ReviewTest(unittest.TestCase):
     def setUp(self):
         self.conn = connect(":memory:")
+        self.addCleanup(self.conn.close)
         self.pid = insert_puzzle(self.conn, "L1-1", "easy", P, S)
 
     def assert_steps_ok(self, pause, board):
@@ -189,6 +191,7 @@ class ReviewTest(unittest.TestCase):
 class StatsTest(unittest.TestCase):
     def setUp(self):
         self.conn = connect(":memory:")
+        self.addCleanup(self.conn.close)
         c = self.conn
         easy = insert_puzzle(c, "e1", "easy", P, S)
         med = insert_puzzle(c, "m1", "medium", P, S)
@@ -316,13 +319,15 @@ class StatsTest(unittest.TestCase):
         )
 
     def test_empty(self):
-        s = stats(connect(":memory:"))
+        with closing(connect(":memory:")) as conn:
+            s = stats(conn)
         self.assertEqual((s["by_level_mode"], s["daily"]), ([], []))
 
 
 class ActivityTest(unittest.TestCase):
     def setUp(self):
         self.conn = connect(":memory:")
+        self.addCleanup(self.conn.close)
         self.pid = insert_puzzle(self.conn, "e1", "easy", P, S)
         self.did = self.conn.execute(
             "INSERT INTO drills (technique, kind, puzzle_id, board, answers) VALUES"
@@ -390,6 +395,7 @@ class ActivityTest(unittest.TestCase):
 class DailyTest(unittest.TestCase):
     def setUp(self):
         self.conn = connect(":memory:")
+        self.addCleanup(self.conn.close)
         self.ids = [insert_puzzle(self.conn, f"m{k}", "medium", P, S, 2) for k in range(20)]
         insert_puzzle(self.conn, "custom-medium-x", "medium", P, S, 2)  # never a daily
         insert_puzzle(self.conn, "e1", "easy", P, S)
@@ -437,6 +443,7 @@ class DailyTest(unittest.TestCase):
 
     def test_no_bank_medium(self):
         conn = connect(":memory:")
+        self.addCleanup(conn.close)
         insert_puzzle(conn, "custom-medium-y", "medium", P, S, 2)
         conn.commit()
         self.assertIsNone(daily_puzzle_id(conn, "2026-11-01"))

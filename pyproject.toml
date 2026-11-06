@@ -2,12 +2,12 @@
 name = "sudoku-gym"
 version = "1.0.0"
 description = "Local speed-sudoku trainer: play, drills, theory and progress stats"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = []  # stdlib only; the dev tools (ruff, pre-commit) run through uvx, see ./gym help
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py314"
 extend-exclude = ["deeptutor-skills", "wiki", "docs"]
 
 [tool.ruff.lint]

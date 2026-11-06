@@ -2,7 +2,8 @@
 //   node tests/e2e/gym.spec.mjs [screenshot-dir]
 // Starts server.py on a free port against a TEMP copy of data/sudoku.db, drives Chromium through every page,
 // prints PASS/FAIL lines and exits non-zero on any failure or console/page error.
-// Env: PLAYWRIGHT_CORE (dir of playwright-core's node_modules), CHROME (executable), SHOTS (screenshot dir).
+// Env: PLAYWRIGHT_CORE (dir of playwright-core's node_modules), CHROME (executable), SHOTS (screenshot dir),
+// PYTHON (a 3.14+ interpreter, python3 by default; ./gym test sets it).
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync } from "node:fs";
@@ -33,7 +34,8 @@ const ok = (cond, label, extra = "") => {
 // --- temp DB + server ---------------------------------------------------------------------
 const tmp = mkdtempSync(path.join(existsSync(SCRATCH) ? SCRATCH : tmpdir(), "gym-e2e-"));
 const DB = path.join(tmp, "gym.db");
-const py = (code, ...args) => execFileSync("python3", ["-c", code, ...args], { cwd: ROOT, encoding: "utf-8" });
+const PYTHON = process.env.PYTHON || "python3";
+const py = (code, ...args) => execFileSync(PYTHON, ["-c", code, ...args], { cwd: ROOT, encoding: "utf-8" });
 py(`import sqlite3, sys
 src = sqlite3.connect("file:data/sudoku.db?mode=ro", uri=True); dst = sqlite3.connect(sys.argv[1])
 src.backup(dst)
@@ -54,7 +56,7 @@ from db import connect
 from import_bank import seed_theory
 seed_theory(connect(sys.argv[1]))`, DB);
 
-const server = spawn("python3", ["server.py", "--port", "0", "--db", DB], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] });
+const server = spawn(PYTHON, ["server.py", "--port", "0", "--db", DB], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] });
 let serverErr = "";
 server.stderr.on("data", d => { serverErr += d; });
 const BASE = await new Promise((resolve, reject) => {

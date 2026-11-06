@@ -39,6 +39,23 @@ open_browser() {
 
 need_docker() { command -v docker >/dev/null || die "нужен Docker (или запусти без него: ./gym dev)"; }
 
+# Python 3.14+ for dev and tests: python3 if new enough, else uv's (installed on first use)
+PY=""
+need_python() {
+  [[ -n "$PY" ]] && return 0
+  if command -v python3 >/dev/null && python3 -c 'import sys; sys.exit(sys.version_info < (3, 14))'; then
+    PY=python3
+  elif command -v uv >/dev/null; then
+    PY="$(uv python find '>=3.14' 2>/dev/null)" || {
+      say "ставлю Python 3.14 через uv…"
+      uv python install 3.14
+      PY="$(uv python find '>=3.14')"
+    }
+  else
+    die "нужен Python 3.14+ или uv (https://docs.astral.sh/uv/) — либо Docker: ./gym start"
+  fi
+}
+
 # Consistent copy of the progress DB (safe while the server runs), then keep the newest $KEEP.
 backup() {
   [[ -f "$DB" ]] || { say "бэкап пропущен: нет $DB"; return 0; }
@@ -100,22 +117,29 @@ case "$cmd" in
     ;;
   dev)
     # without Docker, straight from the working tree (code changes apply on a page reload)
-    command -v python3 >/dev/null || die "нужен python3"
+    need_python
     if healthy; then die "порт $PORT уже занят (контейнер?) — ./gym stop или PORT=8766 ./gym dev"; fi
     backup
-    python3 tools/import_bank.py --if-empty
+    "$PY" tools/import_bank.py --if-empty
     ( sleep 1; wait_ready 30 >/dev/null && open_browser ) &
     say "Sudoku Gym (без Docker): $URL — Ctrl+C, чтобы остановить"
-    exec python3 server.py --port "$PORT"
+    exec "$PY" server.py --port "$PORT"
     ;;
   test)
-    say "юнит-тесты"
-    python3 -m unittest discover -s tests
+    # ./gym test [unit|e2e] [shots-dir]: both suites by default
+    only=""
+    if [[ "${1:-}" == unit || "${1:-}" == e2e ]]; then only="$1"; shift; fi
+    need_python
+    if [[ "$only" != e2e ]]; then
+      say "юнит-тесты ($("$PY" -c 'import platform; print(platform.python_version())'))"
+      "$PY" -m unittest discover -s tests
+    fi
+    [[ "$only" == unit ]] && exit 0
     node_bin="$(find_node || true)"
     if [[ -z "$node_bin" ]]; then say "e2e пропущены: нет node"; exit 0; fi
     say "e2e (${BROWSER:-chromium})"
     set +e
-    "$node_bin" tests/e2e/gym.spec.mjs "$@"
+    PYTHON="$PY" "$node_bin" tests/e2e/gym.spec.mjs "$@"
     code=$?
     set -e
     if (( code == 2 )); then say "e2e пропущены: нет playwright-core (задай PLAYWRIGHT_CORE)"; exit 0; fi
@@ -139,7 +163,7 @@ case "$cmd" in
 ./gym logs [N]  логи контейнера (последние N строк и дальше в реальном времени)
 ./gym open      открыть тренажёр в браузере
 ./gym dev       запустить без Docker из рабочей папки (PORT=8766 — другой порт)
-./gym test      юнит-тесты и e2e (BROWSER=firefox — в Firefox)
+./gym test      юнит-тесты и e2e; ./gym test unit | e2e — что-то одно (BROWSER=firefox — e2e в Firefox)
 ./gym backup    копия базы прогресса в data/backups/ (делается и перед start/restart/dev)
 ./gym setup     поставить git-хуки (pre-commit: ruff, тесты, проверка сообщения коммита)
 ./gym check     прогнать хуки по всем файлам: ruff lint + format, гигиена файлов, тесты
