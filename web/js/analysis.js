@@ -6,6 +6,7 @@ import { gameAnalysis } from "./api.js";
 import { PEERS, cellName, createBoard, toDigits } from "./board.js";
 import { ladderText, ladderView } from "./ladder.js";
 import { h, ignoreKey } from "./ui.js";
+import { icon } from "./icons.js";
 
 const bit = v => 1 << v;
 const digits = m => [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(v => m & bit(v));
@@ -139,9 +140,9 @@ export function analysisSection(game, moves, pauses) {
     engine.append(h("p", { class: "hint", id: "anLine" }, n ? tr("Шагов решателя до конца: {n}.", { n }) + wrong : tr("Позиция решена.")));
     if (level) engine.append(...ladderText(lad, level));
     engine.append(h("div", { class: "bar", style: "margin:0" },
-      level < lad.max_level ? h("button", { type: "button", id: "anHint", onclick: deeper }, level ? tr("💡 Глубже (H)") : tr("💡 Подсказка (H)")) : null,
+      level < lad.max_level ? h("button", { type: "button", id: "anHint", onclick: deeper }, icon("lightbulb"), level ? tr("Глубже (H)") : tr("Подсказка (H)")) : null,
       n ? h("button", { type: "button", id: "anPlay", onclick: play }, tr("Сделать ход (Пробел)")) : null,
-      n && !branch.length ? h("a", { class: "btn", id: "anSolve", href: solveHref() }, tr("🧩 Разбор решения отсюда (S)")) : null));
+      n && !branch.length ? h("a", { class: "btn", id: "anSolve", href: solveHref() }, tr("Разбор решения отсюда (S)")) : null));
   }
 
   function render() {

@@ -7,6 +7,7 @@ import { diagramBoard, hydrateDiagrams, parseDiagram } from "./diagram.js";
 import { ladderView } from "./ladder.js";
 import { renderMarkdown } from "./md.js";
 import { errorBox, h } from "./ui.js";
+import { icon } from "./icons.js";
 
 const LEVEL_TITLE = { 1: tr("Уровень 1 — основа"), 2: tr("Уровень 2 — пересечения и заметки"), 3: tr("Уровень 3 — пары и крылья") };
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
@@ -17,7 +18,7 @@ const SHORT = {
 };
 const bits = m => { const out = []; for (let v = 1; v <= 9; v++) if (m & (1 << v)) out.push(v); return out; };
 
-/** Links to the page's drills: «в строке 3/15», ✓ once mastered, 🔒 before its tier opens (training still works). */
+/** Links to the page's drills: «в строке 3/15», ✓ once mastered, a lock before its tier opens (training still works). */
 function drillLinks(drills, techs, { big = false } = {}) {
   const byT = new Map(techs.map(t => [t.technique, t]));
   return h("div", { class: "drill-links" + (big ? " big" : "") }, drills.map((d, k) => {
@@ -25,7 +26,7 @@ function drillLinks(drills, techs, { big = false } = {}) {
     const prog = !t ? "" : t.mastered ? "✓" : `${Math.min(t.correct, UNLOCK)}/${UNLOCK}`;
     return h("a", { href: `#/drills?technique=${encodeURIComponent(d)}`, class: big && k === 0 ? "primary" : "",
       title: t && !t.unlocked ? tr("Ещё не открыта в адаптивном режиме, но потренировать можно") : tr("Упражнение: {title}", { title: t?.title || d }) },
-      t && !t.unlocked ? "🔒 " : "", label, prog ? h("small", {}, prog) : null);
+      t && !t.unlocked ? icon("lock") : "", label, prog ? h("small", {}, prog) : null);
   }));
 }
 

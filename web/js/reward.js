@@ -1,4 +1,4 @@
-// The reward after a solved game: the page turns green and a dialog with the numbers fades in.
+// The reward after a solved game: the board border turns green and a dialog with the numbers fades in.
 import { tr } from "./i18n.js";
 import { getGame, getRecords, getStats } from "./api.js";
 import { fmtTime } from "./board.js";
@@ -14,7 +14,7 @@ function compare(r, level, stats, records) {
   const rec = records?.find(x => x.level === level && x.mode === r.mode);
   if (r.checks > 0) return tr("Использовалась «Проверить» — партия не идёт в рекорды.");
   if (r.hints > 0) return tr("Использовалась подсказка — партия не идёт в рекорды.");
-  if (rec?.game_id === r.id) return rec.solved <= 1 ? tr("🏆 Первый рекорд на этом уровне и в этом режиме!") : tr("🏆 Новый личный рекорд!");
+  if (rec?.game_id === r.id) return rec.solved <= 1 ? tr("Первый рекорд на этом уровне и в этом режиме") : tr("Новый личный рекорд");
   if (!row || row.solved <= 1) return tr("Первая решённая партия на этом уровне и в этом режиме.");
   const diff = row.median_ms - r.time_ms;
   const vsMedian = Math.abs(diff) < 1000 ? tr("на уровне медианы")
@@ -39,7 +39,7 @@ export function showReward(r, puzzle, { onNew }) {
   const item = (v, k) => h("div", { class: "metric" }, h("b", {}, v), h("span", {}, k));
   const dialog = h("div", { class: "reward-card", role: "dialog", "aria-modal": "true", "aria-labelledby": "rewardTitle" },
     h("div", { class: "reward-badge" }, "✓"),
-    h("h2", { id: "rewardTitle" }, tr("Решено!")),
+    h("h2", { id: "rewardTitle" }, tr("Решено")),
     h("div", { class: "reward-time", id: "rewardTime" }, fmtTime(r.time_ms)),
     h("p", { class: "hint", style: "margin:0" }, `${LEVEL_NAME[puzzle.level] || puzzle.level} · ${puzzle.grade_title} · ${r.mode}`),
     line,
@@ -68,7 +68,7 @@ export function showReward(r, puzzle, { onNew }) {
   getGame(r.id).then(g => { if (g.moves.length) chartBox.append(speedChart(g.moves, r.time_ms)); }).catch(() => {});
 }
 
-/** Close the dialog (if open) and drop the green page tint. */
+/** Close the dialog (if open) and drop the green board border. */
 export function closeReward() {
   current?.();
   document.body.classList.remove("won");

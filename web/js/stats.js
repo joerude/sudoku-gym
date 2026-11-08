@@ -59,7 +59,7 @@ function dailyCard(d) {
       table([[tr("Дата")], [tr("Время"), 1], [tr("Попыток"), 1], [tr("Техника"), 1]],
         d.days.map(r => [r.day, h("a", { href: `#/review/${r.game_id}` }, fmtTime(r.time_ms)), r.attempts, r.tech_grade]),
         "dailyTable")]
-    : [h("p", { class: "hint", style: "margin:0" }, tr("Задач дня пока нет — первая ждёт на «Играть» (📅 Задача дня)."))];
+    : [h("p", { class: "hint", style: "margin:0" }, tr("Задач дня пока нет — первая ждёт на «Играть» → «Задача дня»."))];
   return h("section", { id: "daily" }, h("h2", {}, tr("Задача дня")), ...body);
 }
 
@@ -133,7 +133,7 @@ export function mount(el) {
       games.length
         ? table([["#"], [tr("Дата")], [tr("Уровень")], [tr("Режим")], [tr("Итог")], [tr("Время"), 1], [tr("Ошибки"), 1], [""]],
           games.map(g => [g.id, dateRu(g.started_at), LEVEL_NAME[g.level] || g.level, g.mode,
-            h("span", { class: `status-${g.status}` }, STATUS_NAME[g.status] || g.status, g.hints ? ` · 💡${g.hints}` : ""), fmtTime(g.time_ms, false), g.mistakes ?? "—",
+            h("span", { class: `status-${g.status}` }, STATUS_NAME[g.status] || g.status, g.hints ? ` · ${tr("подсказки: {n}", { n: g.hints })}` : ""), fmtTime(g.time_ms, false), g.mistakes ?? "—",
             g.status === "active" ? "" : h("a", { href: `#/review/${g.id}` }, tr("разбор"))]), "gamesTable")
         : h("p", { class: "hint", style: "margin:0" }, tr("Партий пока нет."))));
   }).catch(e => { box.textContent = ""; box.append(errorBox(e)); });

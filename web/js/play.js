@@ -7,6 +7,7 @@ import { ladderText, ladderView } from "./ladder.js";
 import { closeReward, showReward } from "./reward.js";
 import { dayStrip } from "./daystrip.js";
 import { recordLine } from "./records.js";
+import { icon, setLabel } from "./icons.js";
 import { LEVEL_NAME, alignSideToBoard, confirmDialog, createFav, errorBox, h, ignoreKey, keyTrace, metricsGrid, statusLine, zenButton } from "./ui.js";
 
 const LEVELS = ["easy", "medium", "hard", "expert"];
@@ -94,14 +95,14 @@ function setupSection() {
   lvl.onchange = () => { prefs.level = lvl.value; savePrefs(); sync(); markRecord(); };
   grade.onchange = () => { prefs.grade = grade.value; savePrefs(); };
   const newBtn = h("button", { type: "button", class: "primary", id: "newGame", onclick: () => newGame(false) });
-  const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, tr("🎲 Случайная партия"));
+  const rndBtn = h("button", { type: "button", id: "randomGame", onclick: () => newGame(true) }, icon("dices"), tr("Случайная партия"));
   const favBtn = h("button", { type: "button", id: "favGame", title: tr("Задача из избранного: сначала та, что давно не игралась"),
     onclick: () => begin(getFavoritePuzzle, false) });
   const customBtn = h("button", { type: "button", id: "customGame", title: tr("Ввести задачу самому (например, с usdoku) и решить её как обычную партию"),
-    onclick: () => openEditor() }, tr("✎ Своя сетка"));
+    onclick: () => openEditor() }, icon("pencil"), tr("Своя сетка"));
   const dailyBtn = h("button", { type: "button", id: "dailyGame",
     title: tr("Одна сетка medium на весь день, всегда hardcore; в зачёт — первое решение"),
-    onclick: () => startDaily() }, tr("📅 Задача дня"));
+    onclick: () => startDaily() }, icon("calendar"), tr("Задача дня"));
   const syncFav = () => {
     favBtn.textContent = tr("★ Из избранного") + `${favCount === null ? "" : ` (${favCount})`}`;
     favBtn.disabled = !favCount;
@@ -111,7 +112,7 @@ function setupSection() {
     h("h2", {}, tr("Новая партия")),
     h("div", { class: "bar", style: "margin:0" }, newBtn, dailyBtn, customBtn),
     // everything but the main button is folded: one click to play with the remembered settings
-    h("details", { class: "fold", id: "setupMore" }, h("summary", {}, tr("⚙ Настройки")),
+    h("details", { class: "fold", id: "setupMore" }, h("summary", {}, tr("Настройки")),
       h("div", { class: "bar" }, h("label", { class: "field" }, tr("Уровень"), lvl), h("label", { class: "field" }, tr("Техника"), grade)),
       h("div", { class: "bar" }, fields.modeField, fields.limitField),
       h("div", { class: "bar", style: "margin:0" }, rndBtn, favBtn)));
@@ -165,7 +166,7 @@ export function mount(el, params, query) {
   const clearBtn = h("button", { type: "button", id: "clearBtn", title: tr("Стереть все свои цифры и заметки (отменяется «↶ отменить»)"),
     onclick: () => G?.clear() }, tr("Очистить"));
   const hintBtn = h("button", { type: "button", id: "hintBtn", title: tr("Подсказка (H): каждое нажатие — ступень глубже"),
-    onclick: () => askHint() }, tr("💡 Подсказка"));
+    onclick: () => askHint() }, icon("lightbulb"), tr("Подсказка"));
   // give up needs a second click within 3 s, so a stray click doesn't end the game
   let armed = null;
   const giveUpBtn = h("button", { type: "button", id: "giveUpBtn", title: tr("Завершить партию как брошенную"), onclick: () => {
@@ -344,7 +345,7 @@ function refresh() {
   });
   ui.pad.update(prefs.counts ? S.vals : null);
   const p = S.puzzle, showGrade = !meta.hideGrade || over;
-  ui.badge.textContent = `${meta.daily ? tr("📅 задача дня") + " · " : ""}${LEVEL_NAME[p.level] || p.level} · ${showGrade ? tr("техника: {title}", { title: p.grade_title }) : tr("техника скрыта")} · ${S.mode}${S.hints ? ` · 💡 ${S.hints}` : ""}`;
+  ui.badge.textContent = `${meta.daily ? tr("задача дня") + " · " : ""}${LEVEL_NAME[p.level] || p.level} · ${showGrade ? tr("техника: {title}", { title: p.grade_title }) : tr("техника скрыта")} · ${S.mode}${S.hints ? ` · ${tr("подсказки: {n}", { n: S.hints })}` : ""}`;
   ui.errs.textContent = S.mode === "original" ? tr("Ошибки {n}/{limit}", { n: S.mistakes, limit: S.limit ?? "∞" }) : "";
   ui.errs.classList.toggle("bad", S.mode === "original" && S.mistakes > 0);
   ui.timer.textContent = fmtTime(G.elapsed());
@@ -604,13 +605,13 @@ function renderHint(over) {
   ui.hintBox.textContent = "";
   const last = !!hint && hint.level >= hint.lad.max_level;  // the last level: the next hint comes after a move
   ui.hintBtn.disabled = over || !G || last;
-  ui.hintBtn.textContent = tr("💡 Подсказка");
+  setLabel(ui.hintBtn, "lightbulb", tr("Подсказка"));
   ui.hintBtn.title = last ? tr("Это последняя ступень: после хода подсказка начнётся заново")
     : tr("Подсказка (H): каждое нажатие — ступень глубже");
   if (!hint || over) return;
   const { lad, level } = hint;
   ui.hintBox.append(...ladderText(lad, level));
-  if (level < lad.max_level) ui.hintBtn.textContent = tr("💡 Глубже ({n}/{max})", { n: level + 1, max: lad.max_level });
+  if (level < lad.max_level) setLabel(ui.hintBtn, "lightbulb", tr("Глубже ({n}/{max})", { n: level + 1, max: lad.max_level }));
   const strike = level === 4 ? lad.levels[3].elims.filter(([c, v]) => G.S.notes[c] & (1 << v)) : [];
   if (strike.length) ui.hintBox.append(h("button", { type: "button", id: "hintStrike", onclick: () => flipNotes(strike) },
     tr("Убрать в заметках")));
