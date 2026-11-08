@@ -619,6 +619,23 @@ try {
   const mvM = (await api(`/api/games/${gM.id}`)).moves.slice(-4);
   ok(mvM.map(m => `${m.kind}:${m.cell}:${m.value}`).join(" ") === `place:${eM[0]}:${dM} place:${eM[1]}:${dM} undo:${eM[0]}:0 undo:${eM[1]}:0`
      && mvM[0].t_ms === mvM[1].t_ms, "group: move log has a place per cell (one t_ms) and an undo per cell", JSON.stringify(mvM));
+  const gvM = [...gM.givens].findIndex(c => c !== "0");
+  const gvText = await page.$eval(cellSel(gvM), e => e.textContent.trim());
+  await group(eM[0], gvM);
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(gvM) === gvText && await valOf(eM[0]) === String(dM),
+     "group: a given cell in the group stays as it is, the empty one gets the digit", `${gvText} ${await valOf(gvM)} ${await valOf(eM[0])}`);
+  await page.keyboard.press("Control+z");
+  ok(await valOf(eM[0]) === "" && await valOf(gvM) === gvText, "group: Ctrl+Z takes the digit back from the empty cell of that group");
+  await group(eM[0], eM[1]);
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(eM[0]) === String(dM) && await valOf(eM[1]) === String(dM), "group: a digit goes into both cells again");
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(eM[0]) === "" && await valOf(eM[1]) === "", "group: the same digit again clears the group");
+  await page.keyboard.press("Control+z");
+  ok(await valOf(eM[0]) === String(dM) && await valOf(eM[1]) === String(dM), "group: Ctrl+Z after the clearing brings both digits back");
+  await page.keyboard.press("Control+y");
+  ok(await valOf(eM[0]) === "" && await valOf(eM[1]) === "", "group: Ctrl+Y redoes the group clearing");
   // the game has moves now: abandon it, so the next section's paste opens the editor without a dialog
   await page.keyboard.press("Escape");
   await page.waitForSelector("#confirm");

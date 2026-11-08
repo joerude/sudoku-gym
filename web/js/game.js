@@ -30,8 +30,9 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     S.pausedAt = null;
   }
 
-  function log(kind, cell, value) {
-    const m = { seq: ++S.seq, t_ms: Math.round(clock(performance.now())), kind };
+  /** Queue one move; t — game time to stamp it with (default: now), so a group action can give all its moves one t_ms. */
+  function log(kind, cell, value, t = clock(performance.now())) {
+    const m = { seq: ++S.seq, t_ms: Math.round(t), kind };
     if (cell !== undefined) m.cell = cell;
     if (value !== undefined) m.value = value;
     queue.push(m);
@@ -61,6 +62,18 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
   function pushUndo(i) { S.undo.push({ i, val: S.vals[i], notes: S.notes.slice() }); S.redo.length = 0; }
   /** One undo step for several cells about to change (the format of clear()). */
   function pushBatch(cells) { S.undo.push({ batch: cells.map(i => ({ i, val: S.vals[i] })), notes: S.notes.slice() }); S.redo.length = 0; }
+  /** Put digit v into cell i (notes gone, peers' notes stripped under auto-notes), log it, count a mistake. */
+  function placeDigit(i, v, t) {
+    S.vals[i] = v; S.notes[i] = 0; S.showBad.delete(i);
+    if (S.autoNotes) for (const p of PEERS[i]) S.notes[p] &= ~(1 << v);
+    log("place", i, v, t);
+    if (v !== S.sol[i]) S.mistakes++;
+  }
+  /** Wipe the digit and the notes of cell i and log it. */
+  function wipe(i, t) {
+    S.vals[i] = 0; S.notes[i] = 0; S.showBad.delete(i);
+    log("erase", i, undefined, t);
+  }
   /** Cells an action works on: the group (2+ cells) or the selected cell, givens left out. */
   const targets = () => (S.multi.size > 1 ? [...S.multi] : [S.sel]).filter(i => i >= 0 && !S.given[i]);
 
@@ -69,21 +82,16 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
    * empty cells if any lacks it, else it comes off all of them. */
   function groupInput(v, asNote) {
     if (locked()) return;
-    const cells = targets(), empty = cells.filter(i => !S.vals[i]);
+    const cells = targets(), empty = cells.filter(i => !S.vals[i]), t = clock(performance.now());
     if (asNote) {
       const add = empty.some(i => !(S.notes[i] & (1 << v)));
       const change = empty.filter(i => !!(S.notes[i] & (1 << v)) !== add);
       if (!change.length) return;
       pushBatch(change);
-      for (const i of change) { S.notes[i] ^= 1 << v; log("note", i, v); }
+      for (const i of change) { S.notes[i] ^= 1 << v; log("note", i, v, t); }
     } else if (empty.length) {
       pushBatch(empty);
-      for (const i of empty) {
-        S.vals[i] = v; S.notes[i] = 0; S.showBad.delete(i);
-        if (S.autoNotes) for (const p of PEERS[i]) S.notes[p] &= ~(1 << v);
-        log("place", i, v);
-        if (v !== S.sol[i]) S.mistakes++;
-      }
+      for (const i of empty) placeDigit(i, v, t);
       say(null);
       afterPlace();
     } else if (cells.length && cells.every(i => S.vals[i] === v)) {
@@ -98,7 +106,8 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     const cells = targets().filter(i => S.vals[i] || S.notes[i]);
     if (!cells.length) return;
     pushBatch(cells);
-    for (const i of cells) { S.vals[i] = 0; S.notes[i] = 0; S.showBad.delete(i); log("erase", i); }
+    const t = clock(performance.now());
+    for (const i of cells) wipe(i, t);
     say(null);
     onChange();
   }
@@ -156,10 +165,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       } else {
         if (S.vals[i] === v) return this.erase();  // the same digit again clears the cell
         pushUndo(i);
-        S.vals[i] = v; S.notes[i] = 0; S.showBad.delete(i);
-        if (S.autoNotes) for (const p of PEERS[i]) S.notes[p] &= ~(1 << v);
-        log("place", i, v);
-        if (v !== S.sol[i]) S.mistakes++;
+        placeDigit(i, v);
         say(null);
         afterPlace();
       }
@@ -170,8 +176,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       const i = S.sel;
       if (i < 0 || S.given[i] || locked() || (!S.vals[i] && !S.notes[i])) return;
       pushUndo(i);
-      S.vals[i] = 0; S.notes[i] = 0; S.showBad.delete(i);
-      log("erase", i);
+      wipe(i);
       say(null);
       onChange();
     },
@@ -179,10 +184,10 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     clear() {
       if (locked()) return;
       const cells = [];
-      for (let i = 0; i < 81; i++) if (!S.given[i] && (S.vals[i] || S.notes[i])) cells.push({ i, val: S.vals[i] });
+      for (let i = 0; i < 81; i++) if (!S.given[i] && (S.vals[i] || S.notes[i])) cells.push(i);
       if (!cells.length) return;
-      S.undo.push({ batch: cells, notes: S.notes.slice() }); S.redo.length = 0;
-      for (const { i } of cells) { S.vals[i] = 0; log("erase", i); }
+      pushBatch(cells);
+      for (const i of cells) { S.vals[i] = 0; log("erase", i); }
       S.notes = Array(81).fill(0); S.showBad.clear();
       say(null);
       onChange();
