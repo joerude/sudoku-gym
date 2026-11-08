@@ -568,6 +568,27 @@ try {
   await page.goto(`${BASE}/`);
   ok(await page.waitForSelector("#nav a.active[data-route=play]").then(() => true, () => false), "the main page is «Играть»");
 
+  // --- 3b. a group of cells: Shift+click / Shift+arrows select it, a digit, a note or ⌫ goes into every cell ---
+  const gM = await startGame(page, { level: "easy", mode: "hardcore", grade: "" });
+  const eM = [...gM.givens].map((c, i) => (c === "0" ? i : -1)).filter(i => i >= 0);
+  const selCount = () => page.$$eval("#board .cell.sel", els => els.length);
+  const group = async (...cells) => {
+    await page.click(cellSel(cells[0]));
+    for (const c of cells.slice(1)) await page.click(cellSel(c), { modifiers: ["Shift"] });
+  };
+  await group(eM[0], eM[1], eM[2]);
+  ok(await selCount() === 3, "group: Shift+click selects three cells", String(await selCount()));
+  await page.click(cellSel(eM[2]), { modifiers: ["Shift"] });
+  ok(await selCount() === 2 && !(await page.$eval(cellSel(eM[2]), e => e.classList.contains("sel"))),
+     "group: Shift+click on a selected cell takes it out");
+  await page.click(cellSel(eM[3]));
+  ok(await selCount() === 1, "group: a plain click drops it");
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Shift+ArrowRight");
+  ok(await selCount() === 3, "group: Shift+→ twice grows it to three cells", String(await selCount()));
+  await page.keyboard.press("ArrowLeft");
+  ok(await selCount() === 1, "group: an arrow without Shift drops it");
+
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------
   const ascii = `1 . . | . . 6 | . . .
 6 . . | . 3 5 | 1 2 .

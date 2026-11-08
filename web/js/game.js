@@ -13,7 +13,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
   const S = {
     puzzle, gameId, mode, limit,
     given: givens.map(Boolean), vals: givens.slice(), sol: toDigits(puzzle.solution),
-    notes: Array(81).fill(0), sel: givens.indexOf(0), notesMode: false, autoNotes: true,
+    notes: Array(81).fill(0), sel: givens.indexOf(0), multi: new Set(), notesMode: false, autoNotes: true,
     undo: [], redo: [], showBad: new Set(), mistakes: 0, seq: 0, hints: 0,
     start: performance.now(), end: null, status: "active", msg: null, result: null,
     pausedAt: null, pausedMs: 0, pauses: 0,
@@ -74,9 +74,28 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
 
   const api = {
     S, elapsed, queue,
-    select(i) { S.sel = i; onChange(); },
+    select(i) { S.sel = i; S.multi.clear(); onChange(); },
     move(key) {
       S.sel = stepCell(S.sel < 0 ? 0 : S.sel, key);
+      S.multi.clear();
+      onChange();
+    },
+    /** Shift+click: the cell joins the group, or leaves it if it is in already (one cell left = no group). */
+    extend(i) {
+      if (S.multi.size < 2) { S.multi.clear(); if (S.sel >= 0) S.multi.add(S.sel); }
+      if (S.multi.has(i) && S.multi.size > 1) {
+        S.multi.delete(i);
+        if (S.sel === i) S.sel = [...S.multi].at(-1);
+        if (S.multi.size < 2) S.multi.clear();
+      } else { S.multi.add(i); S.sel = i; }
+      onChange();
+    },
+    /** Shift+arrow: one step on, and the new cell joins the group. */
+    extendMove(key) {
+      if (S.sel < 0) return this.move(key);
+      if (S.multi.size < 2) { S.multi.clear(); S.multi.add(S.sel); }
+      S.sel = stepCell(S.sel, key);
+      S.multi.add(S.sel);
       onChange();
     },
     toggleNotes() { S.notesMode = !S.notesMode; onChange(); },

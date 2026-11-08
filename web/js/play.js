@@ -216,8 +216,8 @@ export function mount(el, params, query) {
   ui.day = dayStrip();
   setup.box.prepend(ui.day.el);
   ui.editor = editorSection();
-  ui.board = createBoard(boardEl, { onCell: i => {
-    if (edit) { edit.sel = i; refresh(); } else if (G) { digit = 0; G.select(i); }
+  ui.board = createBoard(boardEl, { onCell: (i, e) => {
+    if (edit) { edit.sel = i; refresh(); } else if (G) { digit = 0; if (e.shiftKey) G.extend(i); else G.select(i); }
   } });
   ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => (edit ? editCell(0, false) : G?.erase()) });
   ui.root = h("div", { class: "layout" },
@@ -336,7 +336,7 @@ function refresh() {
   const hv = hint && !over ? ladderView(hint.lad, hint.level) : null;
   const cands = hv?.elims.size ? computeCandidates(S.vals) : null;
   ui.board.render({
-    values: S.vals, given: S.given, sel: over ? -1 : S.sel, highlight: true, locked: over && S.status !== "solved",
+    values: S.vals, given: S.given, sel: over ? -1 : S.sel, multi: over ? null : S.multi, highlight: true, locked: over && S.status !== "solved",
     digit: hv?.digit || digit, ghost: hv?.ghost,
     notes: i => (S.vals[i] ? null : cands && hv.elims.has(i) && !S.notes[i] ? cands[i] : bits(S.notes[i])),
     candClass: (i, v) => (hv?.elims.get(i)?.includes(v) ? "c-x" : ""),
@@ -667,7 +667,7 @@ function handleKey(e) {
   if (e.code === "KeyP") { if (G.S.status === "active") G.pause(); e.preventDefault(); return; }
   const d = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
   if (d && d[1] !== "0") { press(+d[1], e.shiftKey || G.S.notesMode); e.preventDefault(); return; }
-  if (e.key.startsWith("Arrow")) { digit = 0; G.move(e.key); e.preventDefault(); return; }
+  if (e.key.startsWith("Arrow")) { digit = 0; if (e.shiftKey) G.extendMove(e.key); else G.move(e.key); e.preventDefault(); return; }
   if (e.key === "Backspace" || e.key === "Delete" || (d && d[1] === "0")) { G.erase(); e.preventDefault(); return; }
   if ("nNтТ".includes(e.key) && e.key.length === 1 || e.code === "Space") { G.toggleNotes(); e.preventDefault(); }
 }
