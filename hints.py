@@ -4,13 +4,13 @@ right digit and let eliminations the player already made count as done."""
 
 import json
 
-from drills import THEORY_SLUG, cells_text, explain_step, hint_step, in_unit, rc
+from drills import THEORY_SLUG, cells_text, chain_text, explain_step, hint_step, in_unit, rc
 from drills import _steps as _drill_steps
 from i18n import tr
-from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, Step, candidates, easiest_steps, parse
+from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, Step, candidates, chain_step, easiest_steps, parse
 
 TIER1_ORDER = {"hidden_single_box": 0, "hidden_single_row": 1, "hidden_single_col": 2, "naked_single": 3}
-SOLUTION = "solution"  # a line step the core can't find by logic: the digit is taken from the solution
+SOLUTION = "solution"  # a line step no technique or chain finds: the digit is taken from the solution
 MAX_FOLLOW = 20
 
 
@@ -65,13 +65,14 @@ def _apply(g, cands, s):
         cands[c].discard(v)
 
 
-def _next_step(g, cands, notes=None):
-    """The easiest step; eliminations the player's notes already show are applied to cands (in place) and skipped."""
+def _next_step(g, cands, notes=None, chains=True):
+    """The easiest step, a chain past Y-Wing; eliminations the player's notes already show are applied to cands
+    (in place) and skipped."""
     while True:
         steps = easiest_steps(g, cands)
-        if not steps:
+        s = _pick(steps) if steps else chain_step(cands) if chains else None
+        if s is None:
             return None
-        s = _pick(steps)
         if (
             s.cell is None
             and s.eliminations
@@ -85,11 +86,11 @@ def _next_step(g, cands, notes=None):
 
 
 def _follow(g, cands, s):
-    """The first placement the solver reaches after the elimination step s."""
+    """The first placement the solver reaches after the elimination step s without another chain."""
     g, cands = g[:], [set(c) for c in cands]
     _apply(g, cands, s)
     for _ in range(MAX_FOLLOW):
-        nxt = _next_step(g, cands)
+        nxt = _next_step(g, cands, chains=False)
         if nxt is None or nxt.cell is not None:
             return nxt
         _apply(g, cands, nxt)
@@ -135,7 +136,15 @@ def _step_levels(s, cands, follow):
         )
         fourth = _level(expl, unit=s.unit, digit=s.value, cells=[s.cell], place=[s.cell, s.value])
     else:
-        if t in ("naked_pair", "hidden_pair"):
+        if s.chain:
+            d = s.eliminations[0][1] if t == "x_chain" else None
+            chain = chain_text(s.chain)
+            third = _level(
+                tr("Цепочка по цифре {d}: {chain}.", d=d, chain=chain) if d else tr("Цепочка: {chain}.", chain=chain),
+                digit=d,
+                cells=s.pattern,
+            )
+        elif t in ("naked_pair", "hidden_pair"):
             a, b = s.pattern[:2]
             if t == "naked_pair":
                 x, y = sorted(cands[a])
@@ -227,7 +236,12 @@ def next_ladder(givens: str, solution: str, board: list, notes=None, cands=None)
         return _ladder(
             "stuck",
             [
-                _level(tr("Одиночки, пересечения, пары, X-Wing и Y-Wing здесь хода не дают — нужна техника сложнее.")),
+                _level(
+                    tr(
+                        "Одиночки, пересечения, пары, X-Wing, Y-Wing и короткие цепочки здесь хода не дают — "
+                        "нужен перебор или техника сложнее."
+                    )
+                ),
                 _level(tr("Цифра из решения: {cell} = {v}.", cell=rc(i), v=v), cells=[i], place=[i, v]),
             ],
             title=tr("Нужна техника сложнее"),

@@ -13,7 +13,7 @@ import time
 
 from db import is_favorite, now_iso
 from i18n import tr
-from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, candidates, find_steps, parse, to_str
+from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, candidates, find_steps, parse, to_str
 
 DRILL_TECHNIQUES = list(TECH_TIER)
 KIND = {t: "place" if TECH_TIER[t] == 1 else "eliminate" for t in DRILL_TECHNIQUES}
@@ -438,8 +438,45 @@ def _elims(elims) -> str:
     return ", ".join(tr("{v} из {cells}", v=v, cells=rc(c)) for c, v in elims)
 
 
+def chain_text(chain) -> str:
+    """The chain's cells in order: «r5c4 → r6c5» on one digit, «r5c4 (1) → r5c4 (6)» across digits."""
+    if len({v for _, v in chain}) == 1:
+        return " → ".join(rc(c) for c, _ in chain)
+    return " → ".join(f"{rc(c)} ({v})" for c, v in chain)
+
+
+def _explain_chain(s, cands) -> str:
+    """«If the first is not its digit: link → link → … So one of the two ends holds: what sees both goes»."""
+    links = []
+    for k in range(1, len(s.chain)):
+        (a, x), (b, y) = s.chain[k - 1], s.chain[k]
+        if k % 2 == 0:  # weak: b is off once a is on
+            links.append(tr("в {cell} не {v}", cell=rc(b), v=y))
+        elif a == b:  # strong, inside a two-candidate cell
+            links.append(tr("в {cell} остаётся только {v}", cell=rc(b), v=y))
+        else:  # strong: the digit has two places in a unit
+            u = next(u for u in range(27) if {a, b} <= set(UNITS[u]) and sum(y in cands[i] for i in UNITS[u]) == 2)
+            links.append(tr("в {unit} цифре {v} остаётся только {cell}", unit=in_unit(u), v=y, cell=rc(b)))
+    (a, x), (b, y) = s.chain[0], s.chain[-1]
+    text = tr("Если в {cell} не {v}, то {links}.", cell=rc(a), v=x, links=" → ".join(links))
+    text += " " + tr("Значит, верно хотя бы одно: {a} = {x} или {b} = {y}.", a=rc(a), x=x, b=rc(b), y=y)
+    if x == y and all(v == x for _, v in s.eliminations):
+        return (
+            text
+            + " "
+            + tr(
+                "{cells} видит обе клетки → убираем {elims}.",
+                cells=cells_text(c for c, _ in s.eliminations),
+                elims=_elims(s.eliminations),
+            )
+        )
+    return text + " " + tr("В обоих случаях отпадает {elims}.", elims=_elims(s.eliminations))
+
+
 def explain_step(s, cands) -> str:
     t = s.technique
+    if s.chain:
+        return _explain_chain(s, cands)
     if t == "naked_single":
         return tr(
             "В {cell} остался один кандидат — {v}: остальные цифры уже стоят в её строке, столбце или блоке.",
@@ -577,6 +614,19 @@ def hint_step(s, cands) -> dict:
             cell=rc(s.pattern[0]),
             x=x,
             y=y,
+        )
+    elif t == "x_chain":
+        unit, digit = None, s.eliminations[0][1]
+        text = tr(
+            "Смотри цифру {d}: где ей осталось ровно два места в строке, столбце или блоке, одно из них верное. "
+            "Сцепи такие пары через клетки, которые видят друг друга.",
+            d=digit,
+        )
+    elif t == "aic":
+        unit = None
+        text = tr(
+            "Ищи цепочку «если не это — то то»: клетки с двумя кандидатами и цифры, которым в строке, "
+            "столбце или блоке осталось два места."
         )
     else:
         text = tr("Ищи: {title}.", title=tr(TECH_TITLE[t]))

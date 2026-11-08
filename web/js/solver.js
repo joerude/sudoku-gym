@@ -21,6 +21,8 @@ const SHORT = {
   hidden_pair: tr("Скрытая пара"),
   x_wing: "X-Wing",
   y_wing: "Y-Wing",
+  x_chain: "X-Chain",
+  aic: tr("Цепочка"),
   solution: tr("Цифра из решения"),
 };
 const TIERS = { ...TIER_NAME, 5: tr("Вне техник тренажёра") };
@@ -388,8 +390,8 @@ function build(el, game, atArg, stepArg) {
     if (k === 0 && wrong.length)
       card.append(h("p", { class: "hint" }, tr("Неверные цифры партии ({cells}) убраны — разбор идёт без них.", { cells: cellsText(wrong) })));
     if (s.technique === "solution")
-      card.append(h("p", { class: "hint" }, tr("Техники тренажёра (одиночки, пересечения, пары, X-Wing, Y-Wing) здесь хода не дают: " +
-        "нужна цепочка или перебор. Цифра взята из решения, чтобы разбор шёл дальше.")));
+      card.append(h("p", { class: "hint" }, tr("Техники тренажёра (одиночки, пересечения, пары, X-Wing, Y-Wing) и короткие цепочки здесь хода не дают: " +
+        "нужен перебор или техника сложнее. Цифра взята из решения, чтобы разбор шёл дальше.")));
     if (groups.length) {
       const why = h("div", { class: "sv-why", id: "svWhy" }, h("h3", {}, tr("Почему так")),
         arrows && groups.some(g => g.items.some(r => r.from !== undefined))

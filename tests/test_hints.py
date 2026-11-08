@@ -12,6 +12,9 @@ from sudoku_core import BOX_OF, TECH_TIER, UNITS, candidates, easiest_steps, fin
 
 INKALA = "800000000003600000070090200050007000000045700000100030001000068008500010090000400"  # grade 5: beyond Y-Wing
 INKALA_SOL = to_str(solve(parse(INKALA)))
+# a hard game past Y-Wing: after the easy eliminations an X-Chain on 1 takes 1 out of r8c4
+PAST_WINGS = "193502078258000009674891523015080060380020057700905380500078006067050830800000705"
+PAST_WINGS_SOL = to_str(solve(parse(PAST_WINGS)))
 TIER1 = [t for t, k in TECH_TIER.items() if k == 1]
 ORDER = ["hidden_single_box", "hidden_single_row", "hidden_single_col", "naked_single"]
 
@@ -187,6 +190,21 @@ class LadderTest(unittest.TestCase):
         _, gv, sol = L1[0]
         self.assertEqual(next_ladder(gv, sol, parse(sol))["kind"], "solved")
 
+    def test_chain_past_the_wings(self):
+        g = parse(PAST_WINGS)
+        cs = candidates(g)
+        while steps := easiest_steps(g, cs):  # the player has done every easy elimination: notes show them
+            for c, v in steps[0].eliminations:
+                cs[c].discard(v)
+            self.assertIsNone(steps[0].cell)
+        lad = next_ladder(PAST_WINGS, PAST_WINGS_SOL, g, notes=masks(cs))
+        self.assertEqual((lad["kind"], lad["technique"], lad["max_level"]), ("step", "x_chain", 4))
+        third, fourth = lad["levels"][2], lad["levels"][3]
+        self.assertEqual(third["digit"], 1)
+        self.assertEqual(fourth["elims"], [[66, 1]])
+        self.assertIn("r8c4", fourth["text"])
+        self.assertTrue(fourth["text"].endswith("Это даёт: r8c9 = 1."), fourth["text"])
+
 
 class LineTest(unittest.TestCase):
     def test_fixtures_solve_by_logic(self):
@@ -196,6 +214,17 @@ class LineTest(unittest.TestCase):
             self.assertEqual(replay_line(parse(gv), line), sol, name)
             self.assertFalse([s for s in line["steps"] if s["technique"] == SOLUTION], name)
             self.assertTrue(all(len(s["cands"]) == 81 and s["explanation"] for s in line["steps"]), name)
+
+    def test_chains_keep_the_solution(self):
+        for gv, sol in ((PAST_WINGS, PAST_WINGS_SOL), (INKALA, INKALA_SOL)):
+            steps = solve_line(gv, sol, parse(gv))["steps"]
+            chains = [s for s in steps if s["technique"] in ("x_chain", "aic")]
+            self.assertTrue(chains, gv)
+            for s in chains:
+                self.assertFalse([e for e in s["eliminations"] if int(sol[e[0]]) == e[1]], s["explanation"])
+                self.assertTrue(s["explanation"].startswith("Если в "), s["explanation"])
+        line = solve_line(PAST_WINGS, PAST_WINGS_SOL, parse(PAST_WINGS))
+        self.assertFalse([s for s in line["steps"] if s["technique"] == SOLUTION])
 
     def test_beyond_the_core_takes_digits_from_the_solution(self):
         line = solve_line(INKALA, INKALA_SOL, parse(INKALA))
@@ -209,7 +238,7 @@ class LineTest(unittest.TestCase):
             self.assertTrue(steps, name)
             for s in steps:
                 t = s["technique"]
-                self.assertEqual(s["tier"], 5 if t == SOLUTION else TECH_TIER[t], (name, t))
+                self.assertEqual(s["tier"], TECH_TIER.get(t, 5), (name, t))
                 self.assertEqual(s["theory"], THEORY_SLUG.get(t), (name, t))
         inkala = solve_line(INKALA, INKALA_SOL, parse(INKALA))["steps"]
         self.assertTrue([s for s in inkala if s["technique"] == SOLUTION and s["tier"] == 5 and s["theory"] is None])
