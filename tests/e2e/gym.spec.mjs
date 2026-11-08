@@ -588,6 +588,42 @@ try {
   ok(await selCount() === 3, "group: Shift+→ twice grows it to three cells", String(await selCount()));
   await page.keyboard.press("ArrowLeft");
   ok(await selCount() === 1, "group: an arrow without Shift drops it");
+  const notesOf = i => page.$$eval(`${cellSel(i)} .notes span[data-v]`, els => els.map(e => e.dataset.v).join(""));
+  const valOf = i => page.$eval(cellSel(i), e => (e.querySelector(".notes") ? "" : e.textContent.trim()));
+  await group(eM[0], eM[1]);
+  await page.keyboard.press("Shift+Digit4");
+  ok(await notesOf(eM[0]) === "4" && await notesOf(eM[1]) === "4", "group: Shift+4 puts the note into both cells");
+  await page.keyboard.press("Shift+Digit4");
+  ok(await notesOf(eM[0]) === "" && await notesOf(eM[1]) === "", "group: Shift+4 again takes it off both");
+  await page.click(cellSel(eM[0]));
+  await page.keyboard.press("Shift+Digit6");
+  await page.click(cellSel(eM[1]), { modifiers: ["Shift"] });
+  await page.keyboard.press("Shift+Digit6");
+  ok(await notesOf(eM[0]) === "6" && await notesOf(eM[1]) === "6", "group: a note some cells lack goes to them, the rest keep it");
+  await page.keyboard.press("Backspace");
+  ok(await notesOf(eM[0]) === "" && await notesOf(eM[1]) === "", "group: ⌫ wipes every cell");
+  await page.keyboard.press("Control+z");
+  ok(await notesOf(eM[0]) === "6" && await notesOf(eM[1]) === "6", "group: one Ctrl+Z brings the wiped notes back");
+  await group(eM[0], eM[1]);
+  await page.keyboard.press("Backspace");
+  const xM = 1, dM = 2;
+  await typeAt(page, eM[2], xM);
+  await group(eM[0], eM[1], eM[2]);
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(eM[0]) === String(dM) && await valOf(eM[1]) === String(dM) && await valOf(eM[2]) === String(xM),
+     "group: a digit goes into every empty cell, the filled one stays");
+  await page.keyboard.press("Control+z");
+  ok(await valOf(eM[0]) === "" && await valOf(eM[1]) === "" && await valOf(eM[2]) === String(xM) && await selCount() === 1,
+     "group: one Ctrl+Z takes the digits back and drops the group");
+  await page.waitForTimeout(1300);
+  const mvM = (await api(`/api/games/${gM.id}`)).moves.slice(-4);
+  ok(mvM.map(m => `${m.kind}:${m.cell}:${m.value}`).join(" ") === `place:${eM[0]}:${dM} place:${eM[1]}:${dM} undo:${eM[0]}:0 undo:${eM[1]}:0`
+     && mvM[0].t_ms === mvM[1].t_ms, "group: move log has a place per cell (one t_ms) and an undo per cell", JSON.stringify(mvM));
+  // the game has moves now: abandon it, so the next section's paste opens the editor without a dialog
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#confirm");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector("#resultsCard");
 
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------
   const ascii = `1 . . | . . 6 | . . .
