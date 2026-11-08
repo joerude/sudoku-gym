@@ -1,4 +1,5 @@
 // GitHub-style activity calendar for #/stats: 53 weeks × 7 days, a point per solved game or correct drill.
+// A game takes minutes and a drill seconds, so the toggle shows games, drills or both, each with its own shades.
 import { lang, tr } from "./i18n.js";
 import { h } from "./ui.js";
 
@@ -9,13 +10,22 @@ const svg = (tag, attrs = {}, ...kids) => {
   e.append(...kids);
   return e;
 };
-const LEVELS = [1, 5, 10, 20];  // fixed: a past day never changes its shade
-const shade = n => LEVELS.filter(t => n >= t).length;
+// fixed: a past day never changes its shade
+const MODES = [
+  { id: "games", name: "Партии", count: r => r.games, levels: [1, 2, 4, 7] },
+  { id: "drills", name: "Упражнения", count: r => r.drills, levels: [1, 10, 25, 50] },
+  { id: "all", name: "Вместе", count: r => r.games + r.drills, levels: [1, 5, 10, 20] },
+];
+const MODE_KEY = "gym-heatmap";
+const shade = (rec, m) => rec ? m.levels.filter(t => m.count(rec) >= t).length : 0;
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const locale = lang === "en" ? "en-GB" : "ru-RU";
 
 export function heatmapCard(a) {
   const byDay = new Map(a.days.map(d => [d.day, d]));
+  let mode = MODES[0];
+  try { mode = MODES.find(m => m.id === localStorage.getItem(MODE_KEY)) || mode; } catch { /* no storage */ }
+  const cells = [];
   const [y, m, d] = a.today.split("-").map(Number);
   const today = new Date(y, m - 1, d);
   const start = new Date(y, m - 1, d - ((today.getDay() + 6) % 7) - 52 * 7);  // Monday, 52 weeks before this week
@@ -36,9 +46,9 @@ export function heatmapCard(a) {
         lastMonth = day.getMonth();
         root.append(svg("text", { x: L + w * (C + G), y: T - 5, class: "lbl" }, months.format(day)));
       }
-      const rec = byDay.get(iso(day)), n = rec ? rec.games + rec.drills : 0;
-      const cell = svg("rect", { x: L + w * (C + G), y: T + r * (C + G), width: C, height: C, rx: 2,
-        class: `heat${shade(n)}`, "data-day": iso(day) });
+      const rec = byDay.get(iso(day));
+      const cell = svg("rect", { x: L + w * (C + G), y: T + r * (C + G), width: C, height: C, rx: 2, "data-day": iso(day) });
+      cells.push([cell, rec]);
       const text = `${dayFmt.format(day)}: ` + (rec ? tr("партии: {g} · упражнения: {d}", { g: rec.games, d: rec.drills }) : tr("нет активности"));
       cell.addEventListener("mouseenter", () => { tip.textContent = text; tip.hidden = false; });
       cell.addEventListener("mousemove", e => { tip.style.left = `${e.clientX + 12}px`; tip.style.top = `${e.clientY + 12}px`; });
@@ -46,6 +56,16 @@ export function heatmapCard(a) {
       root.append(cell);
     }
   }
+  const btns = MODES.map(m => h("button", { type: "button", "data-mode": m.id, onclick: () => {
+    mode = m;
+    try { localStorage.setItem(MODE_KEY, m.id); } catch { /* no storage */ }
+    paint();
+  } }, tr(m.name)));
+  function paint() {
+    for (const [cell, rec] of cells) cell.setAttribute("class", `heat${shade(rec, mode)}`);
+    btns.forEach(b => { const on = b.dataset.mode === mode.id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  }
+  paint();
   const legend = h("div", { class: "heat-legend" }, tr("меньше"),
     ...[0, 1, 2, 3, 4].map(k => h("i", { class: `heat${k}` })), tr("больше"));
   const s = a.streak, t = a.totals;
@@ -54,5 +74,6 @@ export function heatmapCard(a) {
     tr("за год: партий — {g}, упражнений — {d}, активных дней — {a}", { g: t.games, d: t.drills, a: t.active_days }));
   const wrap = h("div", { class: "heat-wrap" }, root);
   requestAnimationFrame(() => { wrap.scrollLeft = wrap.scrollWidth; });  // narrow screens: the recent weeks in view
-  return h("section", { id: "activity" }, h("h2", {}, tr("Активность")), wrap, legend, line, tip);
+  return h("section", { id: "activity" }, h("h2", {}, tr("Активность")),
+    h("div", { class: "chips", id: "heatModes" }, btns), wrap, legend, line, tip);
 }

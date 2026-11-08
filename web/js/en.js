@@ -365,6 +365,8 @@ export default {
   "График появится, когда будут учтённые ответы хотя бы за два дня. Ответы по технике идут в рейтинг после калибровки: 10 верных без подсказки задают её норму.": "The chart appears once there are rated answers on at least two days. A technique's answers count after calibration: 10 correct answers without a hint set its norm.",
   "Активность": "Activity",
   "Календарь активности": "Activity calendar",
+  "Партии": "Games",
+  "Вместе": "Both",
   "Пн": "Mon",
   "Ср": "Wed",
   "Пт": "Fri",
