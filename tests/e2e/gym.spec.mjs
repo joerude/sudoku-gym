@@ -522,8 +522,10 @@ try {
   // «＋ новая» and zen sit next to the timer; mid-game the first click only asks
   ok(await page.$eval("#newGameTop", e => e.closest(".bar").contains(document.querySelector("#timer"))), "new game + zen next to the timer");
   ok(await page.$$eval(".main-col .bar .zen-btn", els => els.length === 1), "zen toggle above the board, not below");
-  ok(await page.$$eval("#keysHelp .key-row", rows => rows.length === 14
-    && rows.some(r => r.textContent === "Pпауза" && /время стоит/.test(r.title))), "«Клавиши»: 14 rows, the details in tooltips");
+  ok(await page.$$eval("#keysHelp .key-row", rows => rows.length === 16
+    && rows.some(r => r.textContent === "Pпауза" && /время стоит/.test(r.title))
+    && rows.some(r => r.textContent === "Shift+кликдобавить в группу" && /Esc — снять группу/.test(r.title))),
+     "«Клавиши»: 16 rows, the details in tooltips, Shift+click for a group");
   await page.click("#newGameTop");
   ok((await page.textContent("#newGameTop")).includes("Бросить"), "«＋ новая» mid-game asks first");
   await page.waitForTimeout(3200);
@@ -636,11 +638,15 @@ try {
   ok(await valOf(eM[0]) === String(dM) && await valOf(eM[1]) === String(dM), "group: Ctrl+Z after the clearing brings both digits back");
   await page.keyboard.press("Control+y");
   ok(await valOf(eM[0]) === "" && await valOf(eM[1]) === "", "group: Ctrl+Y redoes the group clearing");
-  // the game has moves now: abandon it, so the next section's paste opens the editor without a dialog
+  // Esc drops a group first; with no group it asks as before (and the abandoned game lets section 4's paste open the editor)
+  await group(eM[0], eM[1]);
+  await page.keyboard.press("Escape");
+  ok(await selCount() === 1 && !(await page.$("#confirm")), "group: Esc drops it without the dialog");
   await page.keyboard.press("Escape");
   await page.waitForSelector("#confirm");
   await page.keyboard.press("Enter");
   await page.waitForSelector("#resultsCard");
+  ok((await api(`/api/games/${gM.id}`)).status === "abandoned", "group: with no group Esc asks as before, Enter abandons");
 
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------
   const ascii = `1 . . | . . 6 | . . .

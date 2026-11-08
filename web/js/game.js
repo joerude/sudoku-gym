@@ -151,6 +151,13 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       S.multi.add(S.sel);
       onChange();
     },
+    /** Drop the group (the selected cell stays); false if there was none. */
+    clearMulti() {
+      if (S.multi.size < 2) return false;
+      S.multi.clear();
+      onChange();
+      return true;
+    },
     toggleNotes() { S.notesMode = !S.notesMode; onChange(); },
     setAutoNotes(on) { S.autoNotes = on; },
     input(v, asNote) {

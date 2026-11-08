@@ -283,7 +283,9 @@ function keysHelp() {
       row(["Shift+1–9"], tr("заметка")),
       row(["N", tr("пробел")], tr("режим заметок"), tr("или Т в русской раскладке")),
       row(["0", "⌫"], tr("стереть"), tr("Backspace или Delete")),
-      row(["← ↑ ↓ →"], tr("перемещение"))),
+      row(["← ↑ ↓ →"], tr("перемещение")),
+      row([tr("Shift+клик")], tr("добавить в группу"), tr("цифра, заметка и ⌫ — во все клетки группы; Esc — снять группу")),
+      row(["Shift+← ↑ ↓ →"], tr("расширить группу"))),
     h("div", {},
       row(["Ctrl+Z"], tr("отменить")),
       row(["Ctrl+Y"], tr("вернуть"), tr("или Ctrl+Shift+Z")),
@@ -622,11 +624,12 @@ function renderHint(over) {
     tr("Исправь это — и «Подсказка» покажет следующий ход.")));
 }
 
-/** Esc on «Играть» (app.js): a game in progress is thrown away only after a yes in the dialog. */
+/** Esc on «Играть» (app.js): a group of cells is dropped first; a game in progress is thrown away only after a yes in the dialog. */
 export function escape() {
   if (!ui || asking) return;
   if (edit) { closeEditor(); return; }
   if (G?.S.status !== "active") return;
+  if (G.clearMulti()) return;  // Esc drops a group of cells first
   asking = confirmDialog({
     title: tr("Бросить партию?"), text: tr("Партия запишется как брошенная."), ok: tr("Бросить"),
     onOk: () => { if (G?.S.status !== "active") return; G.S.msg = { text: tr("Партия брошена"), cls: "bad" }; endGame("abandoned"); },
