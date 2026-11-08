@@ -41,7 +41,11 @@ TECH_TITLE = {
     "hidden_pair": "Скрытая пара (Hidden Pair)",
     "x_wing": "X-Wing",
     "y_wing": "Y-Wing (XY-Wing)",
+    "x_chain": "Цепочка по цифре (X-Chain)",
+    "aic": "Цепочка (AIC)",
 }
+CHAIN_TECHNIQUES = ("x_chain", "aic")  # outside TECH_TIER: hints only, grading stops at Y-Wing
+MAX_CHAIN = 6  # strong links
 _HIDDEN_UNITS = {"hidden_single_row": range(9), "hidden_single_col": range(9, 18), "hidden_single_box": range(18, 27)}
 
 
@@ -53,6 +57,7 @@ class Step:
     unit: int | None = None
     eliminations: list = field(default_factory=list)  # [(cell, value)]
     pattern: list = field(default_factory=list)  # cells forming the pattern (for explanations)
+    chain: list = field(default_factory=list)  # [(cell, value)] of a chain: the first is off, links strong/weak in turn
 
 
 def parse(s: str) -> Grid:
@@ -256,6 +261,78 @@ def easiest_steps(g: Grid, cands=None) -> list:
         if steps:
             return steps
     return []
+
+
+def _strong_links(cands, one_digit) -> dict:
+    """(cell, v) -> candidates that must be on when it is off: v's other place in a unit where v has two places, the
+    other digit of a two-candidate cell."""
+    links = {}
+    for u in range(27):
+        for v in range(1, 10):
+            spots = [i for i in UNITS[u] if v in cands[i]]
+            if len(spots) == 2:
+                links.setdefault((spots[0], v), set()).add((spots[1], v))
+                links.setdefault((spots[1], v), set()).add((spots[0], v))
+    if not one_digit:
+        for i in range(81):
+            if len(cands[i]) == 2:
+                x, y = sorted(cands[i])
+                links.setdefault((i, x), set()).add((i, y))
+                links.setdefault((i, y), set()).add((i, x))
+    return {n: sorted(m) for n, m in links.items()}
+
+
+def _sees(n, cands, one_digit=False) -> set:
+    """Candidates that are off when n is on: n's digit in its peers, the other digits of its cell."""
+    i, v = n
+    peers = {(p, v) for p in PEERS[i] if v in cands[p]}
+    return peers if one_digit else peers | {(i, w) for w in cands[i] if w != v}
+
+
+def _shortest_chain(cands, one_digit, limit):
+    """(strong links, chain, eliminations) of the shortest chain within `limit` strong links, or None. A chain
+    off -strong-> on -weak-> off … -strong-> on proves «the first or the last is on»: what sees both is off."""
+    links, best = _strong_links(cands, one_digit), None
+    for start in sorted(links):
+        start_sees = _sees(start, cands)
+        prev = {(start, 0): None}  # (node, on?) -> the state it came from
+        frontier, k = [(start, 0)], 0
+        while frontier and k < (limit if best is None else best[0] - 1):
+            k += 1
+            nxt = []
+            for n, _ in frontier:  # n is off: a strong link turns its partner on
+                for m in links.get(n, ()):
+                    if (m, 1) in prev:
+                        continue
+                    prev[(m, 1)] = (n, 0)
+                    elims = sorted(start_sees & _sees(m, cands) - {start, m})
+                    if m != start and elims and (best is None or k < best[0]):
+                        path, state = [], (m, 1)
+                        while state:
+                            path.append(state[0])
+                            state = prev[state]
+                        best = (k, path[::-1], elims)
+                    for w in sorted(_sees(m, cands, one_digit)):  # m is on: a weak link turns these off
+                        if (w, 0) not in prev:
+                            prev[(w, 0)] = (m, 1)
+                            nxt.append((w, 0))
+            frontier = nxt
+    return best
+
+
+def chain_step(cands, limit: int = MAX_CHAIN) -> Step | None:
+    """The shortest chain that removes a candidate; a chain on one digit wins a tie (and is easier to see)."""
+    one = _shortest_chain(cands, True, limit)
+    many = _shortest_chain(cands, False, one[0] - 1 if one else limit)
+    _, chain, elims = many or one or (0, None, None)
+    if chain is None:
+        return None
+    return Step(
+        "x_chain" if many is None else "aic",
+        eliminations=elims,
+        pattern=list(dict.fromkeys(c for c, _ in chain)),
+        chain=chain,
+    )
 
 
 def grade(g: Grid) -> int:

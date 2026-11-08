@@ -1,11 +1,13 @@
 import unittest
 
 from sudoku_core import (
+    CHAIN_TECHNIQUES,
     GRADE_TITLE,
     PEERS,
     TECH_TIER,
     TECH_TITLE,
     UNITS,
+    chain_step,
     count_solutions,
     easiest_steps,
     find_steps,
@@ -103,7 +105,7 @@ class StepsTest(unittest.TestCase):
         self.assertTrue(all(TECH_TIER[s.technique] == 1 for s in steps))
 
     def test_titles_cover_all(self):
-        self.assertEqual(set(TECH_TITLE), set(TECH_TIER))
+        self.assertEqual(set(TECH_TITLE), set(TECH_TIER) | set(CHAIN_TECHNIQUES))
 
 
 def cands_from(rows):
@@ -141,6 +143,33 @@ class WingTest(unittest.TestCase):
         elims = {e for s in steps for e in s.eliminations}
         self.assertIn((2 * 9 + 4, 9), elims)  # r3c5 sees r1c5 (col) and r3c2 (row)
         self.assertNotIn((6 * 9 + 6, 9), elims)  # r7c7 sees neither
+
+
+class ChainTest(unittest.TestCase):
+    def test_x_chain(self):
+        # 1 has two places in row 1 (r1c1, r1c5), column 5 (r1c5, r6c5) and box 5 (r6c5, r4c6), three in column 1:
+        # r1c1 or r4c6 is 1 → out of r4c1, which sees both
+        cands = cands_from(
+            {(1, 1): {1, 2}, (1, 5): {1, 3}, (6, 5): {1, 4}, (4, 6): {1, 5}, (4, 1): {1, 6}, (8, 1): {1, 7}}
+        )
+        s = chain_step(cands)
+        self.assertEqual(s.technique, "x_chain")
+        self.assertEqual(s.eliminations, [(27, 1)])
+        self.assertEqual(s.chain, [(0, 1), (4, 1), (49, 1), (32, 1)])
+
+    def test_aic_through_two_candidate_cells(self):
+        # r1c1 {1,2} → r1c5 {2,3} → r5c5 {3,1}: if r1c1 is not 1 it is 2, r1c5 is 3, r5c5 is 1 — so r1c1 or r5c5 is 1,
+        # and r5c1 sees both; 1 has three places in column 1 and row 5, so no chain on the digit alone
+        cands = cands_from(
+            {(1, 1): {1, 2}, (1, 5): {2, 3}, (5, 5): {3, 1}, (5, 1): {1, 7}, (9, 1): {1, 8}, (5, 9): {1, 6}}
+        )
+        s = chain_step(cands)
+        self.assertEqual(s.technique, "aic")
+        self.assertIn((36, 1), s.eliminations)
+        self.assertEqual(len({v for _, v in s.chain}), 3)
+
+    def test_none_without_links(self):
+        self.assertIsNone(chain_step(cands_from({(1, 1): {1, 2, 3}, (5, 5): {4, 5, 6}})))
 
 
 class GradeTest(unittest.TestCase):
