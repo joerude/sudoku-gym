@@ -2,6 +2,7 @@
 import { tr } from "./i18n.js";
 import { drillHint, drillTechniques, getFavorites, getRating, nextDrill, revealDrill, sendAttempt } from "./api.js";
 import { ROW, COL, cellName, createBoard, createPad, toDigits, unitCells } from "./board.js";
+import { icon, setLabel } from "./icons.js";
 import { TIER_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, pct, sec, zenButton } from "./ui.js";
 
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
@@ -60,7 +61,7 @@ export function mount(el, params, query) {
   const candBox = h("input", { type: "checkbox", id: "showCands", onchange: e => { showCands = e.target.checked; render(); } });
   const nextBtn = h("button", { type: "button", id: "nextDrill", onclick: () => load() }, tr("Дальше"));
   const hintBtn = h("button", { type: "button", id: "hintBtn", title: tr("Подсказка (H): сначала где искать, потом ответ"),
-    onclick: () => onHint() }, tr("💡 Подсказка"));
+    onclick: () => onHint() }, icon("lightbulb"), tr("Подсказка"));
   const autoBox = h("input", { type: "checkbox", id: "autoNext", onchange: e => {
     autoNext = e.target.checked;
     try { localStorage.setItem(AUTO_KEY, autoNext ? "1" : "0"); } catch {}
@@ -110,16 +111,16 @@ export function mount(el, params, query) {
       title: t && !t.unlocked ? tr("Ещё не открыта в адаптивном режиме, но потренировать можно")
         : count !== undefined ? tr("Только упражнения, отмеченные ★ (клавиша F)") : null,
       onclick: () => { choice = key; renderChips(); load(); } },
-      t && !t.unlocked ? "🔒 " : null, label,
+      t && !t.unlocked ? icon("lock") : null, label,
       t ? h("small", {}, progress(t)) : count !== undefined && count !== null ? h("small", {}, count) : null);
-    chips.append(h("div", { class: "chips" }, chip("adaptive", tr("Адаптивно")), chip("random", tr("🎲 Случайная")),
+    chips.append(h("div", { class: "chips" }, chip("adaptive", tr("Адаптивно")), chip("random", [icon("dices"), tr("Случайная")]),
       chip("favorites", tr("★ Избранное"), null, favCount)));
     for (const tier of [...new Set(techs.map(t => t.tier))].sort()) {
       chips.append(h("div", { class: "tier-name" }, TIER_NAME[tier] || tr("Тир {n}", { n: tier })),
         h("div", { class: "chips" }, techs.filter(t => t.tier === tier).map(t => chip(t.technique, t.title, t))));
     }
     chips.append(h("p", { class: "hint", style: "margin:8px 0 0" },
-      tr("Адаптивно — твоя самая медленная техника. 🔒 откроется после {n} верных на каждой технике группы выше.", { n: UNLOCK })));
+      tr("Адаптивно — твоя самая медленная техника. Закрытые техники откроются после {n} верных на каждой технике группы выше.", { n: UNLOCK })));
   }
 
   function refreshTechs() {
@@ -166,7 +167,7 @@ export function mount(el, params, query) {
     padEl.hidden = elim && (sel < 0 || !!result);
     nextBtn.textContent = result ? tr("Дальше") : tr("Пропустить");
     hintBtn.hidden = !!result;
-    hintBtn.textContent = hinted ? tr("Показать ответ") : tr("💡 Подсказка");
+    if (hinted) hintBtn.textContent = tr("Показать ответ"); else setLabel(hintBtn, "lightbulb", tr("Подсказка"));
   }
 
   async function load() {

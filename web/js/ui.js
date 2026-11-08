@@ -5,7 +5,7 @@ import { THEMES, loadPrefs, palette, savePrefs } from "./appearance.js";
 import { fmtTime } from "./board.js";
 
 export const LEVEL_NAME = { easy: tr("лёгкий"), medium: tr("средний"), hard: tr("сложный"), expert: tr("эксперт"), custom: tr("своя сетка"),
-                            random: tr("🎲 случайный") };
+                            random: tr("случайный") };
 export const MODE_NAME = { original: "original", hardcore: "hardcore" };
 export const STATUS_NAME = { active: tr("идёт"), solved: tr("решено"), failed: tr("провал"), abandoned: tr("брошена") };
 export const TIER_NAME = { 1: tr("Одиночки"), 2: tr("Блок и линия"), 3: tr("Пары"), 4: tr("Крылья") };

@@ -87,7 +87,7 @@ const shot = (page, name, full = true) => page.screenshot({ path: path.join(SHOT
 const cellSel = i => `#board .cell[data-cell="${i}"]`;
 
 async function setSelect(page, id, value) { await page.selectOption(`#${id}`, value); }
-/** «⚙ Настройки» on #/play is folded by default: open it before touching level, technique, mode or limit. */
+/** «Настройки» on #/play is folded by default: open it before touching level, technique, mode or limit. */
 const openSetup = page => page.evaluate(() => { document.querySelector("#setupMore").open = true; });
 
 /** Run action (a click / paste), wait for the POST /api/games it causes and for the board to show the givens. */
@@ -139,13 +139,13 @@ try {
   ok(s1.moves.length === empties.length + 1 && s1.moves.every((m, k) => m.seq === k + 1), "all moves stored in order");
   ok(s1.moves.every((m, k) => k === 0 || m.t_ms >= s1.moves[k - 1].t_ms), "move times are monotonic");
   ok(await page.$eval("#timer", e => e.classList.contains("done")), "timer stopped");
-  // reward: green page + a dialog with the numbers fades in; Esc closes it, the green stays with the results
+  // reward: a green board border + a dialog with the numbers fades in; Esc closes it, the green stays with the results
   await page.waitForSelector("#reward.in");
   ok((await page.textContent("#rewardTime")).trim() === (await page.textContent("#timer")).trim(), "reward: shows the solve time");
   await page.waitForFunction(() => !/^…$/.test(document.querySelector(".reward-compare").textContent));
   ok(/рекорд/.test(await page.textContent(".reward-compare")), "reward: a game without «Проверить» claims the record",
      await page.textContent(".reward-compare"));
-  ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: page turns green");
+  ok(await page.evaluate(() => document.body.classList.contains("won")), "reward: the board turns green");
   await page.waitForSelector("#reward #speedChart .sc-pace");
   ok(await page.evaluate(() => {
     const c = document.querySelector("#reward #speedChart");
@@ -380,13 +380,13 @@ try {
     await page.waitForFunction(n => document.querySelectorAll("#hintBox .ladder-step").length === n, n);
   }
   ok(await page.$$eval("#board .cell.ans", els => els.length) === 1, "hint: level 4 shows the move on the board");
-  ok((await page.textContent("#badge")).includes("💡 4"), "hint: the badge counts hints");
+  ok((await page.textContent("#badge")).includes("подсказки: 4"), "hint: the badge counts hints");
   ok(await page.$eval("#hintBtn", b => b.disabled), "hint: the button is off at the last level");
   await shot(page, "play-hint");
   await page.click("#checkBtn");  // «Проверить» is no move: the ladder stays, H does not log another hint
   await page.keyboard.press("h");
   await page.waitForTimeout(400);
-  ok(await page.$$eval("#hintBox .ladder-step", els => els.length) === 4 && (await page.textContent("#badge")).includes("💡 4"),
+  ok(await page.$$eval("#hintBox .ladder-step", els => els.length) === 4 && (await page.textContent("#badge")).includes("подсказки: 4"),
     "hint: «Проверить» keeps the ladder");
   const target = await page.$eval("#board .cell.ans", e => +e.dataset.cell);
   await typeAt(page, target, gh.solution[target]);
@@ -457,10 +457,10 @@ try {
   await page.fill("#limit", "0"); await page.dispatchEvent("#limit", "change");
   ok(await page.inputValue("#limit") === "7", "invalid limit reverts to the last valid one");
 
-  // --- 3. 🎲 random game; starting another abandons it --------------------------------------
+  // --- 3. random game; starting another abandons it --------------------------------------
   const g3 = await waitGame(page, () => page.click("#randomGame"));
-  ok(g3.status === "active" && ["easy", "medium", "hard", "expert"].includes(g3.level), "🎲 game started");
-  ok((await page.textContent("#badge")).includes("техника скрыта"), "🎲 badge hides the technique");
+  ok(g3.status === "active" && ["easy", "medium", "hard", "expert"].includes(g3.level), "random game started");
+  ok((await page.textContent("#badge")).includes("техника скрыта"), "random: badge hides the technique");
   // notes, notes mode, undo, check → the right move kinds reach the server
   const c3 = g3.givens.indexOf("0");
   await page.click(cellSel(c3));
@@ -600,7 +600,7 @@ try {
     ok((await page.textContent(cellSel(0))).trim() === "1" && (await page.textContent(cellSel(5))).trim() === "6", "custom grid on board");
   }
 
-  // --- 4c. «✎ Своя сетка»: the grid typed in, repeats are red, it starts as a game of the chosen level ---
+  // --- 4c. «Своя сетка»: the grid typed in, repeats are red, it starts as a game of the chosen level ---
   await page.click("#customGame");
   await page.waitForSelector("#customEditor:not([hidden])");
   ok(await boardDigits() === "0".repeat(81), "editor opens empty");
@@ -742,7 +742,7 @@ try {
   ok(/Почему:.*убираем/.test(await page.textContent("#drillWhy")), "eliminate drill: explanation shown");
   ok(await page.$$eval("#drillBoard .cell.pat", els => els.length >= 2), "eliminate drill: pattern cells highlighted");
   ok((await page.getAttribute("#drillTheory", "href")) === "#/theory/pointing-claiming", "drill: theory link");
-  ok(await page.$eval('#picker button[data-tech="x_wing"]', e => e.textContent.includes("🔒")), "drill picker: locked tier marked");
+  ok(await page.$eval('#picker button[data-tech="x_wing"]', e => !!e.querySelector("svg.icon")), "drill picker: locked tier marked with a lock");
   await shot(page, "drills-eliminate-answered");
   rp = drillResp();
   await page.locator("body").press("Space");  // Space = next
@@ -892,7 +892,7 @@ try {
   // --- 8a. daily puzzle: the strip link starts it in hardcore, the first solve shows in the strip and on stats ----
   const today = await api("/api/daily");
   ok(await page.$eval("#dayDaily", a => a.getAttribute("href")) === "#/play?daily=1" && await page.$("#dailyGame") !== null,
-     "daily: «📅 задача дня →» in the strip and the button in the setup");
+     "daily: «задача дня →» in the strip and the button in the setup");
   const gd = await waitGame(page, () => page.click("#dayDaily"));
   ok(gd.puzzle_id === today.puzzle.id && gd.mode === "hardcore" && gd.daily === today.day && /задача дня/.test(await page.textContent("#badge")),
      "daily: today's grid in hardcore, marked on the badge", JSON.stringify([gd.puzzle_id, today.puzzle.id, gd.mode, gd.daily]));
@@ -900,7 +900,7 @@ try {
   await page.waitForSelector("#resultsCard");
   await page.keyboard.press("Escape");
   await page.waitForFunction(id => document.querySelector("#dayDaily")?.getAttribute("href") === `#/review/${id}`, gd.id);
-  ok(/📅 ✓ \d+:\d\d\.\d/.test(await page.textContent("#dayDaily")), "daily: solved — «📅 ✓ time» links to the review");
+  ok(/задача дня ✓ \d+:\d\d\.\d/.test(await page.textContent("#dayDaily")), "daily: solved — «задача дня ✓ time» links to the review");
   const again = await waitGame(page, () => page.click("#dailyGame"));
   ok(again.puzzle_id === today.puzzle.id && again.mode === "hardcore", "daily: a second attempt the same day is the same grid");
   await page.click("#giveUpBtn"); await page.click("#giveUpBtn");

@@ -14,13 +14,13 @@ function localDay() {
 // dimmed until today counts: the streak is still alive, but only until midnight
 const streak = s => h("span", { class: `streak${s.today ? "" : " pending"}`, id: "dayStreak",
   title: s.today ? tr("Серия: {n} дн. подряд — сегодня засчитано", { n: s.current })
-    : tr("Серия: {n} дн. подряд — сегодня ещё не засчитано, не прерви", { n: s.current }) }, `🔥 ${s.current}`);
+    : tr("Серия: {n} дн. подряд — сегодня ещё не засчитано, не прерви", { n: s.current }) }, tr("серия {n}", { n: s.current }));
 
 // the daily puzzle: solved → time linking to its review; otherwise a link that starts it
 const dailyItem = d => d.result
   ? h("a", { href: `#/review/${d.result.game_id}`, id: "dayDaily",
-    title: tr("Задача дня решена — разбор") }, `📅 ✓ ${fmtTime(d.result.time_ms)}`)
-  : h("a", { href: "#/play?daily=1", id: "dayDaily" }, tr("📅 задача дня →"));
+    title: tr("Задача дня решена — разбор") }, tr("задача дня ✓ {time}", { time: fmtTime(d.result.time_ms) }))
+  : h("a", { href: "#/play?daily=1", id: "dayDaily" }, tr("задача дня →"));
 
 /** load() refetches; on an error the line just stays hidden — it is a reminder, not a page. */
 export function dayStrip() {
