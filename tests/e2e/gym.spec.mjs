@@ -522,8 +522,10 @@ try {
   // «＋ новая» and zen sit next to the timer; mid-game the first click only asks
   ok(await page.$eval("#newGameTop", e => e.closest(".bar").contains(document.querySelector("#timer"))), "new game + zen next to the timer");
   ok(await page.$$eval(".main-col .bar .zen-btn", els => els.length === 1), "zen toggle above the board, not below");
-  ok(await page.$$eval("#keysHelp .key-row", rows => rows.length === 14
-    && rows.some(r => r.textContent === "Pпауза" && /время стоит/.test(r.title))), "«Клавиши»: 14 rows, the details in tooltips");
+  ok(await page.$$eval("#keysHelp .key-row", rows => rows.length === 16
+    && rows.some(r => r.textContent === "Pпауза" && /время стоит/.test(r.title))
+    && rows.some(r => r.textContent === "Shift+кликдобавить в группу" && /Esc — снять группу/.test(r.title))),
+     "«Клавиши»: 16 rows, the details in tooltips, Shift+click for a group");
   await page.click("#newGameTop");
   ok((await page.textContent("#newGameTop")).includes("Бросить"), "«＋ новая» mid-game asks first");
   await page.waitForTimeout(3200);
@@ -567,6 +569,84 @@ try {
   ok(await page.waitForFunction(() => location.hash === "#/play").then(() => true, () => false), "Esc on another page goes to «Играть»");
   await page.goto(`${BASE}/`);
   ok(await page.waitForSelector("#nav a.active[data-route=play]").then(() => true, () => false), "the main page is «Играть»");
+
+  // --- 3b. a group of cells: Shift+click / Shift+arrows select it, a digit, a note or ⌫ goes into every cell ---
+  const gM = await startGame(page, { level: "easy", mode: "hardcore", grade: "" });
+  const eM = [...gM.givens].map((c, i) => (c === "0" ? i : -1)).filter(i => i >= 0);
+  const selCount = () => page.$$eval("#board .cell.sel", els => els.length);
+  const group = async (...cells) => {
+    await page.click(cellSel(cells[0]));
+    for (const c of cells.slice(1)) await page.click(cellSel(c), { modifiers: ["Shift"] });
+  };
+  await group(eM[0], eM[1], eM[2]);
+  ok(await selCount() === 3, "group: Shift+click selects three cells", String(await selCount()));
+  await page.click(cellSel(eM[2]), { modifiers: ["Shift"] });
+  ok(await selCount() === 2 && !(await page.$eval(cellSel(eM[2]), e => e.classList.contains("sel"))),
+     "group: Shift+click on a selected cell takes it out");
+  await page.click(cellSel(eM[3]));
+  ok(await selCount() === 1, "group: a plain click drops it");
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Shift+ArrowRight");
+  ok(await selCount() === 3, "group: Shift+→ twice grows it to three cells", String(await selCount()));
+  await page.keyboard.press("ArrowLeft");
+  ok(await selCount() === 1, "group: an arrow without Shift drops it");
+  const notesOf = i => page.$$eval(`${cellSel(i)} .notes span[data-v]`, els => els.map(e => e.dataset.v).join(""));
+  const valOf = i => page.$eval(cellSel(i), e => (e.querySelector(".notes") ? "" : e.textContent.trim()));
+  await group(eM[0], eM[1]);
+  await page.keyboard.press("Shift+Digit4");
+  ok(await notesOf(eM[0]) === "4" && await notesOf(eM[1]) === "4", "group: Shift+4 puts the note into both cells");
+  await page.keyboard.press("Shift+Digit4");
+  ok(await notesOf(eM[0]) === "" && await notesOf(eM[1]) === "", "group: Shift+4 again takes it off both");
+  await page.click(cellSel(eM[0]));
+  await page.keyboard.press("Shift+Digit6");
+  await page.click(cellSel(eM[1]), { modifiers: ["Shift"] });
+  await page.keyboard.press("Shift+Digit6");
+  ok(await notesOf(eM[0]) === "6" && await notesOf(eM[1]) === "6", "group: a note some cells lack goes to them, the rest keep it");
+  await page.keyboard.press("Backspace");
+  ok(await notesOf(eM[0]) === "" && await notesOf(eM[1]) === "", "group: ⌫ wipes every cell");
+  await page.keyboard.press("Control+z");
+  ok(await notesOf(eM[0]) === "6" && await notesOf(eM[1]) === "6", "group: one Ctrl+Z brings the wiped notes back");
+  await group(eM[0], eM[1]);
+  await page.keyboard.press("Backspace");
+  const xM = 1, dM = 2;
+  await typeAt(page, eM[2], xM);
+  await group(eM[0], eM[1], eM[2]);
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(eM[0]) === String(dM) && await valOf(eM[1]) === String(dM) && await valOf(eM[2]) === String(xM),
+     "group: a digit goes into every empty cell, the filled one stays");
+  await page.keyboard.press("Control+z");
+  ok(await valOf(eM[0]) === "" && await valOf(eM[1]) === "" && await valOf(eM[2]) === String(xM) && await selCount() === 1,
+     "group: one Ctrl+Z takes the digits back and drops the group");
+  await page.waitForTimeout(1300);
+  const mvM = (await api(`/api/games/${gM.id}`)).moves.slice(-4);
+  ok(mvM.map(m => `${m.kind}:${m.cell}:${m.value}`).join(" ") === `place:${eM[0]}:${dM} place:${eM[1]}:${dM} undo:${eM[0]}:0 undo:${eM[1]}:0`
+     && mvM[0].t_ms === mvM[1].t_ms, "group: move log has a place per cell (one t_ms) and an undo per cell", JSON.stringify(mvM));
+  const gvM = [...gM.givens].findIndex(c => c !== "0");
+  const gvText = await page.$eval(cellSel(gvM), e => e.textContent.trim());
+  await group(eM[0], gvM);
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(gvM) === gvText && await valOf(eM[0]) === String(dM),
+     "group: a given cell in the group stays as it is, the empty one gets the digit", `${gvText} ${await valOf(gvM)} ${await valOf(eM[0])}`);
+  await page.keyboard.press("Control+z");
+  ok(await valOf(eM[0]) === "" && await valOf(gvM) === gvText, "group: Ctrl+Z takes the digit back from the empty cell of that group");
+  await group(eM[0], eM[1]);
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(eM[0]) === String(dM) && await valOf(eM[1]) === String(dM), "group: a digit goes into both cells again");
+  await page.keyboard.press(`Digit${dM}`);
+  ok(await valOf(eM[0]) === "" && await valOf(eM[1]) === "", "group: the same digit again clears the group");
+  await page.keyboard.press("Control+z");
+  ok(await valOf(eM[0]) === String(dM) && await valOf(eM[1]) === String(dM), "group: Ctrl+Z after the clearing brings both digits back");
+  await page.keyboard.press("Control+y");
+  ok(await valOf(eM[0]) === "" && await valOf(eM[1]) === "", "group: Ctrl+Y redoes the group clearing");
+  // Esc drops a group first; with no group it asks as before (and the abandoned game lets section 4's paste open the editor)
+  await group(eM[0], eM[1]);
+  await page.keyboard.press("Escape");
+  ok(await selCount() === 1 && !(await page.$("#confirm")), "group: Esc drops it without the dialog");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#confirm");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector("#resultsCard");
+  ok((await api(`/api/games/${gM.id}`)).status === "abandoned", "group: with no group Esc asks as before, Enter abandons");
 
   // --- 4. Ctrl+V of an ASCII grid → custom puzzle -------------------------------------------
   const ascii = `1 . . | . . 6 | . . .

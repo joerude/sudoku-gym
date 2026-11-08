@@ -13,7 +13,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
   const S = {
     puzzle, gameId, mode, limit,
     given: givens.map(Boolean), vals: givens.slice(), sol: toDigits(puzzle.solution),
-    notes: Array(81).fill(0), sel: givens.indexOf(0), notesMode: false, autoNotes: true,
+    notes: Array(81).fill(0), sel: givens.indexOf(0), multi: new Set(), notesMode: false, autoNotes: true,
     undo: [], redo: [], showBad: new Set(), mistakes: 0, seq: 0, hints: 0,
     start: performance.now(), end: null, status: "active", msg: null, result: null,
     pausedAt: null, pausedMs: 0, pauses: 0,
@@ -30,8 +30,9 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     S.pausedAt = null;
   }
 
-  function log(kind, cell, value) {
-    const m = { seq: ++S.seq, t_ms: Math.round(clock(performance.now())), kind };
+  /** Queue one move; t — game time to stamp it with (default: now), so a group action can give all its moves one t_ms. */
+  function log(kind, cell, value, t = clock(performance.now())) {
+    const m = { seq: ++S.seq, t_ms: Math.round(t), kind };
     if (cell !== undefined) m.cell = cell;
     if (value !== undefined) m.value = value;
     queue.push(m);
@@ -59,6 +60,57 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
 
   // a new action invalidates what was undone, as in any editor
   function pushUndo(i) { S.undo.push({ i, val: S.vals[i], notes: S.notes.slice() }); S.redo.length = 0; }
+  /** One undo step for several cells about to change (the format of clear()). */
+  function pushBatch(cells) { S.undo.push({ batch: cells.map(i => ({ i, val: S.vals[i] })), notes: S.notes.slice() }); S.redo.length = 0; }
+  /** Put digit v into cell i (notes gone, peers' notes stripped under auto-notes), log it, count a mistake. */
+  function placeDigit(i, v, t) {
+    S.vals[i] = v; S.notes[i] = 0; S.showBad.delete(i);
+    if (S.autoNotes) for (const p of PEERS[i]) S.notes[p] &= ~(1 << v);
+    log("place", i, v, t);
+    if (v !== S.sol[i]) S.mistakes++;
+  }
+  /** Wipe the digit and the notes of cell i and log it. */
+  function wipe(i, t) {
+    S.vals[i] = 0; S.notes[i] = 0; S.showBad.delete(i);
+    log("erase", i, undefined, t);
+  }
+  /** Cells an action works on: the group (2+ cells) or the selected cell, givens left out. */
+  const targets = () => (S.multi.size > 1 ? [...S.multi] : [S.sel]).filter(i => i >= 0 && !S.given[i]);
+
+  /** A digit or a note into every cell of the group: one undo step, one logged move per changed cell.
+   * A digit goes into the empty cells only; the same digit in every cell again clears them. A note goes to all
+   * empty cells if any lacks it, else it comes off all of them. */
+  function groupInput(v, asNote) {
+    if (locked()) return;
+    const cells = targets(), empty = cells.filter(i => !S.vals[i]), t = clock(performance.now());
+    if (asNote) {
+      const add = empty.some(i => !(S.notes[i] & (1 << v)));
+      const change = empty.filter(i => !!(S.notes[i] & (1 << v)) !== add);
+      if (!change.length) return;
+      pushBatch(change);
+      for (const i of change) { S.notes[i] ^= 1 << v; log("note", i, v, t); }
+    } else if (empty.length) {
+      pushBatch(empty);
+      for (const i of empty) placeDigit(i, v, t);
+      say(null);
+      afterPlace();
+    } else if (cells.length && cells.every(i => S.vals[i] === v)) {
+      return groupErase();
+    } else return;
+    onChange();
+  }
+
+  /** ⌫ on a group: every cell with a digit or notes is wiped, one undo step. */
+  function groupErase() {
+    if (locked()) return;
+    const cells = targets().filter(i => S.vals[i] || S.notes[i]);
+    if (!cells.length) return;
+    pushBatch(cells);
+    const t = clock(performance.now());
+    for (const i of cells) wipe(i, t);
+    say(null);
+    onChange();
+  }
   /** The current state of the cells an undo/redo entry touches — what the opposite stack needs to come back. */
   const snapshot = e => ({ batch: (e.batch || [e]).map(({ i }) => ({ i, val: S.vals[i] })), notes: S.notes.slice() });
   /** Put the cells and notes of an entry back; logged as «undo» (a restore, not a new placement or mistake). */
@@ -67,6 +119,7 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       S.vals[i] = val; S.sel = i; S.showBad.delete(i);
       log("undo", i, val);
     }
+    S.multi.clear();
     S.notes = e.notes;
     afterPlace();
     onChange();
@@ -74,14 +127,41 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
 
   const api = {
     S, elapsed, queue,
-    select(i) { S.sel = i; onChange(); },
+    select(i) { S.sel = i; S.multi.clear(); onChange(); },
     move(key) {
       S.sel = stepCell(S.sel < 0 ? 0 : S.sel, key);
+      S.multi.clear();
       onChange();
+    },
+    /** Shift+click: the cell joins the group, or leaves it if it is in already (one cell left = no group). */
+    extend(i) {
+      if (S.multi.size < 2) { S.multi.clear(); if (S.sel >= 0) S.multi.add(S.sel); }
+      if (S.multi.has(i) && S.multi.size > 1) {
+        S.multi.delete(i);
+        if (S.sel === i) S.sel = [...S.multi].at(-1);
+        if (S.multi.size < 2) S.multi.clear();
+      } else { S.multi.add(i); S.sel = i; }
+      onChange();
+    },
+    /** Shift+arrow: one step on, and the new cell joins the group. */
+    extendMove(key) {
+      if (S.sel < 0) return this.move(key);
+      if (S.multi.size < 2) { S.multi.clear(); S.multi.add(S.sel); }
+      S.sel = stepCell(S.sel, key);
+      S.multi.add(S.sel);
+      onChange();
+    },
+    /** Drop the group (the selected cell stays); false if there was none. */
+    clearMulti() {
+      if (S.multi.size < 2) return false;
+      S.multi.clear();
+      onChange();
+      return true;
     },
     toggleNotes() { S.notesMode = !S.notesMode; onChange(); },
     setAutoNotes(on) { S.autoNotes = on; },
     input(v, asNote) {
+      if (S.multi.size > 1) return groupInput(v, asNote);
       const i = S.sel;
       if (i < 0 || S.given[i] || locked()) return;
       if (asNote) {
@@ -92,21 +172,18 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
       } else {
         if (S.vals[i] === v) return this.erase();  // the same digit again clears the cell
         pushUndo(i);
-        S.vals[i] = v; S.notes[i] = 0; S.showBad.delete(i);
-        if (S.autoNotes) for (const p of PEERS[i]) S.notes[p] &= ~(1 << v);
-        log("place", i, v);
-        if (v !== S.sol[i]) S.mistakes++;
+        placeDigit(i, v);
         say(null);
         afterPlace();
       }
       onChange();
     },
     erase() {
+      if (S.multi.size > 1) return groupErase();
       const i = S.sel;
       if (i < 0 || S.given[i] || locked() || (!S.vals[i] && !S.notes[i])) return;
       pushUndo(i);
-      S.vals[i] = 0; S.notes[i] = 0; S.showBad.delete(i);
-      log("erase", i);
+      wipe(i);
       say(null);
       onChange();
     },
@@ -114,10 +191,10 @@ export function startGame({ puzzle, gameId, mode, limit, onChange, onEnd, onQueu
     clear() {
       if (locked()) return;
       const cells = [];
-      for (let i = 0; i < 81; i++) if (!S.given[i] && (S.vals[i] || S.notes[i])) cells.push({ i, val: S.vals[i] });
+      for (let i = 0; i < 81; i++) if (!S.given[i] && (S.vals[i] || S.notes[i])) cells.push(i);
       if (!cells.length) return;
-      S.undo.push({ batch: cells, notes: S.notes.slice() }); S.redo.length = 0;
-      for (const { i } of cells) { S.vals[i] = 0; log("erase", i); }
+      pushBatch(cells);
+      for (const i of cells) { S.vals[i] = 0; log("erase", i); }
       S.notes = Array(81).fill(0); S.showBad.clear();
       say(null);
       onChange();

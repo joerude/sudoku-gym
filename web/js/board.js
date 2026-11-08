@@ -44,9 +44,10 @@ export function parseGrid(text) {
 }
 
 /**
- * createBoard(el, {onCell, onCandidate, interactive})
+ * createBoard(el, {onCell, onCandidate, interactive}) — onCell(i, event): a click on cell i
  * render(view): view = {
  *   values: number[81], given: boolean[81], sel?: number, highlight?: boolean (peers + same digit),
+ *   multi?: Set<number> — more selected cells (a group), shown like sel; peers and digits still follow sel,
  *   notes?: (i) => number[] | null  — small digits in empty cells,
  *   notesBig?: boolean, pickable?: boolean (candidates clickable → onCandidate(i, v)),
  *   cellClass?: (i) => string[], candClass?: (i, v) => string, ghost?: Map<cell, digit>, locked?: boolean,
@@ -81,7 +82,7 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
     c.addEventListener("click", e => {
       const span = e.target.closest("span[data-v]");
       if (span && onCandidate && span.classList.contains("pick")) { onCandidate(i, +span.dataset.v); return; }
-      onCell?.(i);
+      onCell?.(i, e);
     });
     cells.push({ el: c, base: "cell" + (k % 3 === 2 && k < 8 ? " br" : "") + (r % 3 === 2 && r < 8 ? " bb" : "")
       + (k === 8 ? " c8" : "") + (r === 8 ? " r8" : "") });
@@ -132,7 +133,7 @@ export function createBoard(el, { onCell, onCandidate, interactive = true } = {}
       if (given[i]) cls.push("given");
       if (peers.has(i)) cls.push("peer");
       if (sameCell && values[i] === selVal) cls.push("same");
-      if (i === sel) cls.push("sel");
+      if (i === sel || view.multi?.has(i)) cls.push("sel");
       if (view.cellClass) cls.push(...view.cellClass(i));
       const ghost = view.ghost?.get(i);
       if (ghost && !values[i]) cls.push("ghost");

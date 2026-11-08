@@ -216,8 +216,8 @@ export function mount(el, params, query) {
   ui.day = dayStrip();
   setup.box.prepend(ui.day.el);
   ui.editor = editorSection();
-  ui.board = createBoard(boardEl, { onCell: i => {
-    if (edit) { edit.sel = i; refresh(); } else if (G) { digit = 0; G.select(i); }
+  ui.board = createBoard(boardEl, { onCell: (i, e) => {
+    if (edit) { edit.sel = i; refresh(); } else if (G) { digit = 0; if (e.shiftKey) G.extend(i); else G.select(i); }
   } });
   ui.pad = createPad(padEl, { onDigit: v => press(v, G?.S.notesMode), onErase: () => (edit ? editCell(0, false) : G?.erase()) });
   ui.root = h("div", { class: "layout" },
@@ -283,7 +283,9 @@ function keysHelp() {
       row(["Shift+1–9"], tr("заметка")),
       row(["N", tr("пробел")], tr("режим заметок"), tr("или Т в русской раскладке")),
       row(["0", "⌫"], tr("стереть"), tr("Backspace или Delete")),
-      row(["← ↑ ↓ →"], tr("перемещение"))),
+      row(["← ↑ ↓ →"], tr("перемещение")),
+      row([tr("Shift+клик")], tr("добавить в группу"), tr("цифра, заметка и ⌫ — во все клетки группы; Esc — снять группу")),
+      row(["Shift+← ↑ ↓ →"], tr("расширить группу"))),
     h("div", {},
       row(["Ctrl+Z"], tr("отменить")),
       row(["Ctrl+Y"], tr("вернуть"), tr("или Ctrl+Shift+Z")),
@@ -336,7 +338,7 @@ function refresh() {
   const hv = hint && !over ? ladderView(hint.lad, hint.level) : null;
   const cands = hv?.elims.size ? computeCandidates(S.vals) : null;
   ui.board.render({
-    values: S.vals, given: S.given, sel: over ? -1 : S.sel, highlight: true, locked: over && S.status !== "solved",
+    values: S.vals, given: S.given, sel: over ? -1 : S.sel, multi: over ? null : S.multi, highlight: true, locked: over && S.status !== "solved",
     digit: hv?.digit || digit, ghost: hv?.ghost,
     notes: i => (S.vals[i] ? null : cands && hv.elims.has(i) && !S.notes[i] ? cands[i] : bits(S.notes[i])),
     candClass: (i, v) => (hv?.elims.get(i)?.includes(v) ? "c-x" : ""),
@@ -622,11 +624,12 @@ function renderHint(over) {
     tr("Исправь это — и «Подсказка» покажет следующий ход.")));
 }
 
-/** Esc on «Играть» (app.js): a game in progress is thrown away only after a yes in the dialog. */
+/** Esc on «Играть» (app.js): a group of cells is dropped first; a game in progress is thrown away only after a yes in the dialog. */
 export function escape() {
   if (!ui || asking) return;
   if (edit) { closeEditor(); return; }
   if (G?.S.status !== "active") return;
+  if (G.clearMulti()) return;  // Esc drops a group of cells first
   asking = confirmDialog({
     title: tr("Бросить партию?"), text: tr("Партия запишется как брошенная."), ok: tr("Бросить"),
     onOk: () => { if (G?.S.status !== "active") return; G.S.msg = { text: tr("Партия брошена"), cls: "bad" }; endGame("abandoned"); },
@@ -667,7 +670,7 @@ function handleKey(e) {
   if (e.code === "KeyP") { if (G.S.status === "active") G.pause(); e.preventDefault(); return; }
   const d = /^(?:Digit|Numpad)([0-9])$/.exec(e.code);
   if (d && d[1] !== "0") { press(+d[1], e.shiftKey || G.S.notesMode); e.preventDefault(); return; }
-  if (e.key.startsWith("Arrow")) { digit = 0; G.move(e.key); e.preventDefault(); return; }
+  if (e.key.startsWith("Arrow")) { digit = 0; if (e.shiftKey) G.extendMove(e.key); else G.move(e.key); e.preventDefault(); return; }
   if (e.key === "Backspace" || e.key === "Delete" || (d && d[1] === "0")) { G.erase(); e.preventDefault(); return; }
   if ("nNтТ".includes(e.key) && e.key.length === 1 || e.code === "Space") { G.toggleNotes(); e.preventDefault(); }
 }
