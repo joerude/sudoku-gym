@@ -6,6 +6,10 @@
 
 use std::fmt;
 
+pub mod solver;
+
+pub use solver::{count_solutions, solve};
+
 pub type Grid = [u8; 81]; // 0 = empty
 pub type Cands = [u16; 81];
 
