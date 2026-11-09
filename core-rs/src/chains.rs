@@ -78,7 +78,7 @@ fn strong_links(cands: &Cands, one_digit: bool) -> Vec<Vec<u16>> {
     }
     if !one_digit {
         for i in 0..81u8 {
-            let c = cands[i as usize];
+            let c = cands[i as usize] & 0x3FE; // digits 1-9 only
             if c.count_ones() == 2 {
                 let (x, y) = (c.trailing_zeros() as u8, (15 - c.leading_zeros()) as u8);
                 link(node(i, x), node(i, y));
@@ -184,6 +184,7 @@ fn path(m: u16, prev_on: &[u16], prev_off: &[u16]) -> Vec<u16> {
 }
 
 /// The shortest chain that removes a candidate; a chain on one digit wins a tie (and is easier to see).
+/// Candidate bits outside 1-9 (bit 0, bits 10 and up) are ignored.
 pub fn chain_step(cands: &Cands, limit: usize) -> Option<Step> {
     let one = shortest_chain(cands, true, limit);
     let many = shortest_chain(cands, false, one.as_ref().map_or(limit, |f| f.links - 1));
@@ -227,6 +228,24 @@ mod tests {
         assert_eq!(s.eliminations, [(27, 1)]);
         assert_eq!(s.chain, [(0, 1), (4, 1), (49, 1), (32, 1)]);
         assert_eq!(s.pattern, [0, 4, 49, 32]);
+    }
+
+    #[test]
+    fn stray_candidate_bits_are_ignored() {
+        let clean = cands_from(&[
+            ((1, 1), &[1, 2]),
+            ((1, 5), &[1, 3]),
+            ((6, 5), &[1, 4]),
+            ((4, 6), &[1, 5]),
+            ((4, 1), &[1, 6]),
+            ((8, 1), &[1, 7]),
+        ]);
+        let mut dirty = clean;
+        dirty[0] |= 1; // bit 0 on a two-candidate cell
+        dirty[4] |= 1 << 12; // a bit above digit 9
+        dirty[80] |= 1 << 15 | 1; // the last cell, which has no candidates otherwise
+        assert_eq!(chain_step(&dirty, MAX_CHAIN), chain_step(&clean, MAX_CHAIN));
+        assert!(chain_step(&dirty, MAX_CHAIN).is_some());
     }
 
     #[test]

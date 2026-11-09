@@ -42,5 +42,8 @@ pub fn chain_step_js(cands: &[u16]) -> Result<String, JsError> {
     let c: Cands = cands
         .try_into()
         .map_err(|_| JsError::new(&format!("нужно 81 маску кандидатов, получено {}", cands.len())))?;
+    if let Some(i) = c.iter().position(|&m| m & !0x3FE != 0) {
+        return Err(JsError::new(&format!("маска кандидатов {i}: только цифры 1–9")));
+    }
     Ok(crate::chain_step(&c, MAX_CHAIN).map_or("null".into(), |s| s.to_json()))
 }
