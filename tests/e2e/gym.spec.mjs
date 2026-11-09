@@ -908,6 +908,18 @@ try {
   await page.waitForSelector("#gamesTable");
   const byLevel = await page.textContent("#byLevel");
   ok(/лёгкий/.test(byLevel) && /hardcore/.test(byLevel) && /original/.test(byLevel), "stats: level/mode table");
+  const act = await api("/api/activity"), todayRec = act.days.find(x => x.day === act.today);
+  const heatToday = () => page.$eval(`#activity rect[data-day="${act.today}"]`, r => r.getAttribute("class"));
+  ok(await page.$eval("#heatModes button.on", b => b.dataset.mode) === "games", "heatmap: games by default");
+  ok(todayRec && todayRec.drills >= 1 && (await heatToday()) !== "heat0", "heatmap: today has games and drills", JSON.stringify(todayRec));
+  await page.click('#heatModes button[data-mode="drills"]');
+  ok(await page.$eval('#heatModes button[data-mode="drills"]', b => b.getAttribute("aria-pressed") === "true"), "heatmap: the drills button is pressed");
+  const lv = [1, 10, 25, 50].filter(t => todayRec.drills >= t).length;
+  ok((await heatToday()) === `heat${lv}`, "heatmap: drills mode shades by drills", `${await heatToday()} vs heat${lv}`);
+  await page.reload();
+  await page.waitForSelector("#heatModes button.on");
+  ok(await page.$eval("#heatModes button.on", b => b.dataset.mode) === "drills", "heatmap: the mode is remembered");
+  await page.click('#heatModes button[data-mode="games"]');
   await page.waitForSelector("#recordsStats table.records");
   ok(await page.$$eval("#recordsStats td[data-rec] a", as => as.length >= 1), "stats: records table with links to the record games");
   ok(await page.$$eval("#gamesTable tbody tr", r => r.length >= 5), "stats: recent games listed");
