@@ -4,7 +4,7 @@
 
 ## Совпадение с Python
 
-`tools/export_golden.py` выгружает ответы Python-ядра в `core-rs/golden/` (не в git), `tests/parity.rs` сверяет с ними: `grade`, решение и число решений всех головоломок; кандидаты, `find_steps` и `easiest_steps` позиций из партий; `find_steps` и `chain_step` головоломок, где техники 1–4 кончаются. Исключения сравниваются отсортированными: в Y-Wing и в голых парах Python обходит множества в порядке хеш-таблицы, а не по возрастанию.
+`tools/export_golden.py` выгружает ответы Python-ядра в `core-rs/golden/` (не в git), `tests/parity.rs` сверяет с ними: `grade`, решение и число решений всех головоломок; кандидаты, `find_steps` и `easiest_steps` позиций из партий; `chain_step` головоломок, где техники 1–4 кончаются (`find_steps` там ничего не находит, это проверяется тоже). Исключения сравниваются отсортированными: в Y-Wing и в голых парах Python обходит множества в порядке хеш-таблицы, а не по возрастанию.
 
 Сначала нужны эталонные данные: без `golden/` `cargo test` падает с сообщением об этом.
 
@@ -12,6 +12,18 @@
 python3.14 tools/export_golden.py   # БД по умолчанию data/sudoku.db; из worktree — --db <путь к основной копии>/data/sudoku.db
 cargo test --release --manifest-path core-rs/Cargo.toml
 ```
+
+## WASM
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.100 --locked
+cargo build --release --manifest-path core-rs/Cargo.toml --target wasm32-unknown-unknown --features wasm
+wasm-bindgen --target web --out-dir core-rs/pkg core-rs/target/wasm32-unknown-unknown/release/sudoku_core.wasm
+python3.14 -m http.server -d core-rs 8790 --bind 127.0.0.1   # демо: http://127.0.0.1:8790/demo/
+```
+
+JS: `grade(givens)`, `solve(givens)`, `countSolutions(givens, limit)`, `candidates(grid)` → `Uint16Array`, `easiestSteps(grid)` → JSON, `chainStep(cands)` → JSON или `"null"`.
 
 ## Скорость
 
@@ -29,15 +41,3 @@ python3.14 tools/bench_core.py
 cargo run --release --manifest-path core-rs/Cargo.toml --example bench
 node core-rs/demo/bench.mjs
 ```
-
-## WASM
-
-```bash
-rustup target add wasm32-unknown-unknown
-cargo install wasm-bindgen-cli --version 0.2.100 --locked
-cargo build --release --manifest-path core-rs/Cargo.toml --target wasm32-unknown-unknown --features wasm
-wasm-bindgen --target web --out-dir core-rs/pkg core-rs/target/wasm32-unknown-unknown/release/sudoku_core.wasm
-python3.14 -m http.server -d core-rs 8790   # демо: http://127.0.0.1:8790/demo/
-```
-
-JS: `grade(givens)`, `solve(givens)`, `countSolutions(givens, limit)`, `candidates(grid)` → `Uint16Array`, `easiestSteps(grid)` → JSON, `chainStep(cands)` → JSON или `"null"`.
