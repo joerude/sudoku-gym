@@ -127,8 +127,18 @@ pub const TIERS: [&[Technique]; 4] = [
 
 impl Technique {
     /// What find_steps knows, in TECH_TIER order (its default in Python).
-    pub const GRADED: [Technique; 10] =
-        [NakedSingle, HiddenSingleBox, HiddenSingleRow, HiddenSingleCol, Pointing, Claiming, NakedPair, HiddenPair, XWing, YWing];
+    pub const GRADED: [Technique; 10] = [
+        NakedSingle,
+        HiddenSingleBox,
+        HiddenSingleRow,
+        HiddenSingleCol,
+        Pointing,
+        Claiming,
+        NakedPair,
+        HiddenPair,
+        XWing,
+        YWing,
+    ];
 
     /// The id the Python core, the database and the UI use.
     pub fn slug(self) -> &'static str {

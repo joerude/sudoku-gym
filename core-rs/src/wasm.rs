@@ -39,9 +39,8 @@ pub fn easiest_steps_js(g: &str) -> Result<String, JsError> {
 
 #[wasm_bindgen(js_name = chainStep)]
 pub fn chain_step_js(cands: &[u16]) -> Result<String, JsError> {
-    let c: Cands = cands
-        .try_into()
-        .map_err(|_| JsError::new(&format!("нужно 81 маску кандидатов, получено {}", cands.len())))?;
+    let c: Cands =
+        cands.try_into().map_err(|_| JsError::new(&format!("нужно 81 маску кандидатов, получено {}", cands.len())))?;
     if let Some(i) = c.iter().position(|&m| m & !0x3FE != 0) {
         return Err(JsError::new(&format!("маска кандидатов {i}: только цифры 1–9")));
     }
