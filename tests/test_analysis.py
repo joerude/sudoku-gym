@@ -357,8 +357,21 @@ class ActivityTest(unittest.TestCase):
         self.attempt("2026-10-31", correct=0, valid_other=1)
         a = activity(self.conn, today="2026-11-01")
         self.assertEqual(a["today"], "2026-11-01")
-        self.assertEqual(a["days"], [{"day": "2026-10-31", "games": 1, "drills": 1}])
-        self.assertEqual(a["totals"], {"games": 1, "drills": 1, "active_days": 1})
+        # time: all three finished games (100 s each) and all four attempts (1 s each)
+        self.assertEqual(a["days"], [{"day": "2026-10-31", "games": 1, "drills": 1, "ms": 304000}])
+        self.assertEqual(a["totals"], {"games": 1, "drills": 1, "ms": 304000, "active_days": 1})
+
+    def test_time_only_day_keeps_no_streak(self):
+        self.game("2026-10-30")
+        self.game("2026-10-31", "abandoned")
+        self.attempt("2026-10-31", correct=0)
+        self.conn.execute(  # active: no time yet
+            "INSERT INTO games (puzzle_id, mode, started_at) VALUES (?, 'hardcore', '2026-10-31T13:00:00')", (self.pid,)
+        )
+        a = activity(self.conn, today="2026-11-01")
+        self.assertEqual(a["days"][-1], {"day": "2026-10-31", "games": 0, "drills": 0, "ms": 101000})
+        self.assertEqual(a["streak"], {"current": 0, "best": 1, "today": False})
+        self.assertEqual(a["totals"]["active_days"], 1)
 
     def test_streak_alive_until_day_ends(self):
         for d in ("2026-10-25", "2026-10-26", "2026-10-29", "2026-10-30", "2026-10-31"):
@@ -386,7 +399,7 @@ class ActivityTest(unittest.TestCase):
                 "today": "2026-11-01",
                 "days": [],
                 "streak": {"current": 0, "best": 0, "today": False},
-                "totals": {"games": 0, "drills": 0, "active_days": 0},
+                "totals": {"games": 0, "drills": 0, "ms": 0, "active_days": 0},
             },
         )
         self.assertRegex(activity(self.conn)["today"], r"^\d{4}-\d{2}-\d{2}$")

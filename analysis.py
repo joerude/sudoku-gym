@@ -317,21 +317,29 @@ def daily_history(conn, limit: int = 60) -> dict:
 
 
 def activity(conn, today: str | None = None) -> dict:
-    """GitHub-style calendar: points per local day (solved games + correct drill attempts), streaks, yearly totals.
+    """GitHub-style calendar: points per local day (solved games + correct drill attempts), time spent, streaks,
+    yearly totals.
 
-    The window is 53 weeks, Monday-first, ending with today's week. The current streak ends today or, while today is
-    still empty, yesterday — it is not broken until the day is over."""
+    Time (ms) counts every finished game and every drill attempt, so a day of abandoned games has time but no points:
+    it is in "days", yet it neither makes nor keeps a streak. The window is 53 weeks, Monday-first, ending with today's
+    week. The current streak ends today or, while today is still empty, yesterday — it is not broken until the day is
+    over."""
     today = today or local_today(conn)
     per_day = {}
-    for day, n in conn.execute(
-        "SELECT date(started_at, 'localtime'), COUNT(*) FROM games WHERE status = 'solved' GROUP BY 1"
+    rec = lambda day: per_day.setdefault(day, {"day": day, "games": 0, "drills": 0, "ms": 0})  # noqa: E731
+    for day, n, ms in conn.execute(
+        "SELECT date(started_at, 'localtime'), SUM(status = 'solved'), SUM(COALESCE(time_ms, 0)) FROM games"
+        " WHERE status != 'active' GROUP BY 1"
     ):
-        per_day.setdefault(day, {"day": day, "games": 0, "drills": 0})["games"] = n
-    for day, n in conn.execute(
-        "SELECT date(a.at, 'localtime'), COUNT(*) FROM drill_attempts a"
-        f" WHERE a.correct = 1 AND NOT {NEUTRAL} GROUP BY 1"
+        r = rec(day)
+        r["games"], r["ms"] = n, r["ms"] + ms
+    for day, n, ms in conn.execute(
+        f"SELECT date(a.at, 'localtime'), SUM(a.correct = 1 AND NOT {NEUTRAL}), SUM(a.time_ms) FROM drill_attempts a"
+        " GROUP BY 1"
     ):
-        per_day.setdefault(day, {"day": day, "games": 0, "drills": 0})["drills"] = n
+        r = rec(day)
+        r["drills"], r["ms"] = n, r["ms"] + ms
+    active = {d for d, r in per_day.items() if r["games"] or r["drills"]}
     t = date.fromisoformat(today)
     start = (t - timedelta(days=t.weekday() + 52 * 7)).isoformat()
     year_ago = (t - timedelta(days=365)).isoformat()
@@ -340,20 +348,21 @@ def activity(conn, today: str | None = None) -> dict:
 
     best = run = 0
     prev = None
-    for d in sorted(per_day):
+    for d in sorted(active):
         cur = date.fromisoformat(d)
         run = run + 1 if prev is not None and cur - prev == timedelta(days=1) else 1
         best, prev = max(best, run), cur
-    current, k = 0, t if today in per_day else t - timedelta(days=1)
-    while k.isoformat() in per_day:
+    current, k = 0, t if today in active else t - timedelta(days=1)
+    while k.isoformat() in active:
         current, k = current + 1, k - timedelta(days=1)
     return {
         "today": today,
         "days": days,
-        "streak": {"current": current, "best": best, "today": today in per_day},
+        "streak": {"current": current, "best": best, "today": today in active},
         "totals": {
             "games": sum(d["games"] for d in year),
             "drills": sum(d["drills"] for d in year),
-            "active_days": len(year),
+            "ms": sum(d["ms"] for d in year),
+            "active_days": sum(1 for d in year if d["day"] in active),
         },
     }
