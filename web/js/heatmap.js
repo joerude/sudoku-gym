@@ -1,5 +1,6 @@
 // GitHub-style activity calendar for #/stats: 53 weeks × 7 days, a point per solved game or correct drill.
-// A game takes minutes and a drill seconds, so the toggle shows games, drills or both, each with its own shades.
+// A game takes minutes and a drill seconds, so the toggle shows games, drills, time spent or points of both, each with
+// its own shades. Time counts abandoned games and wrong answers too: a day of only those is shaded in «Время» alone.
 import { lang, tr } from "./i18n.js";
 import { h } from "./ui.js";
 
@@ -14,9 +15,14 @@ const svg = (tag, attrs = {}, ...kids) => {
 const MODES = [
   { id: "games", name: "Партии", count: r => r.games, levels: [1, 2, 4, 7] },
   { id: "drills", name: "Упражнения", count: r => r.drills, levels: [1, 10, 25, 50] },
+  { id: "time", name: "Время", count: r => r.ms, levels: [1, 15, 30, 60].map(m => m * 60000) },
   { id: "all", name: "Вместе", count: r => r.games + r.drills, levels: [1, 5, 10, 20] },
 ];
 const MODE_KEY = "gym-heatmap";
+const dur = ms => {  // 0 → 0 мин, 20 s → 1 мин, 125 min → 2 ч 05 мин
+  const t = ms > 0 ? Math.max(1, Math.round(ms / 60000)) : 0;
+  return t < 60 ? tr("{m} мин", { m: t }) : tr("{h} ч {m} мин", { h: Math.floor(t / 60), m: String(t % 60).padStart(2, "0") });
+};
 const shade = (rec, m) => rec ? m.levels.filter(t => m.count(rec) >= t).length : 0;
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const locale = lang === "en" ? "en-GB" : "ru-RU";
@@ -49,7 +55,7 @@ export function heatmapCard(a) {
       const rec = byDay.get(iso(day));
       const cell = svg("rect", { x: L + w * (C + G), y: T + r * (C + G), width: C, height: C, rx: 2, "data-day": iso(day) });
       cells.push([cell, rec]);
-      const text = `${dayFmt.format(day)}: ` + (rec ? tr("партии: {g} · упражнения: {d}", { g: rec.games, d: rec.drills }) : tr("нет активности"));
+      const text = `${dayFmt.format(day)}: ` + (rec ? tr("партии: {g} · упражнения: {d} · время: {t}", { g: rec.games, d: rec.drills, t: dur(rec.ms) }) : tr("нет активности"));
       cell.addEventListener("mouseenter", () => { tip.textContent = text; tip.hidden = false; });
       cell.addEventListener("mousemove", e => { tip.style.left = `${e.clientX + 12}px`; tip.style.top = `${e.clientY + 12}px`; });
       cell.addEventListener("mouseleave", () => { tip.hidden = true; });
@@ -71,7 +77,8 @@ export function heatmapCard(a) {
   const s = a.streak, t = a.totals;
   const line = h("p", { class: "heat-sum", id: "activitySum" },
     h("b", {}, tr("Серия: {n} дн.", { n: s.current })), " · ", tr("лучшая: {n} дн.", { n: s.best }), " · ",
-    tr("за год: партий — {g}, упражнений — {d}, активных дней — {a}", { g: t.games, d: t.drills, a: t.active_days }));
+    tr("за год: партий — {g}, упражнений — {d}, время — {t}, активных дней — {a}",
+      { g: t.games, d: t.drills, t: dur(t.ms), a: t.active_days }));
   const wrap = h("div", { class: "heat-wrap" }, root);
   requestAnimationFrame(() => { wrap.scrollLeft = wrap.scrollWidth; });  // narrow screens: the recent weeks in view
   return h("section", { id: "activity" }, h("h2", {}, tr("Активность")),

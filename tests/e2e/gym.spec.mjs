@@ -919,6 +919,11 @@ try {
   await page.reload();
   await page.waitForSelector("#heatModes button.on");
   ok(await page.$eval("#heatModes button.on", b => b.dataset.mode) === "drills", "heatmap: the mode is remembered");
+  await page.click('#heatModes button[data-mode="time"]');
+  const lvT = [1, 15, 30, 60].filter(m => todayRec.ms >= m * 60000).length;
+  ok(todayRec.ms > 0 && (await heatToday()) === `heat${lvT}`, "heatmap: time mode shades by time spent", `${await heatToday()} vs heat${lvT}, ms=${todayRec.ms}`);
+  ok(/время — \d+ (ч \d+ )?мин/.test(await page.textContent("#activitySum")), "heatmap: the year line shows the time spent",
+    await page.textContent("#activitySum"));
   await page.click('#heatModes button[data-mode="games"]');
   await page.waitForSelector("#recordsStats table.records");
   ok(await page.$$eval("#recordsStats td[data-rec] a", as => as.length >= 1), "stats: records table with links to the record games");
