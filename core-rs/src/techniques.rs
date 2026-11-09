@@ -174,8 +174,8 @@ fn locked(cands: &Cands, t: Technique, steps: &mut Vec<Step>) {
 }
 
 fn naked_pairs(cands: &Cands, steps: &mut Vec<Step>) {
-    for u in 0..27 {
-        let empty: Vec<u8> = UNITS[u].iter().copied().filter(|&i| cands[i as usize] != 0).collect();
+    for (u, unit) in UNITS.iter().enumerate() {
+        let empty: Vec<u8> = unit.iter().copied().filter(|&i| cands[i as usize] != 0).collect();
         for (k, &a) in empty.iter().enumerate() {
             for &b in &empty[k + 1..] {
                 let ca = cands[a as usize];

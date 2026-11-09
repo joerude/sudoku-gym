@@ -14,6 +14,10 @@ pub mod techniques;
 
 pub use techniques::{candidates, easiest_steps, find_steps, grade};
 
+pub mod chains;
+
+pub use chains::{chain_step, MAX_CHAIN};
+
 pub type Grid = [u8; 81]; // 0 = empty
 pub type Cands = [u16; 81];
 
