@@ -18,6 +18,9 @@ pub mod chains;
 
 pub use chains::{chain_step, MAX_CHAIN};
 
+#[cfg(feature = "wasm")]
+mod wasm;
+
 pub type Grid = [u8; 81]; // 0 = empty
 pub type Cands = [u16; 81];
 

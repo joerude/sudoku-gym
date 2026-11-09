@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "pkg/sudoku_core.js is an ES module for both the demo page and the Node bench"
+}

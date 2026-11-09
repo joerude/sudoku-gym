@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rust-ядро в браузере</title>
+  <style>
+    :root { --bg: #fafaf7; --fg: #222; --muted: #777; --line: #ccc; --err: #b3261e; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1d1d1b; --fg: #e8e6e0; --muted: #999; --line: #444; --err: #f2b8b5; } }
+    body { margin: 0 auto; max-width: 760px; padding: 24px 16px; background: var(--bg); color: var(--fg);
+           font: 15px/1.5 system-ui, sans-serif; }
+    textarea { width: 100%; box-sizing: border-box; font: 14px/1.4 ui-monospace, monospace; background: transparent;
+               color: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+    button { margin-top: 8px; padding: 6px 14px; font: inherit; }
+    .muted { color: var(--muted); }
+    .err { color: var(--err); }
+    pre { white-space: pre-wrap; font: 13px/1.4 ui-monospace, monospace; border-top: 1px solid var(--line);
+          padding-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Rust-ядро в браузере</h1>
+  <p class="muted">Вставьте сетку: 81 клетка, 0 или точка — пусто, линии сетки пропускаются.</p>
+  <textarea id="grid" rows="4">000009050080030000705200001850060200020000010006050043100005304000040060070300000</textarea>
+  <button id="run">Посчитать</button>
+  <p id="error" class="err"></p>
+  <pre id="out"></pre>
+  <script type="module">
+    import init, { grade, countSolutions, easiestSteps, candidates, chainStep } from "../pkg/sudoku_core.js";
+
+    await init();
+    const $ = id => document.getElementById(id);
+    const timed = fn => { const t = performance.now(); const r = fn(); return [r, performance.now() - t]; };
+
+    $("run").onclick = () => {
+      $("error").textContent = $("out").textContent = "";
+      const g = $("grid").value;
+      try {
+        const [gr, tg] = timed(() => grade(g));
+        const [n, tn] = timed(() => countSolutions(g, 2));
+        const [steps, ts] = timed(() => JSON.parse(easiestSteps(g)));
+        const [chain, tc] = timed(() => JSON.parse(chainStep(candidates(g))));
+        const ms = t => `${t.toFixed(2)} мс`;
+        $("out").textContent = [
+          `grade: ${gr} (${ms(tg)})`,
+          `решений (до 2): ${n} (${ms(tn)})`,
+          `лёгкие шаги: ${steps.length} (${ms(ts)})`,
+          ...steps.slice(0, 5).map(s => "  " + JSON.stringify(s)),
+          `цепочка сразу: ${chain ? chain.technique + " " + JSON.stringify(chain.chain) : "нет"} (${ms(tc)})`,
+        ].join("\n");
+      } catch (e) {
+        $("error").textContent = e.message;
+      }
+    };
+  </script>
+</body>
+</html>
