@@ -67,6 +67,43 @@ pub fn easiest_steps(cands: &Cands) -> Vec<Step> {
     Vec::new()
 }
 
+/// Highest technique tier needed to solve logically (1..4), or 5 if the core can't solve it. Each round places
+/// every single at once, or else applies every step of the lowest tier that has any — as grade() in Python.
+pub fn grade(g: &Grid) -> u8 {
+    let (mut g, mut cands, mut used) = (*g, candidates(g), 1u8);
+    while g.contains(&0) {
+        if (0..81).any(|i| g[i] == 0 && cands[i] == 0) {
+            return 5;
+        }
+        let placements = find_steps(&cands, TIERS[0]);
+        if !placements.is_empty() {
+            for st in placements {
+                let (c, v) = (st.cell.unwrap() as usize, st.value.unwrap());
+                if g[c] == 0 && cands[c] & (1 << v) != 0 {
+                    g[c] = v;
+                    cands[c] = 0;
+                    for &p in &PEERS[c] {
+                        cands[p as usize] &= !(1u16 << v);
+                    }
+                }
+            }
+            continue;
+        }
+        let Some((tier, steps)) =
+            (2..=4u8).map(|t| (t, find_steps(&cands, TIERS[t as usize - 1]))).find(|(_, s)| !s.is_empty())
+        else {
+            return 5;
+        };
+        for st in &steps {
+            for &(c, v) in &st.eliminations {
+                cands[c as usize] &= !(1u16 << v);
+            }
+        }
+        used = used.max(tier);
+    }
+    used
+}
+
 fn naked_singles(cands: &Cands, steps: &mut Vec<Step>) {
     for i in 0..81u8 {
         let c = cands[i as usize];
@@ -352,5 +389,15 @@ mod tests {
             find_steps(&cands, &[Technique::YWing]).into_iter().flat_map(|s| s.eliminations).collect();
         assert!(elims.contains(&(2 * 9 + 4, 9))); // r3c5 sees r1c5 (col) and r3c2 (row)
         assert!(!elims.contains(&(6 * 9 + 6, 9))); // r7c7 sees neither
+    }
+
+    #[test]
+    fn grades() {
+        assert_eq!(grade(&parse(P).unwrap()), 1);
+        assert_eq!(grade(&parse(L2).unwrap()), 2);
+        assert_eq!(grade(&parse(L3).unwrap()), 3);
+        let mut broken = parse(P).unwrap();
+        broken[1] = 1; // duplicate 1 in row 1: r1c1 and r1c2
+        assert_eq!(grade(&broken), 5);
     }
 }
