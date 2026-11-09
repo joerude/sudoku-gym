@@ -10,6 +10,10 @@ pub mod solver;
 
 pub use solver::{count_solutions, solve};
 
+pub mod techniques;
+
+pub use techniques::{candidates, easiest_steps, find_steps};
+
 pub type Grid = [u8; 81]; // 0 = empty
 pub type Cands = [u16; 81];
 
