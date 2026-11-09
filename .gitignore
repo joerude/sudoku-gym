@@ -6,3 +6,8 @@ node_modules/
 
 # design specs and plans — local only
 docs/superpowers/
+
+# Rust core experiment: build output, golden data (from the owner's games), wasm-bindgen output — local only
+core-rs/target/
+core-rs/golden/
+core-rs/pkg/
