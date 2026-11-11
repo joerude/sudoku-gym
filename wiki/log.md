@@ -20,3 +20,8 @@
 
 - Созданы `index.md`, `log.md`, `BACKLOG.md`, `ideas-parking.md`, `templates/` (source, decision, experiment, analysis + доменные из профиля), зона сброса `input/`; блок схемы `claude-setup:wiki` в CLAUDE.md.
 - Параметры: корень `wiki/`, ссылки `md`, порядок лога `append`.
+
+## [2026-11-11] experiment | Дебютные упражнения → темп первой половины партии
+
+- Создан `experiments/2026-11-11-opening-drills.md` (DESIGNED): базлайн по `data/sudoku.db` — medium hardcore без подсказок, 05–09.11, 16 партий: p1 8,34 с/ход, p2 2,54, медиана 5:15.8; тренд без дебютов 12,06 → 8,34.
+- `index.md` (раздел «Решения и эксперименты»), `BACKLOG.md` (старт эксперимента; строка 6,8 в `../progress.md` — по одной партии).
