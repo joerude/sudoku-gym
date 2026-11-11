@@ -10,13 +10,18 @@ from db import connect
 from drills import (
     DRILL_PROMPT,
     DRILL_TECHNIQUES,
+    DRILL_TITLE,
     KIND,
+    OPENING,
+    OPENING_MAX_FILL,
+    SINGLES,
     UNLOCK_MIN_CORRECT,
     attempt,
     explain,
     hint,
     make_drills,
     next_drill,
+    pick_technique,
     reveal,
     technique_list,
     unlocked_tier,
@@ -25,7 +30,7 @@ from fixtures import L2, L3, seed_variants
 from sudoku_core import TECH_TIER, TECH_TITLE, candidates, find_steps, parse
 
 ELIM = [t for t in DRILL_TECHNIQUES if KIND[t] == "eliminate"]
-PLACE = [t for t in DRILL_TECHNIQUES if KIND[t] == "place"]
+PLACE = [t for t in DRILL_TECHNIQUES if KIND[t] == "place" and t != OPENING]
 
 
 def seeded_conn():
@@ -64,11 +69,15 @@ def sub(d, keys):
 
 class ConstantsTest(unittest.TestCase):
     def test_techniques_and_kinds(self):
-        self.assertEqual(DRILL_TECHNIQUES, list(TECH_TIER))
-        self.assertEqual(len(DRILL_TECHNIQUES), 10)
+        self.assertEqual(DRILL_TECHNIQUES, [*PLACE, OPENING, *ELIM])
+        self.assertEqual([t for t in DRILL_TECHNIQUES if t != OPENING], list(TECH_TIER))
+        self.assertEqual(len(DRILL_TECHNIQUES), 11)
         self.assertEqual(PLACE, ["naked_single", "hidden_single_box", "hidden_single_row", "hidden_single_col"])
+        self.assertEqual(SINGLES, PLACE)
+        self.assertEqual(KIND[OPENING], "place")
         self.assertEqual(KIND["pointing"], "eliminate")
         self.assertEqual(KIND["y_wing"], "eliminate")
+        self.assertEqual(DRILL_TITLE[OPENING], "Дебют")
 
     def test_prompts(self):
         self.assertEqual(set(DRILL_PROMPT), set(DRILL_TECHNIQUES))
@@ -78,6 +87,7 @@ class ConstantsTest(unittest.TestCase):
         self.assertIn("в столбце", DRILL_PROMPT["hidden_single_col"])
         self.assertEqual(DRILL_PROMPT["pointing"], "Найди кандидата, которого убирает указывающая пара (pointing)")
         self.assertIn("X-Wing", DRILL_PROMPT["x_wing"])
+        self.assertEqual(DRILL_PROMPT[OPENING], "Начало партии: найди любую одиночку")
 
 
 class MakeDrillsTest(unittest.TestCase):
@@ -100,11 +110,14 @@ class MakeDrillsTest(unittest.TestCase):
             self.assertEqual(per[t], 5, t)
         for t in DRILL_TECHNIQUES:
             self.assertLessEqual(per[t], 5, t)
+        self.assertGreaterEqual(per[OPENING], 1)
 
     def test_levels(self):
         for r in self.rows:
             level = self.levels[r["puzzle_id"]]
-            if r["kind"] == "place":
+            if r["technique"] == OPENING:
+                self.assertIn(level, ("medium", "hard"))
+            elif r["kind"] == "place":
                 self.assertIn(level, ("easy", "medium"))
             elif level == "expert":
                 self.assertEqual(TECH_TIER[r["technique"]], 4)
@@ -121,7 +134,7 @@ class MakeDrillsTest(unittest.TestCase):
                     self.assertEqual(board[i], sol[i])
 
     def test_place_answers(self):
-        rows = [r for r in self.rows if r["kind"] == "place"]
+        rows = [r for r in self.rows if r["kind"] == "place" and r["technique"] != OPENING]
         self.assertTrue(rows)
         for r in rows:
             board, sol, givens = r["board"], r["solution"], r["givens"]
@@ -153,7 +166,27 @@ class MakeDrillsTest(unittest.TestCase):
             self.assertTrue(1 <= len(steps) <= 3, steps)
             self.assertEqual({(c, v) for s in steps for c, v in s.eliminations}, {tuple(a) for a in answers})
             # the position is stuck on singles
-            self.assertEqual(find_steps(g, fresh, PLACE), [])
+            self.assertEqual(find_steps(g, fresh, SINGLES), [])
+
+    def test_opening_answers(self):
+        rows = [r for r in self.rows if r["technique"] == OPENING]
+        self.assertTrue(rows)
+        self.assertEqual(len({r["puzzle_id"] for r in rows}), len(rows))  # one per puzzle
+        for r in rows:
+            board, sol, givens = r["board"], r["solution"], r["givens"]
+            answers = json.loads(r["answers"])
+            self.assertTrue(1 <= len(answers) <= 3, answers)
+            self.assertEqual(answers, sorted(answers))
+            for cell, value in answers:
+                self.assertEqual(board[cell], "0")
+                self.assertEqual(int(sol[cell]), value)
+            # every single on the board is an answer, and nothing else
+            steps = find_steps(parse(board), techniques=SINGLES)
+            self.assertEqual({(s.cell, s.value) for s in steps}, {tuple(a) for a in answers})
+            empty0 = givens.count("0")
+            filled = empty0 - board.count("0")
+            self.assertGreaterEqual(filled, 0)
+            self.assertLessEqual(filled, empty0 * OPENING_MAX_FILL // 100)
 
     def test_deterministic(self):
         conn2, _ = seeded_conn()
@@ -192,6 +225,12 @@ class MakeDrillsTest(unittest.TestCase):
                 "mastered": False,
             },
         )
+        op = next(x for x in lst if x["technique"] == OPENING)
+        self.assertEqual(
+            sub(op, ["title", "kind", "tier", "unlocked", "theory"]),
+            {"title": "Дебют", "kind": "place", "tier": 1, "unlocked": True, "theory": None},
+        )
+        self.assertGreaterEqual(op["n"], 1)
         self.assertEqual(next(x for x in lst if x["technique"] == "pointing")["kind"], "eliminate")
         with closing(connect(":memory:")) as conn:
             self.assertEqual(technique_list(conn)[0]["n"], 0)
@@ -320,6 +359,34 @@ class NextDrillTest(unittest.TestCase):
         self.assertEqual((e["technique"], e["kind"]), ("naked_pair", "eliminate"))
         with self.assertRaises(ValueError):
             next_drill(self.conn, "swordfish")
+
+    def test_opening_is_explicit_only(self):
+        d = next_drill(self.conn, OPENING)
+        self.assertEqual((d["technique"], d["kind"], d["title"]), (OPENING, "place", "Дебют"))
+        self.assertEqual(d["prompt"], DRILL_PROMPT[OPENING])
+        for _ in range(100):
+            self.assertNotEqual(next_drill(self.conn, "random")["technique"], OPENING)
+        # never attempted, yet the adaptive choice does not offer it
+        self.assertNotEqual(pick_technique(self.conn), OPENING)
+        # the slowest by far, still not offered
+        self.tried_all(OPENING, [60000] * UNLOCK_MIN_CORRECT)
+        self.assertNotEqual(pick_technique(self.conn), OPENING)
+
+    def test_opening_does_not_gate_tiers(self):
+        self.master(PLACE)
+        self.assertEqual(unlocked_tier(self.conn), 2)  # tier 2 opens without a single opening attempt
+        add_attempts(self.conn, OPENING, [], n_wrong=UNLOCK_MIN_CORRECT)
+        self.assertEqual(unlocked_tier(self.conn), 2)
+
+    def test_opening_any_answer_counts(self):
+        did, answers = self.conn.execute(
+            "SELECT id, answers FROM drills WHERE technique = ? ORDER BY id LIMIT 1", (OPENING,)
+        ).fetchone()
+        for c, v in json.loads(answers):
+            r = attempt(self.conn, did, 5000, c, v)
+            self.assertTrue(r["correct"])
+            self.assertTrue(r["explanation"])
+            self.assertIsNone(r["theory"])
 
     def test_random_only_unlocked(self):
         seen = {next_drill(self.conn, "random")["technique"] for _ in range(100)}

@@ -15,8 +15,17 @@ from db import is_favorite, now_iso
 from i18n import tr
 from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, candidates, find_steps, parse, to_str
 
-DRILL_TECHNIQUES = list(TECH_TIER)
-KIND = {t: "place" if TECH_TIER[t] == 1 else "eliminate" for t in DRILL_TECHNIQUES}
+OPENING = "opening"  # a pseudo-technique: any single on a nearly empty board, as at the start of a game
+SINGLES = [t for t in TECH_TIER if TECH_TIER[t] == 1]
+ELIMINATORS = [t for t in TECH_TIER if TECH_TIER[t] > 1]
+DRILL_TECHNIQUES = [*SINGLES, OPENING, *ELIMINATORS]
+DRILL_TIER = {**TECH_TIER, OPENING: 1}
+DRILL_TITLE = {**TECH_TITLE, OPENING: "Дебют"}
+KIND = {t: "place" if DRILL_TIER[t] == 1 else "eliminate" for t in DRILL_TECHNIQUES}
+# chosen by hand only: an opening scans the whole board, so by time it would always be the adaptive pick,
+# and it must not lock a tier that is already open
+EXPLICIT_ONLY = [OPENING]
+OPENING_MAX_FILL = 15  # an opening drill has at most this % of the puzzle's empty cells filled
 _PROMPTS = {
     "naked_single": "Найди клетку, где остался один кандидат (naked single)",
     "hidden_single_box": "Найди скрытую одиночку (hidden single) в блоке",
@@ -28,17 +37,16 @@ _PROMPTS = {
     "hidden_pair": "Найди кандидата, которого убирает скрытая пара (hidden pair)",
     "x_wing": "Найди кандидата, которого убирает X-Wing",
     "y_wing": "Найди кандидата, которого убирает Y-Wing",
+    OPENING: "Начало партии: найди любую одиночку",
 }
-DRILL_PROMPT = {t: _PROMPTS.get(t, f"Найди ход: {TECH_TITLE.get(t, t)}") for t in DRILL_TECHNIQUES}
+DRILL_PROMPT = {t: _PROMPTS.get(t, f"Найди ход: {DRILL_TITLE.get(t, t)}") for t in DRILL_TECHNIQUES}
 
 
 def drill_prompt(t: str) -> str:
     """DRILL_PROMPT in the request's language."""
-    return tr(_PROMPTS[t]) if t in _PROMPTS else tr("Найди ход: {title}", title=tr(TECH_TITLE.get(t, t)))
+    return tr(_PROMPTS[t]) if t in _PROMPTS else tr("Найди ход: {title}", title=tr(DRILL_TITLE.get(t, t)))
 
 
-SINGLES = [t for t in DRILL_TECHNIQUES if TECH_TIER[t] == 1]
-ELIMINATORS = [t for t in DRILL_TECHNIQUES if TECH_TIER[t] > 1]
 MAX_TIER = max(TECH_TIER.values())
 RECENT_EXCLUDE = 50  # drills attempted most recently are not shown again
 MEDIAN_WINDOW = 10  # last N correct attempts for the speed median
@@ -68,13 +76,13 @@ def _place(g, cands, cell, value):
         cands[p].discard(value)
 
 
-def _place_position(givens: str, rng: random.Random):
-    """Walk a singles-only solve one random step at a time; stop at a random 20–80% fill point.
+def _singles_walk(givens: str, rng: random.Random, lo_pct: int, hi_pct: int):
+    """Walk a singles-only solve one random step at a time; stop at a random lo–hi % fill point of the empty cells.
 
     Returns the grid, or None if the singles walk stalls before the target."""
     g = parse(givens)
     empty = g.count(0)
-    lo, hi = -(-empty * 20 // 100), empty * 80 // 100
+    lo, hi = -(-empty * lo_pct // 100), empty * hi_pct // 100
     if empty == 0 or lo > hi:
         return None
     target = rng.randint(lo, hi)
@@ -129,8 +137,9 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
     """Generate drills until each technique has per_technique of them (rare ones may get fewer).
 
     place drills come from easy/medium puzzles, eliminate drills from medium/hard puzzles (expert too for
-    the top tier). Existing drills count towards the quota and identical (technique, board) pairs are
-    skipped, so re-running only tops up. Returns the number of rows inserted."""
+    the top tier); opening drills come from medium/hard puzzles a few singles in. Existing drills count towards
+    the quota and identical (technique, board) pairs are skipped, so re-running only tops up. Returns the number
+    of rows inserted."""
     rng = random.Random(seed)
     deadline = time.monotonic() + max_seconds
     have = dict.fromkeys(DRILL_TECHNIQUES, 0)
@@ -165,7 +174,7 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
         need = [t for t in SINGLES if have[t] < per_technique]
         if not need or time.monotonic() > deadline:
             break
-        g = _place_position(givens, rng)
+        g = _singles_walk(givens, rng, 20, 80)
         if g is None:
             continue
         cands, board = candidates(g), to_str(g)
@@ -173,6 +182,18 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
             pairs = _answers(t, find_steps(g, cands, [t]))
             if 1 <= len(pairs) <= 3 and (t, board) not in seen and all(int(solution[c]) == v for c, v in pairs):
                 store(t, pid, board, pairs)
+
+    # opening drills: a medium/hard puzzle at most OPENING_MAX_FILL % in, with 1–3 singles of any kind; one per puzzle
+    for pid, _, givens, solution in pool(("medium", "hard")):
+        if have[OPENING] >= per_technique or time.monotonic() > deadline:
+            break
+        g = _singles_walk(givens, rng, 0, OPENING_MAX_FILL)
+        if g is None:
+            continue
+        board = to_str(g)
+        pairs = _answers(OPENING, find_steps(g, candidates(g), SINGLES))
+        if 1 <= len(pairs) <= 3 and (OPENING, board) not in seen and all(int(solution[c]) == v for c, v in pairs):
+            store(OPENING, pid, board, pairs)
 
     # eliminate drills: one per technique per puzzle, taken at the first stuck point where it fits
     # (grade-1 puzzles never get stuck on singles, so they are skipped)
@@ -253,11 +274,12 @@ def mastery(conn, technique: str) -> dict:
 
 
 def unlocked_tier(conn) -> int:
-    """Tiers open one by one: tier N+1 unlocks once every technique of tier N with drills is mastered."""
-    have = set(available_techniques(conn))
+    """Tiers open one by one: tier N+1 unlocks once every technique of tier N with drills is mastered
+    (EXPLICIT_ONLY ones do not count)."""
+    have = set(available_techniques(conn)) - set(EXPLICIT_ONLY)
     tier = 1
     while tier < MAX_TIER:
-        techs = [t for t in DRILL_TECHNIQUES if TECH_TIER[t] == tier and t in have]
+        techs = [t for t in DRILL_TECHNIQUES if DRILL_TIER[t] == tier and t in have]
         if not all(mastery(conn, t)["mastered"] for t in techs):
             break
         tier += 1
@@ -265,8 +287,9 @@ def unlocked_tier(conn) -> int:
 
 
 def unlocked_techniques(conn) -> list:
+    """The adaptive and random choice: unlocked techniques with drills, EXPLICIT_ONLY left out."""
     top = unlocked_tier(conn)
-    return [t for t in available_techniques(conn) if TECH_TIER[t] <= top]
+    return [t for t in available_techniques(conn) if DRILL_TIER[t] <= top and t not in EXPLICIT_ONLY]
 
 
 def pick_technique(conn) -> str | None:
@@ -318,7 +341,7 @@ def next_drill(conn, technique: str | None = None) -> dict | None:
         "technique": row[1],
         "kind": row[2],
         "prompt": drill_prompt(row[1]),
-        "title": tr(TECH_TITLE[row[1]]),
+        "title": tr(DRILL_TITLE[row[1]]),
         "board": board,
         "candidates": [sorted(c) for c in candidates(parse(board))],
         "fav": is_favorite(conn, "drill", row[0]),
@@ -396,7 +419,7 @@ def hint(conn, drill_id: int) -> dict | None:
         return None
     steps, cands = _steps(row[0], row[4], json.loads(row[1]))
     if not steps:
-        return {"hint": tr("Ищи: {title}.", title=tr(TECH_TITLE[row[4]])), "unit": None, "digit": None, "cells": []}
+        return {"hint": tr("Ищи: {title}.", title=tr(DRILL_TITLE[row[4]])), "unit": None, "digit": None, "cells": []}
     return hint_step(steps[0], cands)
 
 
@@ -407,11 +430,11 @@ def technique_list(conn) -> list:
     return [
         {
             "technique": t,
-            "title": tr(TECH_TITLE[t]),
+            "title": tr(DRILL_TITLE[t]),
             "kind": KIND[t],
-            "tier": TECH_TIER[t],
+            "tier": DRILL_TIER[t],
             "n": counts.get(t, 0),
-            "unlocked": TECH_TIER[t] <= top,
+            "unlocked": DRILL_TIER[t] <= top,
             "theory": THEORY_SLUG.get(t),
             **mastery(conn, t),
         }
@@ -634,12 +657,14 @@ def hint_step(s, cands) -> dict:
 
 
 def _steps(board: str, technique: str, answers: list):
-    """Steps of `technique` on the board that give one of the answers, and the board's candidates."""
+    """Steps of `technique` (any single for an opening) on the board that give one of the answers, and the board's
+    candidates."""
     g = parse(board)
     cands = candidates(g)
     want = {tuple(a) for a in answers}
+    techniques = SINGLES if technique == OPENING else [technique]
     return [
-        s for s in find_steps(g, cands, [technique]) if (s.cell, s.value) in want or want & set(s.eliminations)
+        s for s in find_steps(g, cands, techniques) if (s.cell, s.value) in want or want & set(s.eliminations)
     ], cands
 
 

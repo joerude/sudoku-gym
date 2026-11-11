@@ -21,6 +21,7 @@ from analysis import (
     stats,
 )
 from db import connect
+from drills import DRILL_TECHNIQUES
 from fixtures import L1, insert_puzzle
 from sudoku_core import TECH_TIER, TECH_TITLE, parse, to_str, unit_name
 
@@ -305,16 +306,20 @@ class StatsTest(unittest.TestCase):
 
     def test_techniques(self):
         techs = stats(self.conn)["techniques"]
-        self.assertEqual([t["technique"] for t in techs], list(TECH_TIER))
+        self.assertEqual([t["technique"] for t in techs], DRILL_TECHNIQUES)
         ns = techs[0]
         self.assertEqual(ns["title"], TECH_TITLE["naked_single"])
         self.assertEqual((ns["n"], ns["median_ms"], ns["kind"], ns["tier"]), (3, 4000, "place", 1))
         self.assertEqual(
-            [t["theory"] for t in techs[:5]], ["naked-single", *["hidden-single"] * 3, "pointing-claiming"]
+            [t["theory"] for t in techs[:6]], ["naked-single", *["hidden-single"] * 3, None, "pointing-claiming"]
         )
         self.assertAlmostEqual(ns["accuracy"], 2 / 3)
+        op = techs[4]
         self.assertEqual(
-            (techs[4]["technique"], techs[4]["n"], techs[4]["median_ms"], techs[4]["accuracy"]),
+            (op["technique"], op["title"], op["kind"], op["tier"], op["n"]), ("opening", "Дебют", "place", 1, 0)
+        )
+        self.assertEqual(
+            (techs[5]["technique"], techs[5]["n"], techs[5]["median_ms"], techs[5]["accuracy"]),
             ("pointing", 0, None, None),
         )
 
