@@ -6,7 +6,8 @@ import { icon, setLabel } from "./icons.js";
 import { TIER_NAME, alignSideToBoard, createFav, errorBox, h, ignoreKey, keyTrace, pct, sec, zenButton } from "./ui.js";
 
 const UNLOCK = 15;  // drills.UNLOCK_MIN_CORRECT
-const progress = t => t.mastered ? "✓" : t.unlocked ? `${Math.min(t.correct, UNLOCK)}/${UNLOCK}` : "";
+// an explicit-only technique (opening) unlocks nothing, so it gets no «n/15 → ✓» counter
+const progress = t => t.explicit ? "" : t.mastered ? "✓" : t.unlocked ? `${Math.min(t.correct, UNLOCK)}/${UNLOCK}` : "";
 
 let choice = "adaptive";  // 'adaptive' | 'random' | 'favorites' | slug
 let showCands = false;     // place drills only; eliminate drills always show candidates
@@ -108,7 +109,8 @@ export function mount(el, params, query) {
     // t — a technique row; count — a plain number to show instead (the favourites chip)
     const chip = (key, label, t, count) => h("button", { type: "button", class: choice === key ? "on" : "", "data-tech": key,
       "aria-pressed": choice === key, disabled: t?.n === 0 || (count === 0 && choice !== key),
-      title: t && !t.unlocked ? tr("Ещё не открыта в адаптивном режиме, но потренировать можно")
+      title: t?.explicit ? tr("Только по выбору: в адаптивный и случайный режим не входит и тиры не открывает")
+        : t && !t.unlocked ? tr("Ещё не открыта в адаптивном режиме, но потренировать можно")
         : count !== undefined ? tr("Только упражнения, отмеченные ★ (клавиша F)") : null,
       onclick: () => { choice = key; renderChips(); load(); } },
       t && !t.unlocked ? icon("lock") : null, label,
