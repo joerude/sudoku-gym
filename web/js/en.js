@@ -140,6 +140,7 @@ export default {
   " — zen-режим (": " — zen mode (",
   " — выйти).": " — leave).",
   "Ещё не открыта в адаптивном режиме, но потренировать можно": "Not unlocked in adaptive mode yet, but you can practise it",
+  "Только по выбору: в адаптивный и случайный режим не входит и тиры не открывает": "By choice only: not in adaptive or random mode, and it unlocks no tiers",
   "Только упражнения, отмеченные ★ (клавиша F)": "Only drills marked ★ (key F)",
   "Адаптивно": "Adaptive",
   "Случайная": "Random",

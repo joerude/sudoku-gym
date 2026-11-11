@@ -435,7 +435,8 @@ def hint(conn, drill_id: int) -> dict | None:
 
 
 def technique_list(conn) -> list:
-    """[{technique, title, kind, tier, n, unlocked, theory, correct, accuracy, mastered}] for every drill technique."""
+    """[{technique, title, kind, tier, n, unlocked, explicit, theory, correct, accuracy, mastered}] for every
+    drill technique (explicit: EXPLICIT_ONLY, chosen by hand only)."""
     counts = dict(conn.execute("SELECT technique, COUNT(*) FROM drills GROUP BY technique").fetchall())
     top = unlocked_tier(conn)
     return [
@@ -446,6 +447,7 @@ def technique_list(conn) -> list:
             "tier": DRILL_TIER[t],
             "n": counts.get(t, 0),
             "unlocked": DRILL_TIER[t] <= top,
+            "explicit": t in EXPLICIT_ONLY,
             "theory": THEORY_SLUG.get(t),
             **mastery(conn, t),
         }

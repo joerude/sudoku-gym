@@ -229,6 +229,7 @@ class MakeDrillsTest(unittest.TestCase):
                 "tier": 1,
                 "n": 5,
                 "unlocked": True,
+                "explicit": False,
                 "theory": "naked-single",
                 "correct": 0,
                 "accuracy": None,
@@ -237,8 +238,8 @@ class MakeDrillsTest(unittest.TestCase):
         )
         op = next(x for x in lst if x["technique"] == OPENING)
         self.assertEqual(
-            sub(op, ["title", "kind", "tier", "unlocked", "theory"]),
-            {"title": "Дебют", "kind": "place", "tier": 1, "unlocked": True, "theory": None},
+            sub(op, ["title", "kind", "tier", "unlocked", "explicit", "theory"]),
+            {"title": "Дебют", "kind": "place", "tier": 1, "unlocked": True, "explicit": True, "theory": None},
         )
         self.assertGreaterEqual(op["n"], 1)
         self.assertEqual(next(x for x in lst if x["technique"] == "pointing")["kind"], "eliminate")
