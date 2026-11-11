@@ -206,6 +206,15 @@ class MakeDrillsTest(unittest.TestCase):
         self.assertEqual(make_drills(conn2, per_technique=2, seed=1), 0)
         self.assertEqual(conn2.execute("SELECT COUNT(*) FROM drills").fetchone()[0], n)
 
+    def test_opening_one_per_puzzle_across_top_ups(self):
+        conn2, _ = seeded_conn()
+        self.addCleanup(conn2.close)
+        for per_technique, seed in ((2, 1), (5, 2), (8, 3)):
+            make_drills(conn2, per_technique=per_technique, seed=seed)
+        pids = [r[0] for r in conn2.execute("SELECT puzzle_id FROM drills WHERE technique = ?", (OPENING,))]
+        self.assertGreater(len(pids), 2)
+        self.assertEqual(len(pids), len(set(pids)))
+
     def test_technique_list(self):
         lst = technique_list(self.conn)
         self.assertEqual([x["technique"] for x in lst], DRILL_TECHNIQUES)

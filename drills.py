@@ -76,7 +76,7 @@ def _place(g, cands, cell, value):
         cands[p].discard(value)
 
 
-def _singles_walk(givens: str, rng: random.Random, lo_pct: int, hi_pct: int):
+def _singles_walk(givens: str, rng: random.Random, lo_pct: int, hi_pct: int) -> list[int] | None:
     """Walk a singles-only solve one random step at a time; stop at a random lo–hi % fill point of the empty cells.
 
     Returns the grid, or None if the singles walk stalls before the target."""
@@ -144,10 +144,13 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
     deadline = time.monotonic() + max_seconds
     have = dict.fromkeys(DRILL_TECHNIQUES, 0)
     seen = set()
-    for t, board in conn.execute("SELECT technique, board FROM drills"):
+    opened = set()  # puzzles that already have an opening drill
+    for t, board, pid in conn.execute("SELECT technique, board, puzzle_id FROM drills"):
         if t in have:
             have[t] += 1
         seen.add((t, board))
+        if t == OPENING:
+            opened.add(pid)
     added = 0
 
     def store(t, pid, board, pairs):
@@ -187,6 +190,8 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
     for pid, _, givens, solution in pool(("medium", "hard")):
         if have[OPENING] >= per_technique or time.monotonic() > deadline:
             break
+        if pid in opened:
+            continue
         g = _singles_walk(givens, rng, 0, OPENING_MAX_FILL)
         if g is None:
             continue
@@ -194,6 +199,7 @@ def make_drills(conn, per_technique: int = 150, seed: int = 1, max_seconds: floa
         pairs = _answers(OPENING, find_steps(g, candidates(g), SINGLES))
         if 1 <= len(pairs) <= 3 and (OPENING, board) not in seen and all(int(solution[c]) == v for c, v in pairs):
             store(OPENING, pid, board, pairs)
+            opened.add(pid)
 
     # eliminate drills: one per technique per puzzle, taken at the first stuck point where it fits
     # (grade-1 puzzles never get stuck on singles, so they are skipped)
