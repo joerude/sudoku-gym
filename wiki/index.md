@@ -31,4 +31,4 @@ _(пока пусто)_
 
 ## Решения и эксперименты
 
-- [experiments/2026-11-11-opening-drills.md](experiments/2026-11-11-opening-drills.md) — DESIGNED: ежедневные дебютные упражнения → темп первой половины партий medium hardcore; базлайн 8,34 с/ход (16 партий 05–09.11), успех ≤ 6,5.
+- [experiments/2026-11-11-opening-drills.md](experiments/2026-11-11-opening-drills.md) — RUNNING 11–24.11: ежедневные дебютные упражнения → темп первой половины партий medium hardcore; базлайн 8,34 с/ход (16 партий 05–09.11), успех ≤ 6,5.
