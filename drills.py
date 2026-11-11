@@ -253,6 +253,11 @@ def available_techniques(conn) -> list:
     return [t for t in DRILL_TECHNIQUES if t in have]
 
 
+def drills_missing(conn) -> bool:
+    """True when some drill technique has no drills: a new database, or a technique added since its drills were made."""
+    return not set(DRILL_TECHNIQUES) <= set(available_techniques(conn))
+
+
 def mastery(conn, technique: str) -> dict:
     """{correct, accuracy, mastered}: total correct answers and accuracy over the last ERROR_WINDOW attempts.
 

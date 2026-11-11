@@ -17,6 +17,7 @@ from drills import (
     SINGLES,
     UNLOCK_MIN_CORRECT,
     attempt,
+    drills_missing,
     explain,
     hint,
     make_drills,
@@ -243,6 +244,24 @@ class MakeDrillsTest(unittest.TestCase):
         self.assertEqual(next(x for x in lst if x["technique"] == "pointing")["kind"], "eliminate")
         with closing(connect(":memory:")) as conn:
             self.assertEqual(technique_list(conn)[0]["n"], 0)
+
+
+class DrillsMissingTest(unittest.TestCase):
+    def test_a_technique_without_drills_is_topped_up_alone(self):
+        conn, _ = seeded_conn()
+        self.addCleanup(conn.close)
+        self.assertTrue(drills_missing(conn))  # an empty table
+        make_drills(conn, per_technique=3, seed=5)
+        present = {r[0] for r in conn.execute("SELECT DISTINCT technique FROM drills")}
+        self.assertEqual(drills_missing(conn), present != set(DRILL_TECHNIQUES))
+        self.assertIn(OPENING, present)
+        others = "SELECT technique, board, answers FROM drills WHERE technique != ? ORDER BY id"
+        before = [tuple(r) for r in conn.execute(others, (OPENING,))]
+        conn.execute("DELETE FROM drills WHERE technique = ?", (OPENING,))
+        self.assertTrue(drills_missing(conn))
+        self.assertGreater(make_drills(conn, per_technique=3, seed=5), 0)
+        self.assertIn(OPENING, {r[0] for r in conn.execute("SELECT DISTINCT technique FROM drills")})
+        self.assertEqual([tuple(r) for r in conn.execute(others, (OPENING,))], before)  # the others are untouched
 
 
 class AttemptTest(unittest.TestCase):
