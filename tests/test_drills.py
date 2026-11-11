@@ -406,6 +406,15 @@ class NextDrillTest(unittest.TestCase):
         add_attempts(self.conn, OPENING, [], n_wrong=UNLOCK_MIN_CORRECT)
         self.assertEqual(unlocked_tier(self.conn), 2)
 
+    def test_opening_hint_does_not_give_the_answer(self):
+        did, answers = self.conn.execute(
+            "SELECT id, answers FROM drills WHERE technique = ? ORDER BY id LIMIT 1", (OPENING,)
+        ).fetchone()
+        h = hint(self.conn, did)
+        self.assertTrue(h["hint"])
+        for c, _ in json.loads(answers):
+            self.assertNotIn(f"r{c // 9 + 1}c{c % 9 + 1}", h["hint"])
+
     def test_opening_any_answer_counts(self):
         did, answers = self.conn.execute(
             "SELECT id, answers FROM drills WHERE technique = ? ORDER BY id LIMIT 1", (OPENING,)

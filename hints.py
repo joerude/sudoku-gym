@@ -4,7 +4,7 @@ right digit and let eliminations the player already made count as done."""
 
 import json
 
-from drills import THEORY_SLUG, cells_text, chain_text, explain_step, hint_step, in_unit, rc
+from drills import DRILL_TIER, DRILL_TITLE, THEORY_SLUG, cells_text, chain_text, explain_step, hint_step, in_unit, rc
 from drills import _steps as _drill_steps
 from i18n import tr
 from sudoku_core import BOX_OF, PEERS, TECH_TIER, TECH_TITLE, UNITS, Step, candidates, chain_step, easiest_steps, parse
@@ -114,7 +114,7 @@ def _ladder(kind, levels, technique=None, title=None):
     return {
         "kind": kind,
         "technique": technique,
-        "title": title or tr(TECH_TITLE[technique]),
+        "title": title or tr(DRILL_TITLE[technique]),
         "theory": THEORY_SLUG.get(technique),
         "max_level": len(levels),
         "levels": levels,
@@ -190,7 +190,7 @@ def drill_example(conn, technique: str, n: int = 0) -> dict | None:
             "count": len(rows),
             "board": board,
             "cands": masks(cands),
-            "tier": TECH_TIER[technique],
+            "tier": DRILL_TIER[technique],
         }
     return None
 
