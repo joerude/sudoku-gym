@@ -102,10 +102,10 @@ def main():
             added = import_level(conn, bank_file, level, args.n)
             print(f"{level}: +{added}", flush=True)
     try:
-        from drills import make_drills
+        from drills import drills_missing, make_drills
     except ImportError:
         make_drills = None
-    if make_drills and not conn.execute("SELECT 1 FROM drills LIMIT 1").fetchone():
+    if make_drills and drills_missing(conn):
         print(f"drills: +{make_drills(conn)}", flush=True)
     print(f"theory: {seed_theory(conn)}", flush=True)
 

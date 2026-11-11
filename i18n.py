@@ -34,6 +34,7 @@ EN = {
     "Скрытая пара (Hidden Pair)": "Hidden Pair",
     "Цепочка по цифре (X-Chain)": "X-Chain",
     "Цепочка (AIC)": "Chain (AIC)",
+    "Дебют": "Opening",
     "одиночки": "singles",
     "+ пары": "+ pairs",
     "сложнее": "harder",
@@ -51,6 +52,7 @@ EN = {
     "Найди кандидата, которого убирает скрытая пара (hidden pair)": "Find a candidate removed by a hidden pair",
     "Найди кандидата, которого убирает X-Wing": "Find a candidate removed by an X-Wing",
     "Найди кандидата, которого убирает Y-Wing": "Find a candidate removed by a Y-Wing",
+    "Начало партии: найди любую одиночку": "Start of the game: find any single",
     "Найди ход: {title}": "Find the move: {title}",
     # drill explanations and hints (drills)
     "строке {n}": "row {n}",
