@@ -847,6 +847,19 @@ try {
   await page.waitForSelector("#drillMsg.ok");
   ok(true, "eliminate drill: cell + keyboard digit answers");
 
+  // opening has no theory page: the explanation ends with its text, not with a stray "null"
+  rp = drillResp();
+  await page.click('#picker button[data-tech="opening"]');
+  d = await (await rp).json();
+  inf = info(d.id);
+  const [opc, opv] = inf.answers[0];
+  await page.click(`#drillBoard .cell[data-cell="${opc}"]`);
+  await page.locator("body").press(`Digit${opv}`);
+  await page.waitForSelector("#drillMsg.ok");
+  const owhy = await page.textContent("#drillWhy");
+  ok(/Почему:/.test(owhy) && !/null|undefined/.test(owhy) && await page.$$eval("#drillWhy a", els => els.length) === 0,
+    "opening drill: explanation without a theory link and without «null»", owhy);
+
   // focus: a mouse click on a checkbox or chip must not swallow digits / Space (Firefox on Linux keeps focus)
   rp = drillResp();
   await page.click('#picker button[data-tech="hidden_single_row"]');
