@@ -265,8 +265,9 @@ export function mount(el, params, query) {
   function showWhy(res) {
     if (!res.explanation) return;
     why.textContent = "";
-    why.append(h("b", {}, tr("Почему: ")), res.explanation, " ",
-      res.theory ? h("a", { href: `#/theory/${res.theory}` }, tr("Теория →")) : null);
+    why.append(h("b", {}, tr("Почему: ")), res.explanation);
+    // Element.append() turns null into the text "null", so a technique without a theory page (opening) adds nothing
+    if (res.theory) why.append(" ", h("a", { href: `#/theory/${res.theory}` }, tr("Теория →")));
     why.hidden = false;
   }
 
